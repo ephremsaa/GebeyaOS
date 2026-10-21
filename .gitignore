@@ -1,8 +1,48 @@
-node_modules/
 dist/
-coverage/
-*.log
+**/dist/
+apps/branch-server/dist/
+apps/hq-server/dist/
+apps/pos-web/dist/
+apps/pos-web/build/
+
+# Packages
+packages/*/dist/
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment variables
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# Runtime and logs
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# Backups and local databases
 backups/*.sql.gz
 backups/*.log
+backups/*.tar
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# OS and Editor files
 .DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+.idea/
