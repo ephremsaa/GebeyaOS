@@ -4,6 +4,7 @@ export * from './inventory.types';
 export * from './pos.types';
 export * from './purchasing.types';
 export * from './transfer.types';
+export * from './reports.types';
 export * from './pricing-calculator';
 export * from './barcode-parser';
 export * from './fefo-allocator';
