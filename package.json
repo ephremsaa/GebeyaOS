@@ -8,6 +8,10 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm run dev -w apps/pos-web",
+    "dev:pos": "npm run dev -w apps/pos-web",
+    "dev:branch": "npm run start:dev -w apps/branch-server",
+    "dev:hq": "npm run start:dev -w apps/hq-server",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },

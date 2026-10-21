@@ -20,7 +20,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3001;
   await app.listen(port);
   logger.log(`GebeyaOS Branch LAN Server listening on port ${port}`);
 }
