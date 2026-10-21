@@ -125,3 +125,35 @@ export class PricingCalculator {
     };
   }
 }
+
+/**
+ * Calculates Ethiopian tax-inclusive breakdown for a net total amount.
+ */
+export function calculatePricing(
+  netTotal: number,
+  isVatApplicable: boolean,
+  vatRate = 0.15,
+): {
+  taxableSubtotal: number;
+  taxAmount: number;
+  taxExemptSubtotal: number;
+  total: number;
+} {
+  const r4 = (n: number) => Number(n.toFixed(4));
+  if (isVatApplicable && vatRate > 0) {
+    const taxableSubtotal = r4(netTotal / (1 + vatRate));
+    const taxAmount = r4(netTotal - taxableSubtotal);
+    return {
+      taxableSubtotal,
+      taxAmount,
+      taxExemptSubtotal: 0,
+      total: netTotal,
+    };
+  }
+  return {
+    taxableSubtotal: 0,
+    taxAmount: 0,
+    taxExemptSubtotal: netTotal,
+    total: netTotal,
+  };
+}
