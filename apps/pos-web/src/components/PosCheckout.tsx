@@ -1,24 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Search,
-  Barcode,
-  Trash2,
-  Plus,
-  Minus,
-  ShoppingCart,
-  CreditCard,
-  Scale,
-} from 'lucide-react';
+import { Search, Scale, Sparkles } from 'lucide-react';
 import { SAMPLE_PRODUCTS, SAMPLE_CATEGORIES, SampleProduct } from '../sample-data';
 import {
   BarcodeParser,
-  calculatePricing,
   formatEscPosThermalReceipt,
   generateReceiptNumber,
-  PaymentMethod,
 } from '@gebeyaos/shared-types';
-import { PaymentModal } from './PaymentModal';
+import { useI18n } from '../i18n/I18nContext';
+import { Pill } from './ui/Pill';
+import { Card } from './ui/Card';
+import { BasketPanel } from './BasketPanel';
+import { WeightModal } from './WeightModal';
+import { PaymentModal, PaymentMethodType } from './PaymentModal';
 import { ReceiptModal } from './ReceiptModal';
+import { playScanBeep } from '../utils/sound';
 
 export interface CartItem {
   product: SampleProduct;
@@ -31,43 +26,59 @@ export interface CartItem {
 }
 
 export const PosCheckout: React.FC = () => {
+  const { language, t, formatCurrency } = useI18n();
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [heldCart, setHeldCart] = useState<CartItem[] | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
+
+  // Modals state
+  const [weighedProduct, setWeighedProduct] = useState<SampleProduct | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState<boolean>(false);
+  const [completedReceiptNo, setCompletedReceiptNo] = useState<string | null>(null);
   const [completedReceiptText, setCompletedReceiptText] = useState<string | null>(null);
-  const [completedReceiptNo, setCompletedReceiptNo] = useState<string>('');
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus search/scanner input on mount
+  // Focus search input on mount and keep focused
   useEffect(() => {
     searchInputRef.current?.focus();
   }, []);
 
-  // Filter products by category and search query
-  const filteredProducts = SAMPLE_PRODUCTS.filter((p) => {
-    const matchesCategory =
-      selectedCategory === 'ALL' || p.category === selectedCategory;
-    const matchesQuery =
-      p.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.nameAm && p.nameAm.includes(searchQuery)) ||
-      p.barcode.includes(searchQuery) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesQuery;
-  });
+  // Global keyboard shortcuts (F2: search, F4: pay, F6: hold, Esc: close)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        if (cart.length > 0 && !isPaymentOpen) {
+          setIsPaymentOpen(true);
+        }
+      } else if (e.key === 'F6') {
+        e.preventDefault();
+        if (cart.length > 0) {
+          handleHoldBasket();
+        } else if (heldCart) {
+          handleResumeBasket();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart, heldCart, isPaymentOpen]);
 
-  const addToCart = (product: SampleProduct, quantity = 1, scaleWeightGrams?: number) => {
+  // Add Item to Cart with sound and visual feedback
+  const addToCart = (product: SampleProduct, quantity: number = 1, scaleWeightGrams?: number) => {
+    playScanBeep();
+    setRecentlyAddedId(product.id);
+    setTimeout(() => setRecentlyAddedId(null), 400);
+
     setCart((prev) => {
-      const existingIdx = prev.findIndex((i) => i.product.id === product.id);
-      if (existingIdx >= 0 && !product.isWeighed) {
-        const updated = [...prev];
-        const newQty = updated[existingIdx].quantity + quantity;
-        updated[existingIdx].quantity = newQty;
-        updated[existingIdx].lineTotal = Math.round(newQty * product.price * 100) / 100;
-        return updated;
-      } else {
-        const lineTotal = Math.round(quantity * product.price * 100) / 100;
+      // If scale item, always add as discrete line
+      if (scaleWeightGrams) {
         return [
           ...prev,
           {
@@ -75,43 +86,60 @@ export const PosCheckout: React.FC = () => {
             quantity,
             unitPrice: product.price,
             discount: 0,
-            lineTotal,
+            lineTotal: Number((product.price * quantity).toFixed(2)),
             isVat: product.isVat,
             scaleWeightGrams,
           },
         ];
       }
+
+      // If unit item, increment if already exists
+      const existingIdx = prev.findIndex((i) => i.product.id === product.id && !i.scaleWeightGrams);
+      if (existingIdx >= 0) {
+        const copy = [...prev];
+        const item = copy[existingIdx];
+        const newQty = item.quantity + quantity;
+        copy[existingIdx] = {
+          ...item,
+          quantity: newQty,
+          lineTotal: Number((item.unitPrice * newQty).toFixed(2)),
+        };
+        return copy;
+      }
+
+      return [
+        ...prev,
+        {
+          product,
+          quantity,
+          unitPrice: product.price,
+          discount: 0,
+          lineTotal: Number((product.price * quantity).toFixed(2)),
+          isVat: product.isVat,
+        },
+      ];
     });
   };
 
-  const updateQuantity = (idx: number, delta: number) => {
-    setCart((prev) => {
-      const updated = [...prev];
-      const newQty = Math.max(0.001, updated[idx].quantity + delta);
-      updated[idx].quantity = Math.round(newQty * 1000) / 1000;
-      updated[idx].lineTotal =
-        Math.round(updated[idx].quantity * updated[idx].unitPrice * 100) / 100;
-      return updated;
-    });
+  const handleProductCardClick = (product: SampleProduct) => {
+    if (product.stockOnHand <= 0) return;
+
+    if (product.isWeighed) {
+      setWeighedProduct(product);
+    } else {
+      addToCart(product, 1);
+    }
   };
 
-  const removeFromCart = (idx: number) => {
-    setCart((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const clearCart = () => setCart([]);
-
-  // Barcode enter handler (supports scale barcodes 20-PLU-WEIGHT and 02-PLU-PRICE)
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const code = searchQuery.trim();
     if (!code) return;
 
-    // Check if it is an in-store scale barcode (starts with 20 or 02)
+    // Check for EAN-13 scale barcode (prefix 20 or 02)
     if (code.startsWith('20') || code.startsWith('02')) {
       const parsed = BarcodeParser.parse(code);
       if (parsed.isScaleBarcode && parsed.embeddedQuantity) {
-        // Find product with scale PLU or match bananas/beef sample
         const matched =
           SAMPLE_PRODUCTS.find((p) => p.isWeighed && code.startsWith(p.barcode.slice(0, 4))) ||
           SAMPLE_PRODUCTS.find((p) => p.isWeighed);
@@ -124,257 +152,290 @@ export const PosCheckout: React.FC = () => {
       }
     }
 
-    // Direct standard EAN lookup
-    const found = SAMPLE_PRODUCTS.find((p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase());
+    // Standard barcode or SKU match
+    const found = SAMPLE_PRODUCTS.find(
+      (p) =>
+        p.barcode === code ||
+        p.sku.toLowerCase() === code.toLowerCase() ||
+        p.nameEn.toLowerCase() === code.toLowerCase()
+    );
+
     if (found) {
-      addToCart(found, 1);
+      if (found.isWeighed) {
+        setWeighedProduct(found);
+      } else {
+        addToCart(found, 1);
+      }
       setSearchQuery('');
+    } else {
+      // Keep query in input for manual name filtering
     }
   };
 
-  // Calculate cart financials with Ethiopian tax-inclusive standard
-  let subtotal = 0;
-  let taxableSubtotal = 0;
-  let taxExemptSubtotal = 0;
-  let taxTotal = 0;
-  let grandTotal = 0;
+  const handleUpdateQuantity = (index: number, newQty: number) => {
+    if (newQty <= 0) {
+      handleRemoveItem(index);
+      return;
+    }
+    setCart((prev) => {
+      const copy = [...prev];
+      const item = copy[index];
+      copy[index] = {
+        ...item,
+        quantity: newQty,
+        lineTotal: Number((item.unitPrice * newQty).toFixed(2)),
+      };
+      return copy;
+    });
+  };
 
-  for (const item of cart) {
-    const pricing = calculatePricing(item.lineTotal, item.isVat, 0.15);
-    subtotal += item.lineTotal;
-    taxableSubtotal += pricing.taxableSubtotal;
-    taxExemptSubtotal += pricing.taxExemptSubtotal;
-    taxTotal += pricing.taxAmount;
-    grandTotal += pricing.total;
-  }
+  const handleRemoveItem = (index: number) => {
+    setCart((prev) => prev.filter((_, i) => i !== index));
+  };
 
-  const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-  subtotal = r2(subtotal);
-  taxableSubtotal = r2(taxableSubtotal);
-  taxExemptSubtotal = r2(taxExemptSubtotal);
-  taxTotal = r2(taxTotal);
-  grandTotal = r2(grandTotal);
+  const handleClearBasket = () => {
+    setCart([]);
+  };
 
-  const handleCompleteSale = (
-    payments: Array<{ method: PaymentMethod; amount: number; reference?: string }>,
-    changeGiven: number,
-  ) => {
-    const seq = Math.floor(Math.random() * 900) + 100;
-    const receiptNo = generateReceiptNumber('BOLE01', 'POS01', new Date(), 1, seq);
+  const handleHoldBasket = () => {
+    if (cart.length === 0) return;
+    setHeldCart([...cart]);
+    setCart([]);
+  };
 
-    const receiptString = formatEscPosThermalReceipt({
-      storeName: 'GEBEYA HYPERMARKET',
+  const handleResumeBasket = () => {
+    if (!heldCart) return;
+    setCart([...heldCart]);
+    setHeldCart(null);
+  };
+
+  // Complete Sale & Fiscal Receipt Formatting
+  const handleCompleteSale = (details: {
+    method: PaymentMethodType;
+    amountPaid: number;
+    change: number;
+    refCode?: string;
+  }) => {
+    const totalAmount = cart.reduce((sum, i) => sum + i.lineTotal, 0);
+    const receiptNo = generateReceiptNumber('BOLE01', 'POS01', new Date(), 1, Math.floor(Math.random() * 8999 + 1000));
+    setCompletedReceiptNo(receiptNo);
+
+    // Format 80mm ESC/POS Thermal Receipt
+    const receiptText = formatEscPosThermalReceipt({
+      storeName: 'GebeyaOS Supermarket',
       storeTin: '0012345678',
-      storeVatNumber: 'ETH-VAT-987654',
-      branchName: 'BOLE ROAD BRANCH',
-      branchAddress: 'Cameroon Street, Addis Ababa',
-      branchPhone: '+251 11 661 0000',
+      storeVatNumber: 'VAT-ET-9921',
+      branchName: 'Bole Medhanialem',
+      branchAddress: 'Cameroon St, Addis Ababa',
+      branchPhone: '+251 11 661 2233',
       terminalCode: 'POS-01',
-      cashierName: 'Abebe B. (Cashier)',
+      cashierName: 'Bethlehem T.',
       receiptNumber: receiptNo,
-      saleDate: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      saleDate: new Date().toLocaleString(),
       items: cart.map((i) => ({
-        name: i.product.nameEn,
+        name: language === 'am' && i.product.nameAm ? i.product.nameAm : i.product.nameEn,
         quantity: i.quantity,
         unitPrice: i.unitPrice,
+        discount: 0,
         lineTotal: i.lineTotal,
         isVat: i.isVat,
       })),
-      subtotal,
+      subtotal: totalAmount,
       discountTotal: 0,
-      taxableSubtotal,
-      vatAmount: taxTotal,
-      exemptSubtotal: taxExemptSubtotal,
-      grandTotal,
-      payments,
-      changeGiven,
-      fiscalMrc: 'MOR-ETH-BOLE01-01',
-      fiscalReceiptNo: `FRN-${receiptNo}`,
-      fiscalSignature: '9A8B7C6D5E4F3A2B1C0D9988',
+      taxableSubtotal: totalAmount,
+      vatAmount: totalAmount * (15 / 115),
+      exemptSubtotal: 0,
+      grandTotal: totalAmount,
+      payments: [
+        {
+          method: details.method as any,
+          amount: details.amountPaid,
+          reference: details.refCode,
+        },
+      ],
+      changeGiven: details.change,
+      fiscalMrc: 'MOR-ET-2026-0081',
+      fiscalReceiptNo: `FS-${receiptNo}`,
+      fiscalSignature: 'SIG-ET-98234-VALID',
     });
 
-    setCompletedReceiptText(receiptString);
-    setCompletedReceiptNo(receiptNo);
-    setIsPaymentOpen(false);
-    clearCart();
+    setCompletedReceiptText(receiptText);
   };
 
+  const handleNewSale = () => {
+    setCart([]);
+    setIsPaymentOpen(false);
+    setCompletedReceiptNo(null);
+    setCompletedReceiptText(null);
+    searchInputRef.current?.focus();
+  };
+
+  // Filtered Products
+  const filteredProducts = SAMPLE_PRODUCTS.filter((prod) => {
+    const matchesCategory =
+      selectedCategory === 'ALL' ||
+      (selectedCategory === 'FAVORITES' && ['prod-01', 'prod-02', 'prod-03', 'prod-06'].includes(prod.id)) ||
+      prod.category === selectedCategory;
+
+    const matchesSearch =
+      !searchQuery ||
+      prod.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (prod.nameAm && prod.nameAm.includes(searchQuery)) ||
+      prod.barcode.includes(searchQuery);
+
+    return matchesCategory && matchesSearch;
+  });
+
   return (
-    <div className="pos-layout">
-      {/* Catalog & Scanning Pane */}
-      <div className="pos-catalog-pane">
-        {/* Search & Barcode Wedge Input */}
-        <form onSubmit={handleBarcodeSubmit} className="search-bar-wrapper">
-          <Barcode size={22} color="var(--primary)" />
+    <div className="flex-1 flex h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
+      {/* Product Catalog Area (Left) */}
+      <div className="flex-1 flex flex-col p-4 sm:p-5 overflow-hidden">
+        {/* Search Bar (Large, Always Focused, F2) */}
+        <form onSubmit={handleBarcodeSubmit} className="relative mb-3 flex-shrink-0">
           <input
             ref={searchInputRef}
             type="text"
-            className="search-input"
-            placeholder="Scan barcode or type SKU / item name (e.g. 6001234567890 or 2010450000000 for weighed scale)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('scanOrSearchPlaceholder')}
+            className="w-full min-h-[54px] pl-12 pr-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-base font-medium shadow-xs focus:border-gebeya-500 dark:focus:border-gebeya-500 focus:outline-none transition-all placeholder:text-slate-400"
           />
-          <button type="submit" className="chip-btn active" style={{ padding: '6px 16px' }}>
-            Enter
-          </button>
+          <Search
+            size={22}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
         </form>
 
-        {/* Category Filter Chips */}
-        <div className="category-chips">
-          {SAMPLE_CATEGORIES.map((cat) => (
-            <button
+        {/* Categories (Horizontally Scrollable Large Pills) */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3 flex-shrink-0 no-scrollbar">
+          <Pill
+            active={selectedCategory === 'ALL'}
+            onClick={() => setSelectedCategory('ALL')}
+          >
+            {t('allCategories')}
+          </Pill>
+          <Pill
+            active={selectedCategory === 'FAVORITES'}
+            onClick={() => setSelectedCategory('FAVORITES')}
+          >
+            {t('favorites')}
+          </Pill>
+          {SAMPLE_CATEGORIES.filter((c) => c !== 'ALL').map((cat) => (
+            <Pill
               key={cat}
-              type="button"
-              className={`chip-btn ${selectedCategory === cat ? 'active' : ''}`}
+              active={selectedCategory === cat}
               onClick={() => setSelectedCategory(cat)}
             >
               {cat}
-            </button>
+            </Pill>
           ))}
         </div>
 
-        {/* Product Quick Grid */}
-        <div className="product-grid">
-          {filteredProducts.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className="product-card"
-              onClick={() => addToCart(p, 1)}
-            >
-              <div>
-                <div className="prod-name">{p.nameEn}</div>
-                {p.nameAm && (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {p.nameAm}
-                  </div>
-                )}
-                <div className="prod-sku">
-                  {p.isWeighed && <Scale size={12} style={{ display: 'inline', marginRight: '4px' }} />}
-                  {p.sku}
-                </div>
-              </div>
-              <div className="prod-footer">
-                <span className="prod-price">{p.price.toFixed(2)} ETB</span>
-                <span className="prod-vat-tag">{p.isVat ? '(A) 15%' : '(B) Exempt'}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+        {/* Product Cards Grid */}
+        <div className="flex-1 overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {filteredProducts.map((product) => {
+              const productName = language === 'am' && product.nameAm ? product.nameAm : product.nameEn;
+              const isOut = product.stockOnHand <= 0;
+              const isLow = product.stockOnHand > 0 && product.stockOnHand <= product.minStock;
+              const isRecentlyAdded = recentlyAddedId === product.id;
 
-      {/* Cart & Total Checkout Pane */}
-      <div className="pos-cart-pane">
-        <div className="cart-header">
-          <div className="cart-title">
-            <ShoppingCart size={20} color="var(--primary)" />
-            <span>Active Basket</span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>({cart.length})</span>
-          </div>
-          {cart.length > 0 && (
-            <button
-              type="button"
-              onClick={clearCart}
-              style={{ background: 'transparent', color: 'var(--accent-red)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-            >
-              <Trash2 size={14} /> Clear
-            </button>
-          )}
-        </div>
-
-        {/* Cart Item Rows */}
-        <div className="cart-items-list">
-          {cart.length === 0 ? (
-            <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-dim)' }}>
-              <ShoppingCart size={40} style={{ opacity: 0.3, marginBottom: '8px' }} />
-              <div>Basket is empty</div>
-              <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Scan barcode or tap items to sell</div>
-            </div>
-          ) : (
-            cart.map((item, idx) => (
-              <div key={`${item.product.id}-${idx}`} className="cart-item-row">
-                <div className="cart-item-info">
-                  <div className="cart-item-name">{item.product.nameEn}</div>
-                  <div className="cart-item-meta">
-                    {item.unitPrice.toFixed(2)} ETB {item.isVat ? '(A)' : '(B)'}
-                    {item.scaleWeightGrams && ` • Scale: ${item.scaleWeightGrams}g`}
-                  </div>
-                </div>
-
-                <div className="cart-qty-ctrl">
-                  <button type="button" className="qty-btn" onClick={() => updateQuantity(idx, -1)}>
-                    <Minus size={14} />
-                  </button>
-                  <span className="qty-val">{item.quantity}</span>
-                  <button type="button" className="qty-btn" onClick={() => updateQuantity(idx, 1)}>
-                    <Plus size={14} />
-                  </button>
-                </div>
-
-                <div className="cart-item-total">{item.lineTotal.toFixed(2)} ETB</div>
-
-                <button
-                  type="button"
-                  onClick={() => removeFromCart(idx)}
-                  style={{ background: 'transparent', color: 'var(--text-dim)', marginLeft: '8px' }}
+              return (
+                <Card
+                  key={product.id}
+                  interactive={!isOut}
+                  onClick={() => handleProductCardClick(product)}
+                  className={`p-4 flex flex-col justify-between min-h-[130px] transition-all relative ${
+                    isOut
+                      ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800/40'
+                      : isRecentlyAdded
+                      ? 'ring-2 ring-gebeya-500 bg-gebeya-50/50 dark:bg-gebeya-950/40 scale-[0.98]'
+                      : 'hover:shadow-md'
+                  }`}
                 >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+                  {/* Top: Name & Badges */}
+                  <div>
+                    <div className="flex items-start justify-between gap-1.5 mb-1">
+                      <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug">
+                        {productName}
+                      </h3>
+                      {product.isWeighed && (
+                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1">
+                          <Scale size={11} />
+                          {t('weighedBadge')}
+                        </span>
+                      )}
+                    </div>
 
-        {/* Bill Breakdown & Pay Button */}
-        <div className="cart-footer">
-          <div className="summary-row">
-            <span>Subtotal:</span>
-            <span>{subtotal.toFixed(2)} ETB</span>
-          </div>
-          <div className="summary-row">
-            <span>Taxable (15% VAT):</span>
-            <span>{taxableSubtotal.toFixed(2)} ETB</span>
-          </div>
-          <div className="summary-row">
-            <span>15% VAT Amount:</span>
-            <span>{taxTotal.toFixed(2)} ETB</span>
-          </div>
-          {taxExemptSubtotal > 0 && (
-            <div className="summary-row">
-              <span>Tax Exempt:</span>
-              <span>{taxExemptSubtotal.toFixed(2)} ETB</span>
-            </div>
-          )}
-          <div className="summary-row total-row">
-            <span>TOTAL:</span>
-            <span style={{ color: '#34d399' }}>{grandTotal.toFixed(2)} ETB</span>
-          </div>
+                    {/* Stock Alert (only low or out) */}
+                    {isOut ? (
+                      <span className="text-[11px] font-bold text-red-600 dark:text-red-400">
+                        {t('outOfStock')}
+                      </span>
+                    ) : isLow ? (
+                      <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                        {t('lowStock')} ({product.stockOnHand})
+                      </span>
+                    ) : null}
+                  </div>
 
-          <button
-            type="button"
-            className="pay-btn"
-            disabled={cart.length === 0}
-            onClick={() => setIsPaymentOpen(true)}
-          >
-            <CreditCard size={20} /> PAY NOW ({grandTotal.toFixed(2)} ETB)
-          </button>
+                  {/* Bottom: Price in 20px+ bold */}
+                  <div className="pt-2 flex items-baseline justify-between mt-auto">
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                      {formatCurrency(product.price)}
+                    </span>
+                    {product.isWeighed && (
+                      <span className="text-xs text-slate-400 font-medium">/{t('weighedUnitKg')}</span>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Payment Tender Modal */}
-      {isPaymentOpen && (
-        <PaymentModal
-          grandTotal={grandTotal}
-          onClose={() => setIsPaymentOpen(false)}
-          onCompletePayment={handleCompleteSale}
-        />
-      )}
+      {/* Basket Panel (Right Side, Always Visible) */}
+      <BasketPanel
+        cart={cart}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onClearBasket={handleClearBasket}
+        onHoldBasket={handleHoldBasket}
+        onResumeBasket={handleResumeBasket}
+        hasHeldBasket={!!heldCart}
+        onOpenPayment={() => setIsPaymentOpen(true)}
+      />
 
-      {/* ESC/POS Fiscal Receipt Modal */}
+      {/* Weighed Item Entry Modal */}
+      <WeightModal
+        isOpen={!!weighedProduct}
+        onClose={() => setWeighedProduct(null)}
+        product={weighedProduct}
+        onConfirm={(prod, weightKg) => {
+          addToCart(prod, weightKg, weightKg * 1000);
+          setWeighedProduct(null);
+        }}
+      />
+
+      {/* Payment & Change Modal */}
+      <PaymentModal
+        isOpen={isPaymentOpen}
+        onClose={() => setIsPaymentOpen(false)}
+        totalAmount={cart.reduce((sum, i) => sum + i.lineTotal, 0)}
+        onCompleteSale={handleCompleteSale}
+        onPrintReceipt={() => {
+          // Open thermal preview
+        }}
+        onNewSale={handleNewSale}
+        completedReceiptNo={completedReceiptNo}
+      />
+
+      {/* 80mm ESC/POS Thermal Receipt Modal (Optional preview when printing) */}
       {completedReceiptText && (
         <ReceiptModal
           receiptText={completedReceiptText}
-          receiptNumber={completedReceiptNo}
+          receiptNumber={completedReceiptNo || ''}
           onClose={() => setCompletedReceiptText(null)}
         />
       )}
