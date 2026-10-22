@@ -24,16 +24,16 @@ export const TopBar: React.FC = () => {
     <header className="h-14 px-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0 relative z-30 select-none">
       {/* Brand & Branch */}
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gebeya-600 flex items-center justify-center text-white shadow-sm shadow-gebeya-600/30">
-          <Store size={18} />
+        <div className="w-9 h-9 rounded-xl bg-gebeya-600 flex items-center justify-center text-white shadow-sm shadow-gebeya-600/30 flex-shrink-0">
+          <Store size={20} />
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">
-            {t('appName')}
-          </span>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-            {t('branchName')}
-          </span>
+        <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">
+          {t('appName')}
+        </span>
+        <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
+        <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+          <span className="w-2 h-2 rounded-full bg-gebeya-500" />
+          <span>{t('branchName')}</span>
         </div>
       </div>
 

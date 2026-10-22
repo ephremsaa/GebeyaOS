@@ -112,16 +112,24 @@ export const WeightModal: React.FC<WeightModalProps> = ({
           showDecimal={true}
         />
 
-        {/* Confirm Action Button */}
-        <Button
-          size="lg"
-          variant="primary"
-          fullWidth
-          onClick={handleSave}
-          disabled={weightKg <= 0}
-        >
-          {t('confirmWeight')} ({formatCurrency(calculatedPrice)})
-        </Button>
+        {/* Actions: Cancel & Add to basket */}
+        <div className="grid grid-cols-2 gap-3 mt-1">
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={onClose}
+          >
+            {t('cancel')}
+          </Button>
+          <Button
+            size="lg"
+            variant="primary"
+            onClick={handleSave}
+            disabled={weightKg <= 0}
+          >
+            {t('confirmWeight')} ({formatCurrency(calculatedPrice)})
+          </Button>
+        </div>
       </div>
     </Modal>
   );

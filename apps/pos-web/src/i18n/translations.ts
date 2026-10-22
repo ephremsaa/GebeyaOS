@@ -27,7 +27,7 @@ export const TRANSLATIONS = {
     close: 'Close',
 
     // POS Catalog & Search
-    scanOrSearchPlaceholder: 'Scan or search item (F2)...',
+    scanOrSearchPlaceholder: 'Scan or search item...',
     allCategories: 'All',
     favorites: '⭐ Favorites',
     weighedBadge: 'Scale',
@@ -48,7 +48,7 @@ export const TRANSLATIONS = {
     vatTax: '15% VAT',
     total: 'Total',
     payButton: 'PAY',
-    hold: 'Hold (F6)',
+    hold: 'Hold',
     resume: 'Resume',
     discount: 'Discount',
     clearBasket: 'Clear',
@@ -117,7 +117,7 @@ export const TRANSLATIONS = {
     close: 'ዝጋ',
 
     // POS Catalog & Search
-    scanOrSearchPlaceholder: 'ዕቃ ይቃኙ ወይም ይፈልጉ (F2)...',
+    scanOrSearchPlaceholder: 'ዕቃ ይቃኙ ወይም ይፈልጉ...',
     allCategories: 'ሁሉ',
     favorites: '⭐ ተወዳጆች',
     weighedBadge: 'ሚዛን',
@@ -138,7 +138,7 @@ export const TRANSLATIONS = {
     vatTax: '15% ተ.እ.ታ (VAT)',
     total: 'ጠቅላላ ድምር',
     payButton: 'ክፈል',
-    hold: 'አቆይ (F6)',
+    hold: 'አቆይ',
     resume: 'መልስ',
     discount: 'ቅናሽ',
     clearBasket: 'አጽዳ',

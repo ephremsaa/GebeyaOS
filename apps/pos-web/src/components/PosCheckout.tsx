@@ -290,7 +290,7 @@ export const PosCheckout: React.FC = () => {
     <div className="flex-1 flex h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* Product Catalog Area (Left) */}
       <div className="flex-1 flex flex-col p-4 sm:p-5 overflow-hidden">
-        {/* Search Bar (Large, Always Focused, F2) */}
+        {/* Search Bar (Large, Always Focused with subtle F2 hint) */}
         <form onSubmit={handleBarcodeSubmit} className="relative mb-3 flex-shrink-0">
           <input
             ref={searchInputRef}
@@ -298,12 +298,15 @@ export const PosCheckout: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('scanOrSearchPlaceholder')}
-            className="w-full min-h-[54px] pl-12 pr-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-base font-medium shadow-xs focus:border-gebeya-500 dark:focus:border-gebeya-500 focus:outline-none transition-all placeholder:text-slate-400"
+            className="w-full min-h-[54px] pl-12 pr-14 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-base font-medium shadow-xs focus:border-gebeya-500 dark:focus:border-gebeya-500 focus:outline-none transition-all placeholder:text-slate-400"
           />
           <Search
             size={22}
             className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
           />
+          <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:inline-block px-2 py-0.5 text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 rounded-md">
+            F2
+          </kbd>
         </form>
 
         {/* Categories (Horizontally Scrollable Large Pills) */}

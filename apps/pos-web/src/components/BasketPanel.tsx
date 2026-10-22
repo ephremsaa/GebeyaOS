@@ -139,37 +139,47 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Quantity Controls (Large 48px touch targets) */}
+                {/* Quantity Controls (Large 44px+ touch targets with editable input) */}
                 <div className="flex items-center gap-2">
                   {!isScale ? (
-                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200/80 dark:border-slate-700">
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200/80 dark:border-slate-700">
                       <button
                         onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all"
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all"
                         aria-label="Decrease quantity"
                       >
-                        <Minus size={15} />
+                        <Minus size={16} />
                       </button>
-                      <span className="w-8 text-center text-sm font-bold text-slate-800 dark:text-slate-100">
-                        {item.quantity}
-                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val >= 1) {
+                            onUpdateQuantity(index, val);
+                          }
+                        }}
+                        className="w-12 h-10 text-center font-bold text-base bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:bg-white dark:focus:bg-slate-700 rounded-md"
+                        aria-label="Quantity"
+                      />
                       <button
                         onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all"
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 active:scale-95 transition-all"
                         aria-label="Increase quantity"
                       >
-                        <Plus size={15} />
+                        <Plus size={16} />
                       </button>
                     </div>
                   ) : (
-                    <span className="text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      {(item.scaleWeightGrams! / 1000).toFixed(2)} kg
+                    <span className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      {(item.scaleWeightGrams! / 1000).toFixed(3)} kg
                     </span>
                   )}
 
                   {/* Line Total */}
                   <div className="w-24 text-right">
-                    <span className="text-base font-bold text-slate-900 dark:text-white block">
+                    <span className="text-base font-bold text-slate-900 dark:text-white font-mono block">
                       {formatCurrency(item.lineTotal)}
                     </span>
                   </div>
@@ -177,8 +187,9 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
                   {/* Quick Delete */}
                   <button
                     onClick={() => onRemoveItem(index)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                     aria-label="Remove item"
+                    title={t('clearBasket')}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -190,46 +201,52 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
       </div>
 
       {/* Summary & Big Pay Button */}
-      <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/80 flex flex-col gap-3">
-        {/* Subtotal & VAT (Compact single lines) */}
+      <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/90 flex flex-col gap-3">
+        {/* Subtotal & VAT (Consistent & right-aligned) */}
         <div className="flex flex-col gap-1.5 text-sm">
-          <div className="flex justify-between text-slate-500 dark:text-slate-400">
+          <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
             <span>{t('subtotal')}</span>
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
+            <span className="font-mono font-medium text-slate-700 dark:text-slate-300 text-right">
               {formatCurrency(subtotal)}
             </span>
           </div>
 
-          <div className="flex justify-between text-slate-500 dark:text-slate-400 text-xs">
-            <span>{t('vatTax')}</span>
-            <span className="font-medium text-slate-600 dark:text-slate-400">
+          <div className="flex justify-between items-center text-slate-400 dark:text-slate-500 text-xs">
+            <span>VAT 15% (included)</span>
+            <span className="font-mono font-medium text-right">
               {formatCurrency(vatTotal)}
             </span>
           </div>
 
-          <div className="h-px bg-slate-200 dark:bg-slate-800 my-1" />
+          <div className="h-px bg-slate-200 dark:bg-slate-800 my-0.5" />
 
-          {/* Grand Total */}
-          <div className="flex justify-between items-baseline">
-            <span className="text-base font-bold text-slate-800 dark:text-slate-200">
+          {/* Grand Total - Large and Bold */}
+          <div className="flex justify-between items-baseline pt-1">
+            <span className="text-base font-extrabold text-slate-900 dark:text-white">
               {t('total')}
             </span>
-            <span className="text-2xl font-black text-slate-900 dark:text-white">
+            <span className="text-3xl font-black text-slate-900 dark:text-white font-mono tracking-tight text-right">
               {formatCurrency(total)}
             </span>
           </div>
         </div>
 
-        {/* Large Always-Visible Pay Button */}
+        {/* Large Always-Visible Pay Button with subtle F4 hint */}
         <Button
           size="xl"
           variant="primary"
           fullWidth
           disabled={cart.length === 0}
           onClick={onOpenPayment}
-          className="shadow-lg shadow-gebeya-600/20"
+          className="min-h-[58px] shadow-lg shadow-gebeya-600/20 flex items-center justify-between px-6"
         >
-          {t('payButton')} {formatCurrency(total)} (F4)
+          <span className="text-xl font-bold">{t('payButton')}</span>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-2xl font-black">{formatCurrency(total)}</span>
+            <kbd className="hidden sm:inline-block px-2 py-0.5 text-xs font-semibold bg-white/20 text-white rounded-md">
+              F4
+            </kbd>
+          </div>
         </Button>
       </div>
 
