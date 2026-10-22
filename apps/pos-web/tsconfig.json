@@ -19,6 +19,7 @@
       "@gebeyaos/shared-types": ["../../packages/shared-types/src"],
       "@gebeyaos/sync-protocol": ["../../packages/sync-protocol/src"]
     },
+    "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "../../packages/shared-types/src", "../../packages/sync-protocol/src"]
