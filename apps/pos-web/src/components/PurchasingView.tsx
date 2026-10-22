@@ -1,26 +1,55 @@
 import React, { useState } from 'react';
-import { Truck, Plus, CheckCircle2, DollarSign, Calculator } from 'lucide-react';
-import { calculateAVCO, apportionLandedCost, calculateWithholdingTax } from '@gebeyaos/shared-types';
+import { Truck, Plus, CheckCircle2, Calculator } from 'lucide-react';
+import { apportionLandedCost, calculateWithholdingTax } from '@gebeyaos/shared-types';
+
+const SUPPLIERS = [
+  {
+    id: 's1',
+    code: 'SUP-ALMAZ',
+    name: 'Almaz Agro Industries',
+    tin: '0098765432',
+    phone: '+251 91 100 2233',
+    terms: '30 Days',
+  },
+  {
+    id: 's2',
+    code: 'SUP-ADAA',
+    name: 'Adaa Teff Farmers Union',
+    tin: '0011223344',
+    phone: '+251 91 123 4567',
+    terms: '15 Days',
+  },
+  {
+    id: 's3',
+    code: 'SUP-TOMOCA',
+    name: 'Tomoca Coffee Roasters',
+    tin: '0055443322',
+    phone: '+251 11 155 7788',
+    terms: 'Cash on Delivery',
+  },
+];
+
+type GRNRow = {
+  grnNumber: string;
+  supplier: string;
+  date: string;
+  totalCost: number;
+  withholdingTax: number;
+  itemsCount: number;
+};
 
 export const PurchasingView: React.FC = () => {
-  const [suppliers] = useState([
-    { id: 's1', code: 'SUP-ALMAZ', name: 'Almaz Agro Industries', tin: '0098765432', phone: '+251 91 100 2233', terms: '30 Days' },
-    { id: 's2', code: 'SUP-ADAA', name: 'Adaa Teff Farmers Union', tin: '0011223344', phone: '+251 91 123 4567', terms: '15 Days' },
-    { id: 's3', code: 'SUP-TOMOCA', name: 'Tomoca Coffee Roasters', tin: '0055443322', phone: '+251 11 155 7788', terms: 'Cash on Delivery' },
-  ]);
-
-  const [grnList, setGrnList] = useState([
+  const [grnList, setGrnList] = useState<GRNRow[]>([
     {
       grnNumber: 'GRN-20261021-0001',
       supplier: 'Almaz Agro Industries',
       date: '2026-10-21',
       totalCost: 11000,
-      withholdingTax: 220, // 2%
+      withholdingTax: 220,
       itemsCount: 1,
     },
   ]);
 
-  // New GRN modal state
   const [isGrnModalOpen, setIsGrnModalOpen] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState('s1');
   const [receivedQty, setReceivedQty] = useState(100);
@@ -30,7 +59,6 @@ export const PurchasingView: React.FC = () => {
   const [expiryDate, setExpiryDate] = useState('2026-12-31');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Live calculation preview
   const apportioned = apportionLandedCost(
     [{ productId: 'p-milk', receivedQuantity: receivedQty, purchaseUnitCost: purchaseCost }],
     freightCost,
@@ -40,14 +68,16 @@ export const PurchasingView: React.FC = () => {
   const totalCost = receivedQty * purchaseCost + freightCost;
   const withholdingTax = calculateWithholdingTax(totalCost, true);
 
+  const fmt = (n: number) =>
+    n.toLocaleString('en-ET', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const handleCreateGRN = (e: React.FormEvent) => {
     e.preventDefault();
-    const sup = suppliers.find((s) => s.id === selectedSupplierId);
-    const newGrnNumber = `GRN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-000${grnList.length + 1}`;
-
+    const sup = SUPPLIERS.find((s) => s.id === selectedSupplierId);
+    const newGrn = `GRN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-000${grnList.length + 1}`;
     setGrnList((prev) => [
       {
-        grnNumber: newGrnNumber,
+        grnNumber: newGrn,
         supplier: sup?.name || 'Supplier',
         date: new Date().toISOString().split('T')[0],
         totalCost,
@@ -56,178 +86,228 @@ export const PurchasingView: React.FC = () => {
       },
       ...prev,
     ]);
-
-    setSuccessMsg(`GRN ${newGrnNumber} created: Received ${receivedQty} units at landed unit cost of ${finalUnitCost.toFixed(2)} ETB`);
+    setSuccessMsg(
+      `GRN ${newGrn} created: ${receivedQty} units at landed unit cost ETB ${fmt(finalUnitCost)}`,
+    );
     setIsGrnModalOpen(false);
-    setTimeout(() => setSuccessMsg(null), 4000);
+    setTimeout(() => setSuccessMsg(null), 5000);
   };
 
   return (
-    <div style={{ padding: '24px', overflowY: 'auto', height: '100%', maxWidth: '1100px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div className="page-container">
+      {/* ─── Header ─── */}
+      <div className="page-header">
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Purchasing & Goods Receiving (GRN)</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Suppliers, purchase orders, landed cost distribution, and AVCO cost blending</p>
+          <h1 className="page-title">Purchasing &amp; Goods Receiving</h1>
+          <p className="page-subtitle">
+            Suppliers, purchase orders, landed cost, and AVCO cost blending
+          </p>
         </div>
-        <button
-          type="button"
-          className="chip-btn active"
-          onClick={() => setIsGrnModalOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontWeight: 600 }}
-        >
-          <Plus size={16} /> Receive Goods (New GRN)
+        <button type="button" className="btn-primary" onClick={() => setIsGrnModalOpen(true)}>
+          <Plus size={15} />
+          Receive Goods (GRN)
         </button>
       </div>
 
+      {/* ─── Success banner ─── */}
       {successMsg && (
-        <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#34d399', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <CheckCircle2 size={18} /> {successMsg}
+        <div className="alert-success mb-4">
+          <CheckCircle2 size={16} />
+          {successMsg}
         </div>
       )}
 
-      {/* Suppliers Overview */}
-      <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '20px 0 12px' }}>Approved Suppliers</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '28px' }}>
-        {suppliers.map((s) => (
-          <div key={s.id} className="glass-panel" style={{ padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{s.name}</div>
-              <span className="branch-badge" style={{ fontSize: '0.65rem' }}>{s.code}</span>
+      {/* ─── Suppliers grid ─── */}
+      <h2
+        className="text-base font-bold mb-3 mt-2"
+        style={{ color: 'var(--text-main)' }}
+      >
+        Approved Suppliers
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {SUPPLIERS.map((s) => (
+          <div key={s.id} className="glass-panel p-5">
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <span className="font-bold text-sm" style={{ color: 'var(--text-main)' }}>
+                {s.name}
+              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span className="branch-badge text-xs">{s.code}</span>
+                <span className="badge-warning text-xs">WHT 2%</span>
+              </div>
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              <div>TIN: {s.tin} (Withholding 2% Eligible)</div>
-              <div>Phone: {s.phone}</div>
+            <div className="flex flex-col gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <div>TIN: {s.tin}</div>
+              <div>📞 {s.phone}</div>
               <div>Terms: {s.terms}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* GRN Recent History */}
-      <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '12px' }}>Recent Goods Received Notes (GRN)</h2>
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-          <thead>
-            <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-              <th style={{ padding: '12px 16px' }}>GRN Number</th>
-              <th style={{ padding: '12px 16px' }}>Supplier</th>
-              <th style={{ padding: '12px 16px' }}>Date</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right' }}>Total Landed Cost</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right' }}>Withholding Tax (2%)</th>
-              <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {grnList.map((g) => (
-              <tr key={g.grnNumber} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{g.grnNumber}</td>
-                <td style={{ padding: '12px 16px', fontWeight: 600 }}>{g.supplier}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>{g.date}</td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#34d399' }}>{g.totalCost.toFixed(2)} ETB</td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#f59e0b', fontWeight: 600 }}>{g.withholdingTax.toFixed(2)} ETB</td>
-                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                  <span style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#34d399', padding: '2px 8px', borderRadius: '12px', fontSize: '0.725rem', fontWeight: 600 }}>
-                    Received
-                  </span>
-                </td>
+      {/* ─── GRN Table ─── */}
+      <h2 className="text-base font-bold mb-3" style={{ color: 'var(--text-main)' }}>
+        Recent Goods Received Notes (GRN)
+      </h2>
+      <div className="glass-panel overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>GRN Number</th>
+                <th>Supplier</th>
+                <th>Date</th>
+                <th className="text-right">Total Landed Cost</th>
+                <th className="text-right">Withholding (2%)</th>
+                <th className="text-center">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {grnList.map((g) => (
+                <tr key={g.grnNumber}>
+                  <td>
+                    <span className="font-mono text-xs font-semibold" style={{ color: 'var(--primary)' }}>
+                      {g.grnNumber}
+                    </span>
+                  </td>
+                  <td className="font-semibold">{g.supplier}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{g.date}</td>
+                  <td className="text-right tabular font-bold" style={{ color: 'var(--primary)' }}>
+                    ETB {fmt(g.totalCost)}
+                  </td>
+                  <td className="text-right tabular font-semibold" style={{ color: 'var(--warning)' }}>
+                    ETB {fmt(g.withholdingTax)}
+                  </td>
+                  <td className="text-center">
+                    <span className="badge-success">
+                      <Truck size={11} />
+                      Received
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Receive Goods GRN Modal */}
+      {/* ─── GRN Modal ─── */}
       {isGrnModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-panel" style={{ width: '520px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '16px' }}>Receive Goods Note (GRN)</h2>
-            <form onSubmit={handleCreateGRN} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => e.target === e.currentTarget && setIsGrnModalOpen(false)}
+        >
+          <div className="modal-content" style={{ maxWidth: 560 }}>
+            <h2 className="modal-title">Receive Goods Note (GRN)</h2>
+
+            <form onSubmit={handleCreateGRN} className="flex flex-col gap-4">
               <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Supplier</label>
+                <label className="field-label">Supplier</label>
                 <select
+                  className="field-select mt-1"
                   value={selectedSupplierId}
                   onChange={(e) => setSelectedSupplierId(e.target.value)}
-                  style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                 >
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                  {SUPPLIERS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
                   ))}
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Received Qty</label>
+                  <label className="field-label">Received Qty</label>
                   <input
                     type="number"
+                    className="field-input mt-1"
                     value={receivedQty}
                     onChange={(e) => setReceivedQty(parseFloat(e.target.value) || 0)}
-                    style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Purchase Unit Cost (ETB)</label>
+                  <label className="field-label">Purchase Unit Cost (ETB)</label>
                   <input
                     type="number"
                     step="0.01"
+                    className="field-input mt-1"
                     value={purchaseCost}
                     onChange={(e) => setPurchaseCost(parseFloat(e.target.value) || 0)}
-                    style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Batch / Lot Number</label>
+                  <label className="field-label">Batch / Lot Number</label>
                   <input
                     type="text"
+                    className="field-input mt-1"
                     value={batchNo}
                     onChange={(e) => setBatchNo(e.target.value)}
-                    style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Expiry Date</label>
+                  <label className="field-label">Expiry Date</label>
                   <input
                     type="date"
+                    className="field-input mt-1"
                     value={expiryDate}
                     onChange={(e) => setExpiryDate(e.target.value)}
-                    style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Landed Freight / Transport Cost (ETB)</label>
+                <label className="field-label">Freight / Transport Cost (ETB)</label>
                 <input
                   type="number"
                   step="0.01"
+                  className="field-input mt-1"
                   value={freightCost}
                   onChange={(e) => setFreightCost(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                 />
               </div>
 
-              {/* Live Cost Apportionment Preview Box */}
-              <div style={{ background: 'var(--bg-elevated)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span>Apportioned Final Unit Cost:</span>
-                  <span style={{ color: '#34d399', fontWeight: 700 }}>{finalUnitCost.toFixed(2)} ETB</span>
+              {/* Live cost preview */}
+              <div
+                className="rounded-xl p-4 flex flex-col gap-2.5 text-sm"
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+              >
+                <div className="flex items-center gap-1.5 font-bold mb-1" style={{ color: 'var(--text-muted)' }}>
+                  <Calculator size={14} />
+                  Live Cost Apportionment Preview
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span>Total Received Bill:</span>
-                  <span style={{ color: '#ffffff', fontWeight: 600 }}>{totalCost.toFixed(2)} ETB</span>
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Apportioned Final Unit Cost</span>
+                  <span className="font-bold tabular" style={{ color: 'var(--primary)' }}>
+                    ETB {fmt(finalUnitCost)}
+                  </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span>Ethiopian Withholding Tax (2%):</span>
-                  <span style={{ color: '#f59e0b', fontWeight: 700 }}>{withholdingTax.toFixed(2)} ETB</span>
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Total Received Bill</span>
+                  <span className="font-semibold tabular">{fmt(totalCost)} ETB</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Ethiopian Withholding Tax (2%)</span>
+                  <span className="font-bold tabular" style={{ color: 'var(--warning)' }}>
+                    {fmt(withholdingTax)} ETB
+                  </span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                <button type="button" className="chip-btn" onClick={() => setIsGrnModalOpen(false)} style={{ flex: 1, padding: '10px' }}>Cancel</button>
-                <button type="submit" className="pay-btn" style={{ flex: 1, marginTop: 0 }}>Commit & Update AVCO</button>
+              <div className="flex gap-3 mt-2">
+                <button
+                  type="button"
+                  className="btn-secondary flex-1"
+                  onClick={() => setIsGrnModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary flex-1">
+                  Commit &amp; Update AVCO
+                </button>
               </div>
             </form>
           </div>

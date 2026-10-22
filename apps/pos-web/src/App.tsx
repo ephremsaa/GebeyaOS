@@ -13,7 +13,8 @@ const MainApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTabId>('checkout');
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden font-sans"
+         style={{ background: 'var(--bg-page)', color: 'var(--text-main)' }}>
       {/* 1. Slim Top Bar */}
       <TopBar />
 
@@ -26,44 +27,22 @@ const MainApp: React.FC = () => {
           userRole="manager"
         />
 
-        {/* Active Content Pane */}
-        <main className="flex-1 flex overflow-hidden bg-slate-50 dark:bg-slate-950">
-          {activeTab === 'checkout' && <PosCheckout />}
-          {activeTab === 'shifts' && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <ShiftManagement />
-            </div>
-          )}
-          {activeTab === 'inventory' && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <InventoryView />
-            </div>
-          )}
-          {activeTab === 'purchasing' && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <PurchasingView />
-            </div>
-          )}
-          {activeTab === 'reports' && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <ReportsView />
-            </div>
-          )}
-          {activeTab === 'sync' && (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <SyncMonitor />
-            </div>
-          )}
+        {/* Active Content Pane — pages manage their own padding via page-container */}
+        <main className="flex-1 flex overflow-hidden" style={{ background: 'var(--bg-page)' }}>
+          {activeTab === 'checkout'   && <PosCheckout />}
+          {activeTab === 'shifts'     && <ShiftManagement />}
+          {activeTab === 'inventory'  && <InventoryView />}
+          {activeTab === 'purchasing' && <PurchasingView />}
+          {activeTab === 'reports'    && <ReportsView />}
+          {activeTab === 'sync'       && <SyncMonitor />}
         </main>
       </div>
     </div>
   );
 };
 
-export const App: React.FC = () => {
-  return (
-    <I18nProvider>
-      <MainApp />
-    </I18nProvider>
-  );
-};
+export const App: React.FC = () => (
+  <I18nProvider>
+    <MainApp />
+  </I18nProvider>
+);

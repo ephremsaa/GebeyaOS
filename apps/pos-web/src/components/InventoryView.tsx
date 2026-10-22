@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, AlertTriangle, Plus, Search, FileEdit, CheckCircle2 } from 'lucide-react';
+import { Package, AlertTriangle, FileEdit, CheckCircle2, Search, X } from 'lucide-react';
 import { SAMPLE_PRODUCTS, SampleProduct } from '../sample-data';
 import { StockAdjustmentReasonCode } from '@gebeyaos/shared-types';
 
@@ -7,13 +7,12 @@ export const InventoryView: React.FC = () => {
   const [products, setProducts] = useState<SampleProduct[]>(SAMPLE_PRODUCTS);
   const [search, setSearch] = useState<string>('');
   const [isAdjModalOpen, setIsAdjModalOpen] = useState<boolean>(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Adjustment form state
   const [selectedProdId, setSelectedProdId] = useState<string>(SAMPLE_PRODUCTS[0]?.id || '');
   const [reasonCode, setReasonCode] = useState<StockAdjustmentReasonCode>('DAMAGED_GOODS');
   const [adjQuantity, setAdjQuantity] = useState<number>(-1);
   const [adjNotes, setAdjNotes] = useState<string>('Broken jar / crushed packaging during shelf stocking');
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const filtered = products.filter(
     (p) =>
@@ -22,162 +21,230 @@ export const InventoryView: React.FC = () => {
       p.category.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const fmt = (n: number) =>
+    n.toLocaleString('en-ET', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const handleCreateAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
     setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === selectedProdId) {
-          return {
-            ...p,
-            stockOnHand: Math.max(0, p.stockOnHand + adjQuantity),
-          };
-        }
-        return p;
-      }),
+      prev.map((p) =>
+        p.id === selectedProdId
+          ? { ...p, stockOnHand: Math.max(0, p.stockOnHand + adjQuantity) }
+          : p,
+      ),
     );
-    setSuccessMsg(`Adjustment recorded: ${reasonCode} (${adjQuantity > 0 ? `+${adjQuantity}` : adjQuantity} units)`);
+    setSuccessMsg(
+      `Adjustment recorded: ${reasonCode} (${adjQuantity > 0 ? `+${adjQuantity}` : adjQuantity} units)`,
+    );
     setIsAdjModalOpen(false);
     setTimeout(() => setSuccessMsg(null), 4000);
   };
 
+  const lowCount = products.filter((p) => p.stockOnHand <= p.minStock).length;
+
   return (
-    <div style={{ padding: '24px', overflowY: 'auto', height: '100%', maxWidth: '1100px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div className="page-container">
+      {/* ─── Header ─── */}
+      <div className="page-header">
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Inventory & Stock Ledger</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Real-time on-hand balances, low stock alerts, and write-offs</p>
+          <h1 className="page-title">Inventory &amp; Stock Ledger</h1>
+          <p className="page-subtitle">
+            Real-time on-hand balances, low-stock alerts, and write-offs
+          </p>
         </div>
         <button
           type="button"
-          className="chip-btn active"
+          className="btn-primary"
           onClick={() => setIsAdjModalOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontWeight: 600 }}
         >
-          <FileEdit size={16} /> New Stock Adjustment
+          <FileEdit size={15} />
+          New Adjustment
         </button>
       </div>
 
+      {/* ─── Alert banner ─── */}
       {successMsg && (
-        <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#34d399', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <CheckCircle2 size={18} /> {successMsg}
+        <div className="alert-success mb-4">
+          <CheckCircle2 size={16} />
+          {successMsg}
         </div>
       )}
 
-      {/* Search Bar */}
-      <div className="search-bar-wrapper" style={{ marginBottom: '16px' }}>
-        <Search size={20} color="var(--primary)" />
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Filter stock by product name, SKU, or category..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* ─── Toolbar ─── */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="search-bar-wrapper flex-1">
+          <Search size={16} style={{ color: 'var(--primary)' }} />
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Filter by name, SKU, or category…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {lowCount > 0 && (
+          <span className="badge-danger">
+            <AlertTriangle size={12} />
+            {lowCount} Low Stock
+          </span>
+        )}
       </div>
 
-      {/* Stock Table */}
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-          <thead>
-            <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-              <th style={{ padding: '12px 16px' }}>SKU / Barcode</th>
-              <th style={{ padding: '12px 16px' }}>Product Name</th>
-              <th style={{ padding: '12px 16px' }}>Category</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right' }}>Unit Cost</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right' }}>Shelf Price</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right' }}>On Hand</th>
-              <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p) => {
-              const isLow = p.stockOnHand <= p.minStock;
-              return (
-                <tr key={p.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>{p.sku}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{p.nameEn}</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>{p.category}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.costPrice.toFixed(2)} ETB</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#34d399' }}>{p.price.toFixed(2)} ETB</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700 }}>
-                    {p.stockOnHand} {p.isWeighed ? 'KG' : 'PCS'}
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    {isLow ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid #ef4444', padding: '2px 8px', borderRadius: '12px', fontSize: '0.725rem', fontWeight: 600 }}>
-                        <AlertTriangle size={12} /> Low Stock (&le;{p.minStock})
-                      </span>
-                    ) : (
-                      <span style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#34d399', padding: '2px 8px', borderRadius: '12px', fontSize: '0.725rem', fontWeight: 600 }}>
-                        In Stock
-                      </span>
-                    )}
+      {/* ─── Table ─── */}
+      <div className="glass-panel overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>SKU / Barcode</th>
+                <th>Product Name</th>
+                <th>Category</th>
+                <th className="text-right">Unit Cost</th>
+                <th className="text-right">Shelf Price</th>
+                <th className="text-right">On Hand</th>
+                <th className="text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="text-center py-12 text-sm"
+                    style={{ color: 'var(--text-dim)' }}
+                  >
+                    No items match your search.
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              )}
+              {filtered.map((p) => {
+                const isLow = p.stockOnHand <= p.minStock;
+                return (
+                  <tr key={p.id}>
+                    <td>
+                      <span
+                        className="text-xs font-mono"
+                        style={{ color: 'var(--text-muted)' }}
+                      >
+                        {p.sku}
+                      </span>
+                    </td>
+                    <td className="font-semibold">{p.nameEn}</td>
+                    <td style={{ color: 'var(--text-muted)' }}>{p.category}</td>
+                    <td className="text-right tabular" style={{ color: 'var(--text-muted)' }}>
+                      {fmt(p.costPrice)} ETB
+                    </td>
+                    <td
+                      className="text-right tabular font-semibold"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      {fmt(p.price)} ETB
+                    </td>
+                    <td className="text-right tabular font-bold">
+                      {p.stockOnHand} {p.isWeighed ? 'KG' : 'PCS'}
+                    </td>
+                    <td className="text-center">
+                      {isLow ? (
+                        <span className="badge-danger">
+                          <AlertTriangle size={11} />
+                          Low ≤{p.minStock}
+                        </span>
+                      ) : (
+                        <span className="badge-success">
+                          <Package size={11} />
+                          In Stock
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Stock Adjustment Modal */}
+      {/* ─── Stock Adjustment Modal ─── */}
       {isAdjModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-panel">
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '16px' }}>Stock Adjustment / Write-Off</h2>
-            <form onSubmit={handleCreateAdjustment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => e.target === e.currentTarget && setIsAdjModalOpen(false)}
+        >
+          <div className="modal-content">
+            <h2 className="modal-title">Stock Adjustment / Write-Off</h2>
+
+            <form onSubmit={handleCreateAdjustment} className="flex flex-col gap-4">
               <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Select Item</label>
+                <label className="field-label">Select Item</label>
                 <select
+                  className="field-select mt-1"
                   value={selectedProdId}
                   onChange={(e) => setSelectedProdId(e.target.value)}
-                  style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                 >
                   {products.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nameEn} (Current: {p.stockOnHand})</option>
+                    <option key={p.id} value={p.id}>
+                      {p.nameEn} (On Hand: {p.stockOnHand})
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Mandatory Reason Code</label>
+                <label className="field-label">Mandatory Reason Code</label>
                 <select
+                  className="field-select mt-1"
                   value={reasonCode}
                   onChange={(e) => setReasonCode(e.target.value as StockAdjustmentReasonCode)}
-                  style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                 >
-                  <option value="DAMAGED_GOODS">DAMAGED_GOODS (Broken/Crushed/Liquid Leak)</option>
-                  <option value="EXPIRED">EXPIRED (Past Shelf Life)</option>
-                  <option value="INTERNAL_USE">INTERNAL_USE (Store Cleaning/Sampling)</option>
-                  <option value="CORRECTION">CORRECTION (Physical Count Discrepancy)</option>
-                  <option value="THEFT">THEFT (Shrinkage / Stolen)</option>
+                  <option value="DAMAGED_GOODS">DAMAGED_GOODS — Broken / Liquid Leak</option>
+                  <option value="EXPIRED">EXPIRED — Past Shelf Life</option>
+                  <option value="INTERNAL_USE">INTERNAL_USE — Store Cleaning / Sampling</option>
+                  <option value="CORRECTION">CORRECTION — Physical Count Discrepancy</option>
+                  <option value="THEFT">THEFT — Shrinkage / Stolen</option>
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Quantity Change (Negative for Loss)</label>
+                <label className="field-label">Quantity Change (negative = loss)</label>
                 <input
                   type="number"
                   step="0.001"
+                  className="field-input mt-1 text-xl font-bold"
                   value={adjQuantity}
                   onChange={(e) => setAdjQuantity(parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Audit Notes / Explanation</label>
+                <label className="field-label">Audit Notes / Explanation</label>
                 <textarea
                   rows={2}
+                  className="field-input mt-1"
                   value={adjNotes}
                   onChange={(e) => setAdjNotes(e.target.value)}
-                  style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', marginTop: '6px' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                <button type="button" className="chip-btn" onClick={() => setIsAdjModalOpen(false)} style={{ flex: 1, padding: '10px' }}>Cancel</button>
-                <button type="submit" className="pay-btn" style={{ flex: 1, marginTop: 0 }}>Commit Adjustment</button>
+              <div className="flex gap-3 mt-2">
+                <button
+                  type="button"
+                  className="btn-secondary flex-1"
+                  onClick={() => setIsAdjModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary flex-1">
+                  Commit Adjustment
+                </button>
               </div>
             </form>
           </div>

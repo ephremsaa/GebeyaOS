@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Clock, Banknote, ShieldAlert, FileText, CheckCircle, ArrowDownCircle } from 'lucide-react';
+import { Clock, FileText, ArrowDownCircle, CheckCircle, AlertCircle } from 'lucide-react';
 
 export const ShiftManagement: React.FC = () => {
   const [shiftOpen, setShiftOpen] = useState<boolean>(true);
@@ -9,23 +9,23 @@ export const ShiftManagement: React.FC = () => {
     { time: '12:30 PM', amount: 3000, reason: 'Midday safe drop' },
   ]);
 
-  // Drop modal state
   const [isDropModalOpen, setIsDropModalOpen] = useState<boolean>(false);
   const [dropAmount, setDropAmount] = useState<number>(1000);
   const [dropReason, setDropReason] = useState<string>('Excess cash to back office safe');
 
-  // Close shift modal state
   const [isCloseModalOpen, setIsCloseModalOpen] = useState<boolean>(false);
   const [countedCash, setCountedCash] = useState<number>(0);
   const [zReportData, setZReportData] = useState<any | null>(null);
 
-  // Simulated live readings for X-report
   const grossSales = 12500;
   const cashSales = 7500;
   const telebirrSales = 3500;
   const cardSales = 1500;
   const totalDrops = cashDrops.reduce((sum, d) => sum + d.amount, 0);
   const expectedCashInDrawer = openingFloat + cashSales - totalDrops;
+
+  const fmt = (n: number) =>
+    n.toLocaleString('en-ET', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const handleOpenShift = () => {
     setShiftOpen(true);
@@ -47,7 +47,8 @@ export const ShiftManagement: React.FC = () => {
   };
 
   const handleCloseShift = () => {
-    const variance = Math.round((countedCash - expectedCashInDrawer + Number.EPSILON) * 100) / 100;
+    const variance =
+      Math.round((countedCash - expectedCashInDrawer + Number.EPSILON) * 100) / 100;
     setZReportData({
       shiftNumber,
       closedAt: new Date().toLocaleTimeString(),
@@ -64,95 +65,148 @@ export const ShiftManagement: React.FC = () => {
     setIsCloseModalOpen(false);
   };
 
+  /* ─── Row helper ─── */
+  const Row = ({
+    label,
+    value,
+    valueClass,
+  }: {
+    label: string;
+    value: string;
+    valueClass?: string;
+  }) => (
+    <div className="flex justify-between items-center py-2">
+      <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </span>
+      <span className={`text-sm font-semibold tabular ${valueClass ?? ''}`}>{value}</span>
+    </div>
+  );
+
   return (
-    <div style={{ padding: '24px', overflowY: 'auto', height: '100%', maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    <div className="page-container">
+      {/* ─── Header ─── */}
+      <div className="page-header">
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Cashier Shift Management</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Terminal: POS-01 • Cashier: Abebe Bikila</p>
+          <h1 className="page-title">Cashier Shift</h1>
+          <p className="page-subtitle">Terminal POS-01 · Cashier: Bethlehem T.</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span className={`branch-badge`} style={{ borderColor: shiftOpen ? '#10b981' : '#ef4444', color: shiftOpen ? '#34d399' : '#f87171' }}>
-            <Clock size={14} /> Shift #{shiftNumber}: {shiftOpen ? 'OPEN' : 'CLOSED'}
-          </span>
-        </div>
+        <span
+          className="branch-badge"
+          style={
+            shiftOpen
+              ? {}
+              : { color: 'var(--danger)', borderColor: 'rgba(220,38,38,.3)', background: 'rgba(220,38,38,.08)' }
+          }
+        >
+          <Clock size={13} />
+          Shift #{shiftNumber}: {shiftOpen ? 'OPEN' : 'CLOSED'}
+        </span>
       </div>
 
       {shiftOpen ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-          {/* Active Drawer Reading (Interim X-Report) */}
-          <div className="glass-panel" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-              <FileText size={20} color="var(--primary)" />
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Interim Shift Reading (X-Report)</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* ─── X-Report Card ─── */}
+          <div className="glass-panel p-6 flex flex-col">
+            <div className="flex items-center gap-2 mb-5">
+              <FileText size={18} style={{ color: 'var(--primary)' }} />
+              <h2 className="font-bold text-base" style={{ color: 'var(--text-main)' }}>
+                Interim Shift Reading (X-Report)
+              </h2>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.9rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span>Opening Cash Float:</span>
-                <span style={{ color: '#ffffff', fontWeight: 600 }}>{openingFloat.toFixed(2)} ETB</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span>Gross Sales:</span>
-                <span style={{ color: '#ffffff', fontWeight: 600 }}>{grossSales.toFixed(2)} ETB</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span>  • Cash Sales Tendered:</span>
-                <span style={{ color: '#34d399', fontWeight: 600 }}>+{cashSales.toFixed(2)} ETB</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span>  • Telebirr Sales:</span>
-                <span>{telebirrSales.toFixed(2)} ETB</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span>  • Card POS Sales:</span>
-                <span>{cardSales.toFixed(2)} ETB</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span>Safe Drops Recorded:</span>
-                <span style={{ color: '#f87171', fontWeight: 600 }}>-{totalDrops.toFixed(2)} ETB</span>
-              </div>
-
-              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '6px', display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800 }}>
-                <span>Expected Cash in Drawer:</span>
-                <span style={{ color: '#34d399' }}>{expectedCashInDrawer.toFixed(2)} ETB</span>
-              </div>
+            <div
+              className="divide-y flex-1"
+              style={{ borderColor: 'var(--border-subtle)' }}
+            >
+              <Row label="Opening Cash Float" value={`ETB ${fmt(openingFloat)}`} />
+              <Row label="Gross Sales" value={`ETB ${fmt(grossSales)}`} />
+              <Row
+                label="  • Cash Sales"
+                value={`+ ETB ${fmt(cashSales)}`}
+                valueClass="text-emerald-600 dark:text-emerald-400"
+              />
+              <Row label="  • Telebirr Sales" value={`ETB ${fmt(telebirrSales)}`} />
+              <Row label="  • Card POS Sales" value={`ETB ${fmt(cardSales)}`} />
+              <Row
+                label="Safe Drops Recorded"
+                value={`− ETB ${fmt(totalDrops)}`}
+                valueClass="text-red-600 dark:text-red-400"
+              />
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+            <div
+              className="flex justify-between items-center pt-4 mt-2 border-t font-bold"
+              style={{ borderColor: 'var(--border-subtle)' }}
+            >
+              <span className="text-sm" style={{ color: 'var(--text-main)' }}>
+                Expected Cash in Drawer
+              </span>
+              <span
+                className="text-lg tabular"
+                style={{ color: 'var(--primary)' }}
+              >
+                ETB {fmt(expectedCashInDrawer)}
+              </span>
+            </div>
+
+            <div className="flex gap-3 mt-5">
               <button
                 type="button"
-                className="chip-btn active"
+                className="btn-primary flex-1"
                 onClick={() => setIsDropModalOpen(true)}
-                style={{ flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                <ArrowDownCircle size={16} /> Safe Drop
+                <ArrowDownCircle size={16} />
+                Safe Drop
               </button>
               <button
                 type="button"
-                className="chip-btn"
-                onClick={() => { setCountedCash(expectedCashInDrawer); setIsCloseModalOpen(true); }}
-                style={{ flex: 1, padding: '12px', background: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', color: '#f87171' }}
+                className="btn-danger flex-1"
+                onClick={() => {
+                  setCountedCash(expectedCashInDrawer);
+                  setIsCloseModalOpen(true);
+                }}
               >
-                Blind Close Shift
+                Close Shift
               </button>
             </div>
           </div>
 
-          {/* Cash Drops History */}
-          <div className="glass-panel" style={{ padding: '20px' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px' }}>Shift Cash Drops</h2>
+          {/* ─── Cash Drops History ─── */}
+          <div className="glass-panel p-6">
+            <h2 className="font-bold text-base mb-4" style={{ color: 'var(--text-main)' }}>
+              Shift Cash Drops
+            </h2>
+
             {cashDrops.length === 0 ? (
-              <div style={{ color: 'var(--text-dim)', textAlign: 'center', margin: '40px 0' }}>No safe drops recorded yet this shift</div>
+              <div
+                className="text-sm text-center py-12"
+                style={{ color: 'var(--text-dim)' }}
+              >
+                No safe drops recorded this shift.
+              </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="flex flex-col gap-2">
                 {cashDrops.map((d, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-elevated)', padding: '10px 14px', borderRadius: '8px' }}>
+                  <div
+                    key={i}
+                    className="flex justify-between items-center px-4 py-3 rounded-lg"
+                    style={{ background: 'var(--bg-elevated)' }}
+                  >
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{d.reason}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{d.time}</div>
+                      <div className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                        {d.reason}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                        {d.time}
+                      </div>
                     </div>
-                    <div style={{ fontWeight: 700, color: '#f87171' }}>-{d.amount.toFixed(2)} ETB</div>
+                    <span
+                      className="text-sm font-bold tabular"
+                      style={{ color: 'var(--danger)' }}
+                    >
+                      − ETB {fmt(d.amount)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -160,94 +214,140 @@ export const ShiftManagement: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Shift Closed View / Open Shift Form */
-        <div style={{ maxWidth: '520px', margin: '40px auto' }}>
+        /* ─── Shift Closed View ─── */
+        <div className="max-w-lg mx-auto mt-10 flex flex-col gap-5">
           {zReportData && (
-            <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', borderLeft: '4px solid #10b981' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', marginBottom: '12px' }}>
-                <CheckCircle size={22} />
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Shift #{zReportData.shiftNumber} Z-Report Generated</h3>
+            <div
+              className="glass-panel p-6 border-l-4"
+              style={{ borderLeftColor: 'var(--primary)' }}
+            >
+              <div
+                className="flex items-center gap-2 mb-3 font-bold text-lg"
+                style={{ color: 'var(--primary)' }}
+              >
+                <CheckCircle size={20} />
+                Shift #{zReportData.shiftNumber} Z-Report Generated
               </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Shift successfully closed at {zReportData.closedAt}.</p>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+                Shift closed at {zReportData.closedAt}.
+              </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.9rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Expected System Cash:</span>
-                  <span style={{ fontWeight: 600 }}>{zReportData.expectedCash.toFixed(2)} ETB</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Counted Cash:</span>
-                  <span style={{ fontWeight: 600 }}>{zReportData.countedCash.toFixed(2)} ETB</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: zReportData.variance >= 0 ? '#34d399' : '#f87171' }}>
-                  <span>Variance (Over/Short):</span>
-                  <span>{zReportData.variance.toFixed(2)} ETB</span>
+              <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                <Row label="Expected System Cash" value={`ETB ${fmt(zReportData.expectedCash)}`} />
+                <Row label="Counted Cash" value={`ETB ${fmt(zReportData.countedCash)}`} />
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>
+                    Variance (Over/Short)
+                  </span>
+                  <span
+                    className="text-sm font-extrabold tabular"
+                    style={{ color: zReportData.variance >= 0 ? 'var(--primary)' : 'var(--danger)' }}
+                  >
+                    {zReportData.variance >= 0 ? '+' : ''}
+                    ETB {fmt(zReportData.variance)}
+                  </span>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px' }}>Open New Cashier Shift</h2>
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Initial Drawer Cash Float (ETB)</label>
+          <div className="glass-panel p-6">
+            <h2 className="font-bold text-lg mb-4" style={{ color: 'var(--text-main)' }}>
+              Open New Cashier Shift
+            </h2>
+            <label className="field-label">Initial Drawer Cash Float (ETB)</label>
             <input
               type="number"
+              className="field-input mt-1 mb-4 text-lg font-bold"
               value={openingFloat}
               onChange={(e) => setOpeningFloat(parseFloat(e.target.value) || 0)}
-              style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', fontSize: '1.1rem', margin: '8px 0 16px' }}
             />
-            <button type="button" className="pay-btn" onClick={handleOpenShift}>
+            <button type="button" className="btn-primary w-full" style={{ minHeight: 48 }} onClick={handleOpenShift}>
               Open Shift #{shiftNumber + 1}
             </button>
           </div>
         </div>
       )}
 
-      {/* Cash Drop Modal */}
+      {/* ─── Safe Drop Modal ─── */}
       {isDropModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-panel">
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px' }}>Record Mid-Shift Safe Drop</h2>
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Amount to Transfer to Safe (ETB)</label>
-            <input
-              type="number"
-              value={dropAmount}
-              onChange={(e) => setDropAmount(parseFloat(e.target.value) || 0)}
-              style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', margin: '8px 0 14px' }}
-            />
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Drop Reason</label>
-            <input
-              type="text"
-              value={dropReason}
-              onChange={(e) => setDropReason(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', borderRadius: '8px', margin: '8px 0 16px' }}
-            />
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="button" className="chip-btn" onClick={() => setIsDropModalOpen(false)} style={{ flex: 1, padding: '10px' }}>Cancel</button>
-              <button type="button" className="pay-btn" onClick={handleRecordDrop} style={{ flex: 1, marginTop: 0 }}>Confirm Drop</button>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsDropModalOpen(false)}>
+          <div className="modal-content">
+            <h2 className="modal-title">Record Mid-Shift Safe Drop</h2>
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="field-label">Amount to Transfer to Safe (ETB)</label>
+                <input
+                  type="number"
+                  className="field-input mt-1 text-xl font-bold"
+                  value={dropAmount}
+                  onChange={(e) => setDropAmount(parseFloat(e.target.value) || 0)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="field-label">Drop Reason</label>
+                <input
+                  type="text"
+                  className="field-input mt-1"
+                  value={dropReason}
+                  onChange={(e) => setDropReason(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button type="button" className="btn-secondary flex-1" onClick={() => setIsDropModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn-primary flex-1" onClick={handleRecordDrop}>
+                Confirm Drop
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Blind Close Shift Modal */}
+      {/* ─── Blind Close Shift Modal ─── */}
       {isCloseModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-panel">
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '12px' }}>Blind Close Cashier Shift</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Enter the total physical cash counted in the drawer. The system will audit the discrepancy against sales.
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setIsCloseModalOpen(false)}>
+          <div className="modal-content">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle size={20} style={{ color: 'var(--danger)' }} />
+              <h2 className="modal-title mb-0">Blind Close Cashier Shift</h2>
+            </div>
+            <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
+              Enter the total physical cash counted in the drawer. The system will calculate the
+              discrepancy (variance) against expected sales.
             </p>
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Physical Counted Cash (ETB)</label>
+
+            <label className="field-label">Physical Counted Cash (ETB)</label>
             <input
               type="number"
+              className="field-input mt-1 text-2xl font-extrabold"
               value={countedCash}
               onChange={(e) => setCountedCash(parseFloat(e.target.value) || 0)}
-              style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)', color: '#ffffff', fontSize: '1.2rem', fontWeight: 700, borderRadius: '8px', margin: '8px 0 16px' }}
+              autoFocus
             />
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="button" className="chip-btn" onClick={() => setIsCloseModalOpen(false)} style={{ flex: 1, padding: '10px' }}>Cancel</button>
-              <button type="button" className="pay-btn" onClick={handleCloseShift} style={{ flex: 1, marginTop: 0, background: '#ef4444' }}>Submit Z-Close</button>
+
+            <div
+              className="flex justify-between items-center mt-3 px-3 py-2.5 rounded-lg text-sm"
+              style={{ background: 'var(--bg-elevated)' }}
+            >
+              <span style={{ color: 'var(--text-muted)' }}>Expected in drawer</span>
+              <span className="font-bold tabular" style={{ color: 'var(--primary)' }}>
+                ETB {fmt(expectedCashInDrawer)}
+              </span>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button type="button" className="btn-secondary flex-1" onClick={() => setIsCloseModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn-danger flex-1" onClick={handleCloseShift}>
+                Submit Z-Close
+              </button>
             </div>
           </div>
         </div>

@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Database,
   ArrowUpRight,
-  ArrowDownLeft,
 } from 'lucide-react';
 
 interface SyncEventItem {
@@ -25,66 +24,68 @@ interface SyncEventItem {
   payloadSummary: string;
 }
 
+const INITIAL_EVENTS: SyncEventItem[] = [
+  {
+    id: 'outbox-01',
+    eventType: 'SALE_COMPLETED',
+    aggregateType: 'Transaction',
+    aggregateId: 'TX-20261021-0042',
+    status: 'DELIVERED',
+    retryCount: 0,
+    occurredAt: '2026-10-21 22:45:12',
+    payloadSummary: 'Receipt TX-20261021-0042, Total: ETB 1,120.00, VAT: ETB 146.09 (Telebirr)',
+  },
+  {
+    id: 'outbox-02',
+    eventType: 'STOCK_ADJUSTED',
+    aggregateType: 'StockLedger',
+    aggregateId: 'ADJ-20261021-001',
+    status: 'DELIVERED',
+    retryCount: 0,
+    occurredAt: '2026-10-21 22:30:00',
+    payloadSummary: 'Damaged item write-off: FLOUR-TEFF-MAGNA-5K (−1 bag, DAMAGED_GOODS)',
+  },
+  {
+    id: 'outbox-03',
+    eventType: 'SHIFT_CLOSED',
+    aggregateType: 'Shift',
+    aggregateId: 'SHIFT-20261021-01',
+    status: 'DELIVERED',
+    retryCount: 0,
+    occurredAt: '2026-10-21 21:00:15',
+    payloadSummary: 'Z-Report closed: Cashier Bethlehem T., Over/Short: 0.00 ETB',
+  },
+  {
+    id: 'outbox-04',
+    eventType: 'GRN_RECEIVED',
+    aggregateType: 'GoodsReceivedNote',
+    aggregateId: 'GRN-20261021-008',
+    status: 'PENDING',
+    retryCount: 0,
+    occurredAt: '2026-10-21 22:50:33',
+    payloadSummary: 'Received from Almaz Agro Industries: 40 units Anchor Milk, AVCO → ETB 85.00',
+  },
+];
+
 export const SyncMonitor: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('Just now (22:54:10)');
-  const [events, setEvents] = useState<SyncEventItem[]>([
-    {
-      id: 'outbox-01',
-      eventType: 'SALE_COMPLETED',
-      aggregateType: 'Transaction',
-      aggregateId: 'TX-20261021-0042',
-      status: 'DELIVERED',
-      retryCount: 0,
-      occurredAt: '2026-10-21 22:45:12',
-      payloadSummary: 'Receipt TX-20261021-0042, Total: ETB 1,120.00, VAT: ETB 146.09 (Telebirr)',
-    },
-    {
-      id: 'outbox-02',
-      eventType: 'STOCK_ADJUSTED',
-      aggregateType: 'StockLedger',
-      aggregateId: 'ADJ-20261021-001',
-      status: 'DELIVERED',
-      retryCount: 0,
-      occurredAt: '2026-10-21 22:30:00',
-      payloadSummary: 'Damaged item write-off: FLOUR-TEFF-MAGNA-5K (-1 bag, DAMAGED_EXPIRED)',
-    },
-    {
-      id: 'outbox-03',
-      eventType: 'SHIFT_CLOSED',
-      aggregateType: 'Shift',
-      aggregateId: 'SHIFT-20261021-01',
-      status: 'DELIVERED',
-      retryCount: 0,
-      occurredAt: '2026-10-21 21:00:15',
-      payloadSummary: 'Z-Report closed: Cashier Bethlehem, Over/Short: 0.00 ETB',
-    },
-    {
-      id: 'outbox-04',
-      eventType: 'GRN_RECEIVED',
-      aggregateType: 'GoodsReceivedNote',
-      aggregateId: 'GRN-20261021-008',
-      status: 'PENDING',
-      retryCount: 0,
-      occurredAt: '2026-10-21 22:50:33',
-      payloadSummary: 'Received from Alfoz Trading: 40 units Anchor Milk, AVCO updated to ETB 85.00',
-    },
-  ]);
+  const [events, setEvents] = useState<SyncEventItem[]>(INITIAL_EVENTS);
+
+  const pendingCount = events.filter((e) => e.status === 'PENDING').length;
 
   const handleTriggerSync = () => {
     if (!isOnline) {
-      alert('Branch is currently in Offline Mode! Toggle connection to online to sync with HQ server.');
+      alert('Branch is currently in Offline Mode. Toggle to Online to sync with HQ.');
       return;
     }
     setIsSyncing(true);
     setTimeout(() => {
       setIsSyncing(false);
       setLastSyncTime(new Date().toLocaleTimeString());
-      setEvents((prev) =>
-        prev.map((e) => ({ ...e, status: 'DELIVERED' }))
-      );
-    }, 1200);
+      setEvents((prev) => prev.map((e) => ({ ...e, status: 'DELIVERED' })));
+    }, 1400);
   };
 
   const handleSimulateNewEvent = () => {
@@ -101,254 +102,216 @@ export const SyncMonitor: React.FC = () => {
     setEvents([newEvt, ...events]);
   };
 
-  const pendingCount = events.filter((e) => e.status === 'PENDING').length;
+  /* status pill */
+  const StatusPill = ({ status }: { status: SyncEventItem['status'] }) =>
+    status === 'DELIVERED' ? (
+      <span className="badge-success">
+        <CheckCircle2 size={11} />
+        Delivered
+      </span>
+    ) : status === 'RETRYING' ? (
+      <span className="badge-warning">
+        <RefreshCw size={11} />
+        Retrying
+      </span>
+    ) : (
+      <span className="badge-warning">
+        <AlertCircle size={11} />
+        Pending
+      </span>
+    );
 
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', overflowY: 'auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="page-container flex flex-col gap-6">
+      {/* ─── Header ─── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Database size={24} color="var(--primary)" />
-            Local-Server-First Sync Engine & HQ Replication
-          </h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Bidirectional Outbox Queue & Conflict Resolution (Authority Matrix)
+          <h1 className="page-title flex items-center gap-2">
+            <Database size={22} style={{ color: 'var(--primary)' }} />
+            HQ Sync &amp; Replication
+          </h1>
+          <p className="page-subtitle">
+            Bidirectional Outbox Queue &amp; Conflict Resolution (Authority Matrix)
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Toggle Online/Offline */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Online / Offline toggle */}
           <button
-            onClick={() => setIsOnline(!isOnline)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius-md)',
-              background: isOnline ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-              color: isOnline ? '#10b981' : '#ef4444',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-            }}
+            onClick={() => setIsOnline((v) => !v)}
+            className={isOnline ? 'btn-secondary' : 'btn-danger'}
+            style={
+              isOnline
+                ? {
+                    color: 'var(--primary)',
+                    borderColor: 'rgba(5,150,105,.3)',
+                    background: 'rgba(5,150,105,.08)',
+                  }
+                : undefined
+            }
           >
-            {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-            {isOnline ? 'Branch LAN: Connected to HQ' : 'Branch LAN: Offline Standalone'}
+            {isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
+            {isOnline ? 'Connected to HQ' : 'Offline Standalone'}
           </button>
 
-          {/* Manual Sync Trigger */}
+          {/* Sync Now */}
           <button
+            className="btn-primary"
             onClick={handleTriggerSync}
             disabled={isSyncing}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 18px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--primary)',
-              color: '#000',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              opacity: isSyncing ? 0.7 : 1,
-            }}
+            style={{ opacity: isSyncing ? 0.7 : 1 }}
           >
-            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
-            {isSyncing ? 'Synchronizing...' : 'Sync Now'}
+            <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
+            {isSyncing ? 'Syncing…' : 'Sync Now'}
           </button>
         </div>
       </div>
 
-      {/* Sync Status Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-            <span>Branch Outbox Queue</span>
-            <CloudUpload size={18} color="var(--primary)" />
+      {/* ─── Status KPI Cards ─── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="kpi-card">
+          <div className="kpi-label flex items-center justify-between">
+            Outbox Queue
+            <CloudUpload size={15} style={{ color: 'var(--primary)' }} />
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '8px', color: pendingCount > 0 ? '#f59e0b' : '#10b981' }}>
-            {pendingCount} Pending
+          <div
+            className="kpi-value tabular"
+            style={{ color: pendingCount > 0 ? 'var(--warning)' : 'var(--primary)' }}
+          >
+            {pendingCount}
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-            {isOnline ? 'Pushing queued deltas to HQ' : 'Safely queued locally on SQLite/PG'}
-          </div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-            <span>HQ Catalog Pull</span>
-            <CloudDownload size={18} color="#3b82f6" />
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '8px', color: '#60a5fa' }}>
-            Up To Date
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-            Version v14.0 (Central master catalog)
+          <div className="kpi-sub">
+            {pendingCount > 0 ? 'Events pending sync' : 'All events delivered'}
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-            <span>Conflict Resolution</span>
-            <ShieldCheck size={18} color="#10b981" />
+        <div className="kpi-card">
+          <div className="kpi-label flex items-center justify-between">
+            HQ Catalog Pull
+            <CloudDownload size={15} style={{ color: 'var(--info)' }} />
           </div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: '10px', color: '#34d399' }}>
-            Authority Matrix
+          <div className="kpi-value" style={{ color: 'var(--info)' }}>
+            ✓ Synced
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-            Branch owns Sales/Cash; HQ owns Global Price
-          </div>
+          <div className="kpi-sub">Central master catalog v14.0</div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-            <span>Last Successful Sync</span>
-            <Clock size={18} color="var(--accent-gold)" />
+        <div className="kpi-card">
+          <div className="kpi-label flex items-center justify-between">
+            Conflict Resolution
+            <ShieldCheck size={15} style={{ color: 'var(--primary)' }} />
           </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 800, marginTop: '12px', color: 'var(--text-main)' }}>
-            {lastSyncTime}
+          <div className="kpi-value text-xl" style={{ color: 'var(--primary)' }}>
+            Auth Matrix
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-            Auto-sync interval: every 60s
+          <div className="kpi-sub">Branch owns Sales · HQ owns Prices</div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-label flex items-center justify-between">
+            Last Successful Sync
+            <Clock size={15} style={{ color: 'var(--warning)' }} />
           </div>
+          <div className="kpi-value text-xl">{lastSyncTime}</div>
+          <div className="kpi-sub">Auto-interval: every 60 s</div>
         </div>
       </div>
 
-      {/* Authority Matrix Architectural Info Banner */}
+      {/* ─── Offline integrity banner ─── */}
       <div
-        className="glass-panel"
+        className="glass-panel p-4 flex items-center justify-between gap-4 flex-wrap"
         style={{
-          padding: '16px 20px',
-          background: 'rgba(59, 130, 246, 0.08)',
-          borderColor: 'rgba(59, 130, 246, 0.25)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          background: 'rgba(37,99,235,.06)',
+          borderColor: 'rgba(37,99,235,.2)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="flex items-center gap-3">
           <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '8px',
-              background: 'rgba(59, 130, 246, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#60a5fa',
-            }}
+            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(37,99,235,.15)' }}
           >
-            <ShieldCheck size={22} />
+            <ShieldCheck size={20} style={{ color: 'var(--info)' }} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#93c5fd' }}>
+            <div className="font-bold text-sm" style={{ color: 'var(--info)' }}>
               Multi-Branch Offline Integrity Protocol
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Even if Addis Ababa telecom internet drops for 48 hours, Bole Branch operates at 100% speed.
-              Sales are recorded locally with UUIDv7 timestamps and sync automatically upon reconnection with zero duplicate charges.
+            <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Even if Addis Ababa telecom internet drops for 48 hours, Bole Branch operates at
+              100% speed. Sales are recorded locally with UUIDv7 timestamps and sync automatically
+              upon reconnection with zero duplicate charges.
             </div>
           </div>
         </div>
 
-        <button
-          onClick={handleSimulateNewEvent}
-          style={{
-            padding: '8px 14px',
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            color: 'var(--text-main)',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <button className="btn-secondary text-sm flex-shrink-0" onClick={handleSimulateNewEvent}>
           + Simulate POS Event
         </button>
       </div>
 
-      {/* Outbox Replication Log Table */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <CloudUpload size={18} color="var(--primary)" />
-          Local Branch Outbox Queue (`sync_outbox`)
+      {/* ─── Outbox Queue Table ─── */}
+      <div className="glass-panel p-5">
+        <h3
+          className="font-bold text-base mb-4 flex items-center gap-2"
+          style={{ color: 'var(--text-main)' }}
+        >
+          <CloudUpload size={16} style={{ color: 'var(--primary)' }} />
+          Local Branch Outbox Queue (sync_outbox)
         </h3>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="pos-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+        <div className="overflow-x-auto">
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-dim)', textAlign: 'left' }}>
-                <th style={{ padding: '10px' }}>Direction</th>
-                <th style={{ padding: '10px' }}>Event Type</th>
-                <th style={{ padding: '10px' }}>Aggregate</th>
-                <th style={{ padding: '10px' }}>Payload Summary</th>
-                <th style={{ padding: '10px' }}>Timestamp</th>
-                <th style={{ padding: '10px' }}>Status</th>
+              <tr>
+                <th>Direction</th>
+                <th>Event Type</th>
+                <th>Aggregate</th>
+                <th>Payload Summary</th>
+                <th>Timestamp</th>
+                <th className="text-center">Status</th>
               </tr>
             </thead>
             <tbody>
               {events.map((evt) => (
-                <tr key={evt.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '10px' }}>
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '2px 8px',
-                        borderRadius: 'var(--radius-full)',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        color: '#34d399',
-                      }}
-                    >
-                      <ArrowUpRight size={14} />
+                <tr key={evt.id}>
+                  <td>
+                    <span className="badge-success">
+                      <ArrowUpRight size={11} />
                       Branch → HQ
                     </span>
                   </td>
-                  <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--primary)' }}>
-                    {evt.eventType}
+                  <td>
+                    <span
+                      className="font-mono text-xs font-bold"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      {evt.eventType}
+                    </span>
                   </td>
-                  <td style={{ padding: '10px' }}>
-                    <div style={{ fontWeight: 600 }}>{evt.aggregateType}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{evt.aggregateId}</div>
+                  <td>
+                    <div className="font-semibold text-sm">{evt.aggregateType}</div>
+                    <div
+                      className="text-xs font-mono mt-0.5"
+                      style={{ color: 'var(--text-dim)' }}
+                    >
+                      {evt.aggregateId}
+                    </div>
                   </td>
-                  <td style={{ padding: '10px', color: 'var(--text-muted)' }}>
+                  <td
+                    className="text-xs max-w-xs truncate"
+                    style={{ color: 'var(--text-muted)' }}
+                    title={evt.payloadSummary}
+                  >
                     {evt.payloadSummary}
                   </td>
-                  <td style={{ padding: '10px', fontSize: '0.8rem', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                  <td
+                    className="text-xs whitespace-nowrap"
+                    style={{ color: 'var(--text-dim)' }}
+                  >
                     {evt.occurredAt}
                   </td>
-                  <td style={{ padding: '10px' }}>
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '3px 8px',
-                        borderRadius: 'var(--radius-full)',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        background:
-                          evt.status === 'DELIVERED'
-                            ? 'rgba(16, 185, 129, 0.15)'
-                            : 'rgba(245, 158, 11, 0.15)',
-                        color: evt.status === 'DELIVERED' ? '#34d399' : '#fbbf24',
-                        border: `1px solid ${
-                          evt.status === 'DELIVERED'
-                            ? 'rgba(16, 185, 129, 0.3)'
-                            : 'rgba(245, 158, 11, 0.3)'
-                        }`,
-                      }}
-                    >
-                      {evt.status === 'DELIVERED' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                      {evt.status}
-                    </span>
+                  <td className="text-center">
+                    <StatusPill status={evt.status} />
                   </td>
                 </tr>
               ))}
