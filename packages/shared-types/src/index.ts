@@ -11,3 +11,4 @@ export * from './fefo-allocator';
 export * from './receipt-formatter';
 export * from './purchasing-calculator';
 export * from './uuidv7';
+export * from './auth.types';

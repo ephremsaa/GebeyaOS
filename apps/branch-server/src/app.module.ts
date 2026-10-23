@@ -8,11 +8,15 @@ import { PurchasingModule } from './modules/purchasing/purchasing.module';
 import { TransfersModule } from './modules/transfers/transfers.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
+    AuthModule,
+    UsersModule,
     ProductsModule,
     InventoryModule,
     PosModule,
