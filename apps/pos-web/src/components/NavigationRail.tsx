@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Sparkles,
   ShoppingCart,
@@ -70,7 +70,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
     },
     {
       id: 'catalog' as NavTabId,
-      label: language === 'am' ? 'እቃዎች' : 'Catalog',
+      label: language === 'am' ? 'ካታሎግ' : 'Catalog',
       icon: <Tag size={19} />,
       isPrimary: false,
       allowed: hasPermission('catalog:cost:view') || hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
@@ -152,31 +152,32 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   const secondaryItems = allowedTabs.filter((tab) => !tab.isPrimary);
 
   return (
-    <nav className="w-16 sm:w-20 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col items-center py-2.5 justify-between flex-shrink-0 select-none z-20 overflow-y-auto">
+    <nav className="w-[92px] bg-surface border-r border-border-subtle flex flex-col items-center py-3 justify-between flex-shrink-0 select-none z-20 overflow-y-auto no-scrollbar">
       {/* Primary Actions */}
-      <div className="flex flex-col gap-1.5 w-full px-2">
+      <div className="flex flex-col gap-2 w-full px-2">
         {primaryItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => onTabChange(item.id)}
-              className={`min-h-[48px] w-full rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+              className={`min-h-[52px] w-full rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
                 isActive
-                  ? 'bg-gebeya-600 text-white shadow-sm shadow-gebeya-600/30 font-bold'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 font-medium'
+                  ? 'bg-primary text-white shadow-xs font-bold'
+                  : 'text-text-muted hover:text-text-main hover:bg-elevated font-semibold'
               }`}
               title={item.label}
             >
               {item.icon}
-              <span className="text-[10px] leading-none tracking-tight">{item.label}</span>
+              <span className="text-xs leading-none tracking-tight">{item.label}</span>
             </button>
           );
         })}
 
         {/* Divider if secondary items exist */}
         {secondaryItems.length > 0 && (
-          <div className="h-px bg-slate-200 dark:bg-slate-800 my-1 mx-2" />
+          <div className="h-px bg-border-subtle my-1.5 mx-2" />
         )}
 
         {/* Secondary Modules */}
@@ -186,16 +187,17 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
             return (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => onTabChange(item.id)}
-                className={`min-h-[44px] w-full rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
+                className={`min-h-[48px] w-full rounded-xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer ${
                   isActive
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-bold'
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-elevated text-text-main border border-border-strong font-bold'
+                    : 'text-text-dim hover:text-text-main hover:bg-elevated font-semibold'
                 }`}
                 title={item.label}
               >
                 {item.icon}
-                <span className="text-[9px] leading-none">{item.label}</span>
+                <span className="text-xs leading-none">{item.label}</span>
               </button>
             );
           })}

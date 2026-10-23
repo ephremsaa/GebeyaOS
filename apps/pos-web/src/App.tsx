@@ -86,10 +86,7 @@ const MainApp: React.FC = () => {
 
   // 3. Authenticated POS Application
   return (
-    <div
-      className="flex flex-col h-screen w-screen overflow-hidden font-sans"
-      style={{ background: 'var(--bg-page)', color: 'var(--text-main)' }}
-    >
+    <div className="flex flex-col h-screen w-screen overflow-hidden font-sans bg-page text-text-main">
       {/* 1. Slim Top Bar with Command Search, Notifications, Active Cashier, Menu, Language & Theme */}
       <TopBar
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
@@ -106,7 +103,7 @@ const MainApp: React.FC = () => {
         />
 
         {/* Active Content Pane */}
-        <main className="flex-1 flex overflow-hidden" style={{ background: 'var(--bg-page)' }}>
+        <main className="flex-1 flex overflow-hidden bg-page">
           {activeTab === 'dashboard'  && <DashboardView onNavigate={setActiveTab} />}
           {activeTab === 'checkout'   && <PosCheckout />}
           {activeTab === 'shifts'     && <ShiftManagement />}
