@@ -1,24 +1,49 @@
 import React, { useState } from 'react';
-import { Package, AlertTriangle, FileEdit, CheckCircle2, Search, X } from 'lucide-react';
+import {
+  Package,
+  AlertTriangle,
+  FileEdit,
+  CheckCircle2,
+  Search,
+  X,
+  Plus,
+  History,
+} from 'lucide-react';
 import { SAMPLE_PRODUCTS, SampleProduct } from '../sample-data';
 import { StockAdjustmentReasonCode } from '@gebeyaos/shared-types';
+import { AddStockChooserModal } from './inventory/AddStockChooserModal';
+import { ScanStockDrawer } from './inventory/ScanStockDrawer';
+import { ManualStockDrawer } from './inventory/ManualStockDrawer';
+import { ExcelImportModal } from './inventory/ExcelImportModal';
+import { ImportHistoryModal } from './inventory/ImportHistoryModal';
 
 export const InventoryView: React.FC = () => {
   const [products, setProducts] = useState<SampleProduct[]>(SAMPLE_PRODUCTS);
   const [search, setSearch] = useState<string>('');
-  const [isAdjModalOpen, setIsAdjModalOpen] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Modals state
+  const [isChooserOpen, setIsChooserOpen] = useState<boolean>(false);
+  const [isScanOpen, setIsScanOpen] = useState<boolean>(false);
+  const [isManualOpen, setIsManualOpen] = useState<boolean>(false);
+  const [isExcelOpen, setIsExcelOpen] = useState<boolean>(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
+  const [isAdjModalOpen, setIsAdjModalOpen] = useState<boolean>(false);
+
+  // Write-off form state
   const [selectedProdId, setSelectedProdId] = useState<string>(SAMPLE_PRODUCTS[0]?.id || '');
   const [reasonCode, setReasonCode] = useState<StockAdjustmentReasonCode>('DAMAGED_GOODS');
   const [adjQuantity, setAdjQuantity] = useState<number>(-1);
-  const [adjNotes, setAdjNotes] = useState<string>('Broken jar / crushed packaging during shelf stocking');
+  const [adjNotes, setAdjNotes] = useState<string>(
+    'Broken jar / crushed packaging during shelf stocking',
+  );
 
   const filtered = products.filter(
     (p) =>
       p.nameEn.toLowerCase().includes(search.toLowerCase()) ||
       p.sku.toLowerCase().includes(search.toLowerCase()) ||
-      p.category.toLowerCase().includes(search.toLowerCase()),
+      p.category.toLowerCase().includes(search.toLowerCase()) ||
+      p.barcode.includes(search),
   );
 
   const fmt = (n: number) =>
@@ -40,31 +65,51 @@ export const InventoryView: React.FC = () => {
     setTimeout(() => setSuccessMsg(null), 4000);
   };
 
+  const handleInflowSuccess = (message: string, updatedProducts: SampleProduct[]) => {
+    setProducts(updatedProducts);
+    setSuccessMsg(message);
+    setTimeout(() => setSuccessMsg(null), 5000);
+  };
+
   const lowCount = products.filter((p) => p.stockOnHand <= p.minStock).length;
 
   return (
-    <div className="page-container">
+    <div className="page-container select-none">
       {/* ─── Header ─── */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Inventory &amp; Stock Ledger</h1>
           <p className="page-subtitle">
-            Real-time on-hand balances, low-stock alerts, and write-offs
+            Real-time on-hand balances, barcode intake, Excel import, and write-offs
           </p>
         </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setIsAdjModalOpen(true)}
-        >
-          <FileEdit size={15} />
-          New Adjustment
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsHistoryOpen(true)}
+            className="btn-secondary text-xs flex items-center gap-1.5"
+            title="View past bulk imports and audit log"
+          >
+            <History size={14} className="text-slate-400" />
+            Import History
+          </button>
+
+          {/* Primary Add Stock Button (Replaces single adjustment button) */}
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setIsChooserOpen(true)}
+          >
+            <Plus size={16} />
+            Add Stock
+          </button>
+        </div>
       </div>
 
       {/* ─── Alert banner ─── */}
       {successMsg && (
-        <div className="alert-success mb-4">
+        <div className="alert-success mb-4 flex items-center gap-2">
           <CheckCircle2 size={16} />
           {successMsg}
         </div>
@@ -77,7 +122,7 @@ export const InventoryView: React.FC = () => {
           <input
             type="text"
             className="search-input"
-            placeholder="Filter by name, SKU, or category…"
+            placeholder="Filter by product name, SKU, barcode, or category…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -131,12 +176,14 @@ export const InventoryView: React.FC = () => {
                 return (
                   <tr key={p.id}>
                     <td>
-                      <span
-                        className="text-xs font-mono"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        {p.sku}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
+                          {p.sku}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400">
+                          {p.barcode}
+                        </span>
+                      </div>
                     </td>
                     <td className="font-semibold">{p.nameEn}</td>
                     <td style={{ color: 'var(--text-muted)' }}>{p.category}</td>
@@ -173,7 +220,48 @@ export const InventoryView: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── Stock Adjustment Modal ─── */}
+      {/* ─── Add Stock Chooser Modal ─── */}
+      <AddStockChooserModal
+        isOpen={isChooserOpen}
+        onClose={() => setIsChooserOpen(false)}
+        onSelectScan={() => setIsScanOpen(true)}
+        onSelectManual={() => setIsManualOpen(true)}
+        onSelectExcel={() => setIsExcelOpen(true)}
+        onSelectAdjustment={() => setIsAdjModalOpen(true)}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+      />
+
+      {/* ─── Method A: Scan-to-Add Drawer ─── */}
+      <ScanStockDrawer
+        isOpen={isScanOpen}
+        onClose={() => setIsScanOpen(false)}
+        onCommitSuccess={handleInflowSuccess}
+        existingProducts={products}
+      />
+
+      {/* ─── Method B: Manual Multi-Line Drawer ─── */}
+      <ManualStockDrawer
+        isOpen={isManualOpen}
+        onClose={() => setIsManualOpen(false)}
+        onCommitSuccess={handleInflowSuccess}
+        existingProducts={products}
+      />
+
+      {/* ─── Method C: Excel / CSV Import Modal ─── */}
+      <ExcelImportModal
+        isOpen={isExcelOpen}
+        onClose={() => setIsExcelOpen(false)}
+        onCommitSuccess={handleInflowSuccess}
+        existingProducts={products}
+      />
+
+      {/* ─── Import History Modal ─── */}
+      <ImportHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+      />
+
+      {/* ─── Stock Write-off Adjustment Modal ─── */}
       {isAdjModalOpen && (
         <div
           className="modal-overlay"
@@ -181,6 +269,9 @@ export const InventoryView: React.FC = () => {
         >
           <div className="modal-content">
             <h2 className="modal-title">Stock Adjustment / Write-Off</h2>
+            <p className="text-xs text-slate-500 mb-4">
+              Log inventory damage, expiry shrinkage, or count corrections into append-only ledger.
+            </p>
 
             <form onSubmit={handleCreateAdjustment} className="flex flex-col gap-4">
               <div>
