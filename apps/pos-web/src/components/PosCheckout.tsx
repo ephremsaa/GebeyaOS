@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Scale, Sparkles } from 'lucide-react';
-import { SAMPLE_PRODUCTS, SAMPLE_CATEGORIES, SampleProduct } from '../sample-data';
+import { Scale } from 'lucide-react';
+import {
+  SAMPLE_PRODUCTS,
+  SAMPLE_CATEGORIES,
+  SampleProduct,
+  getCategoryName,
+} from '../sample-data';
 import {
   BarcodeParser,
   formatEscPosThermalReceipt,
   generateReceiptNumber,
 } from '@gebeyaos/shared-types';
 import { useI18n } from '../i18n/I18nContext';
-import { Pill } from './ui/Pill';
-import { Card } from './ui/Card';
+import { Pill, Card, SearchInput, SearchInputHandle } from './ui';
 import { BasketPanel } from './BasketPanel';
 import { WeightModal } from './WeightModal';
 import { PaymentModal, PaymentMethodType } from './PaymentModal';
@@ -39,7 +43,7 @@ export const PosCheckout: React.FC = () => {
   const [completedReceiptNo, setCompletedReceiptNo] = useState<string | null>(null);
   const [completedReceiptText, setCompletedReceiptText] = useState<string | null>(null);
 
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<SearchInputHandle>(null);
 
   // Focus search input on mount and keep focused
   useEffect(() => {
@@ -74,7 +78,7 @@ export const PosCheckout: React.FC = () => {
   const addToCart = (product: SampleProduct, quantity: number = 1, scaleWeightGrams?: number) => {
     playScanBeep();
     setRecentlyAddedId(product.id);
-    setTimeout(() => setRecentlyAddedId(null), 400);
+    setTimeout(() => setRecentlyAddedId(null), 350);
 
     setCart((prev) => {
       // If scale item, always add as discrete line
@@ -119,6 +123,11 @@ export const PosCheckout: React.FC = () => {
         },
       ];
     });
+
+    // Refocus search bar after instant add
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 50);
   };
 
   const handleProductCardClick = (product: SampleProduct) => {
@@ -131,8 +140,7 @@ export const PosCheckout: React.FC = () => {
     }
   };
 
-  const handleBarcodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleBarcodeSubmit = () => {
     const code = searchQuery.trim();
     if (!code) return;
 
@@ -147,6 +155,7 @@ export const PosCheckout: React.FC = () => {
         if (matched) {
           addToCart(matched, parsed.embeddedQuantity, parsed.embeddedQuantity * 1000);
           setSearchQuery('');
+          searchInputRef.current?.focus();
           return;
         }
       }
@@ -167,8 +176,7 @@ export const PosCheckout: React.FC = () => {
         addToCart(found, 1);
       }
       setSearchQuery('');
-    } else {
-      // Keep query in input for manual name filtering
+      searchInputRef.current?.focus();
     }
   };
 
@@ -195,18 +203,21 @@ export const PosCheckout: React.FC = () => {
 
   const handleClearBasket = () => {
     setCart([]);
+    searchInputRef.current?.focus();
   };
 
   const handleHoldBasket = () => {
     if (cart.length === 0) return;
     setHeldCart([...cart]);
     setCart([]);
+    searchInputRef.current?.focus();
   };
 
   const handleResumeBasket = () => {
     if (!heldCart) return;
     setCart([...heldCart]);
     setHeldCart(null);
+    searchInputRef.current?.focus();
   };
 
   // Complete Sale & Fiscal Receipt Formatting
@@ -287,41 +298,35 @@ export const PosCheckout: React.FC = () => {
   });
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="flex-1 flex h-full overflow-hidden bg-page text-text-main">
       {/* Product Catalog Area (Left) */}
-      <div className="flex-1 flex flex-col p-4 sm:p-5 overflow-hidden">
-        {/* Search Bar (Large, Always Focused with subtle F2 hint) */}
-        <form onSubmit={handleBarcodeSubmit} className="relative mb-3 flex-shrink-0">
-          <input
+      <div className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 overflow-hidden min-w-0">
+        {/* 1. Search Bar with F2 badge, clear button, and barcode instant add */}
+        <div className="mb-3.5 flex-shrink-0">
+          <SearchInput
             ref={searchInputRef}
-            type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onValueChange={setSearchQuery}
+            onSearchSubmit={handleBarcodeSubmit}
             placeholder={t('scanOrSearchPlaceholder')}
-            className="w-full min-h-[54px] pl-12 pr-14 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-base font-medium shadow-xs focus:border-gebeya-500 dark:focus:border-gebeya-500 focus:outline-none transition-all placeholder:text-slate-400"
+            shortcut="F2"
+            size="lg"
           />
-          <Search
-            size={22}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-          />
-          <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:inline-block px-2 py-0.5 text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 rounded-md">
-            F2
-          </kbd>
-        </form>
+        </div>
 
-        {/* Categories (Horizontally Scrollable Large Pills) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3 flex-shrink-0 no-scrollbar">
+        {/* 2. Category Pills: translated, 44px high, horizontally scrollable, selected clearly filled */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3.5 flex-shrink-0 no-scrollbar select-none">
           <Pill
             active={selectedCategory === 'ALL'}
             onClick={() => setSelectedCategory('ALL')}
           >
-            {t('allCategories')}
+            {getCategoryName('ALL', language)}
           </Pill>
           <Pill
             active={selectedCategory === 'FAVORITES'}
             onClick={() => setSelectedCategory('FAVORITES')}
           >
-            {t('favorites')}
+            {getCategoryName('FAVORITES', language)}
           </Pill>
           {SAMPLE_CATEGORIES.filter((c) => c !== 'ALL').map((cat) => (
             <Pill
@@ -329,14 +334,14 @@ export const PosCheckout: React.FC = () => {
               active={selectedCategory === cat}
               onClick={() => setSelectedCategory(cat)}
             >
-              {cat}
+              {getCategoryName(cat, language)}
             </Pill>
           ))}
         </div>
 
-        {/* Product Cards Grid */}
+        {/* 3. Product Cards Grid: auto-fill columns (min 180px), name and price only */}
         <div className="flex-1 overflow-y-auto pr-1">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
             {filteredProducts.map((product) => {
               const productName = language === 'am' && product.nameAm ? product.nameAm : product.nameEn;
               const isOut = product.stockOnHand <= 0;
@@ -348,47 +353,47 @@ export const PosCheckout: React.FC = () => {
                   key={product.id}
                   interactive={!isOut}
                   onClick={() => handleProductCardClick(product)}
-                  className={`p-4 flex flex-col justify-between min-h-[130px] transition-all relative ${
+                  className={`p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px] transition-all relative ${
                     isOut
-                      ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800/40'
+                      ? 'opacity-40 cursor-not-allowed bg-elevated/50 pointer-events-none'
                       : isRecentlyAdded
-                      ? 'ring-2 ring-gebeya-500 bg-gebeya-50/50 dark:bg-gebeya-950/40 scale-[0.98]'
-                      : 'hover:shadow-md'
+                      ? 'ring-2 ring-primary bg-primary/5 scale-[0.98]'
+                      : 'hover:shadow-md hover:border-primary/40'
                   }`}
                 >
                   {/* Top: Name & Badges */}
                   <div>
-                    <div className="flex items-start justify-between gap-1.5 mb-1">
-                      <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug">
+                    <div className="flex items-start justify-between gap-1.5 mb-1.5">
+                      <h3 className="font-bold text-xs sm:text-sm text-text-main line-clamp-2 leading-snug">
                         {productName}
                       </h3>
                       {product.isWeighed && (
-                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1">
+                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded-md bg-warning/15 text-warning text-[10px] font-bold flex items-center gap-1 select-none">
                           <Scale size={11} />
                           {t('weighedBadge')}
                         </span>
                       )}
                     </div>
 
-                    {/* Stock Alert (only low or out) */}
+                    {/* Stock Alert: low stock badge only when low, out of stock badge when 0 */}
                     {isOut ? (
-                      <span className="text-[11px] font-bold text-red-600 dark:text-red-400">
+                      <span className="text-[11px] font-bold text-danger">
                         {t('outOfStock')}
                       </span>
                     ) : isLow ? (
-                      <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                      <span className="text-[11px] font-semibold text-warning">
                         {t('lowStock')} ({product.stockOnHand})
                       </span>
                     ) : null}
                   </div>
 
-                  {/* Bottom: Price in 20px+ bold */}
-                  <div className="pt-2 flex items-baseline justify-between mt-auto">
-                    <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                  {/* Bottom: Price in bold with tabular numerals */}
+                  <div className="pt-2 flex items-baseline justify-between mt-auto border-t border-border-subtle/50">
+                    <span className="text-lg sm:text-xl font-extrabold text-text-main tabular-nums font-mono">
                       {formatCurrency(product.price)}
                     </span>
                     {product.isWeighed && (
-                      <span className="text-xs text-slate-400 font-medium">/{t('weighedUnitKg')}</span>
+                      <span className="text-xs text-text-muted font-medium">/{t('weighedUnitKg')}</span>
                     )}
                   </div>
                 </Card>
@@ -398,7 +403,7 @@ export const PosCheckout: React.FC = () => {
         </div>
       </div>
 
-      {/* Basket Panel (Right Side, Always Visible) */}
+      {/* Basket Panel (Right Side, Full Height, Fixed & Always Visible) */}
       <BasketPanel
         cart={cart}
         onUpdateQuantity={handleUpdateQuantity}
@@ -410,7 +415,7 @@ export const PosCheckout: React.FC = () => {
         onOpenPayment={() => setIsPaymentOpen(true)}
       />
 
-      {/* Weighed Item Entry Modal */}
+      {/* Weighed Item Entry Modal for Scale Items */}
       <WeightModal
         isOpen={!!weighedProduct}
         onClose={() => setWeighedProduct(null)}
@@ -428,13 +433,13 @@ export const PosCheckout: React.FC = () => {
         totalAmount={cart.reduce((sum, i) => sum + i.lineTotal, 0)}
         onCompleteSale={handleCompleteSale}
         onPrintReceipt={() => {
-          // Open thermal preview
+          // Open thermal receipt modal
         }}
         onNewSale={handleNewSale}
         completedReceiptNo={completedReceiptNo}
       />
 
-      {/* 80mm ESC/POS Thermal Receipt Modal (Optional preview when printing) */}
+      {/* 80mm ESC/POS Thermal Receipt Modal */}
       {completedReceiptText && (
         <ReceiptModal
           receiptText={completedReceiptText}

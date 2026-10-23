@@ -23,6 +23,23 @@ export const SAMPLE_CATEGORIES = [
   'Meat & Butchery',
 ];
 
+export const CATEGORY_TRANSLATIONS: Record<string, { en: string; am: string }> = {
+  ALL: { en: 'All', am: 'ሁሉ' },
+  FAVORITES: { en: '⭐ Favorites', am: '⭐ ተወዳጆች' },
+  'Dairy & Eggs': { en: 'Dairy & Eggs', am: 'የወተት እና የእንቁላል' },
+  'Bakery & Grains': { en: 'Bakery & Grains', am: 'የዳቦ እና እህሎች' },
+  'Fresh Produce': { en: 'Fresh Produce', am: 'አትክልትና ፍራፍሬ' },
+  Beverages: { en: 'Beverages', am: 'መጠጦች' },
+  Household: { en: 'Household', am: 'የቤት ውስጥ' },
+  'Meat & Butchery': { en: 'Meat & Butchery', am: 'ሥጋ እና የቄራ' },
+};
+
+export function getCategoryName(category: string, lang: 'en' | 'am' = 'en'): string {
+  const match = CATEGORY_TRANSLATIONS[category];
+  if (!match) return category;
+  return lang === 'am' ? match.am : match.en;
+}
+
 export const SAMPLE_PRODUCTS: SampleProduct[] = [
   {
     id: 'prod-01',
