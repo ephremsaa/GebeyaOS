@@ -13,3 +13,4 @@ export * from './purchasing-calculator';
 export * from './uuidv7';
 export * from './auth.types';
 export * from './import.types';
+export * from './money-formatter';

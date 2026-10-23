@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Language, TRANSLATIONS, TranslationKey } from './translations';
+import { formatMoney } from '@gebeyaos/shared-types';
 
 interface I18nContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: TranslationKey) => string;
   formatCurrency: (amount: number) => string;
+  formatMoney: (amount: number) => string;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
 }
@@ -49,11 +51,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const formatCurrency = (amount: number): string => {
-    const formatted = amount.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    return language === 'am' ? `${formatted} ብር` : `${formatted} ETB`;
+    return formatMoney(amount, language);
   };
 
   return (
@@ -63,6 +61,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLanguage,
         t,
         formatCurrency,
+        formatMoney: formatCurrency,
         isDarkMode,
         toggleDarkMode,
       }}
