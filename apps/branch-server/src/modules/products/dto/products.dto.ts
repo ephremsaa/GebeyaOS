@@ -147,3 +147,107 @@ export class PriceChangeDto {
   @IsOptional()
   branch_id?: string;
 }
+
+export class UpdateProductDto {
+  @IsString()
+  @IsOptional()
+  sku?: string;
+
+  @IsString()
+  @IsOptional()
+  name_en?: string;
+
+  @IsString()
+  @IsOptional()
+  name_am?: string;
+
+  @IsUUID()
+  @IsOptional()
+  category_id?: string;
+
+  @IsString()
+  @IsOptional()
+  uom_code?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  base_price?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  cost_price?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  is_vat_applicable?: boolean;
+
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @IsOptional()
+  @Type(() => Number)
+  vat_rate?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  is_weighed?: boolean;
+
+  @IsString()
+  @IsOptional()
+  scale_plu?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  min_stock_level?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  max_stock_level?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  allow_discount?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  is_active?: boolean;
+}
+
+export class ProductQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsUUID()
+  category_id?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  low_stock_only?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  active_only?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  limit?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  offset?: number;
+}
+

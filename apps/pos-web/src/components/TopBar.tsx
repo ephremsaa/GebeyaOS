@@ -14,12 +14,24 @@ import {
   RotateCcw,
   CheckCircle2,
   X,
+  Search,
+  Bell,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
 import { StatusDot } from './ui/StatusDot';
 
-export const TopBar: React.FC = () => {
+export interface TopBarProps {
+  onOpenCommandPalette?: () => void;
+  onOpenNotifications?: () => void;
+  unreadNotificationsCount?: number;
+}
+
+export const TopBar: React.FC<TopBarProps> = ({
+  onOpenCommandPalette,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
+}) => {
   const { language, setLanguage, t, isDarkMode, toggleDarkMode } = useI18n();
   const { currentUser, logout, lockSession, switchCashier, updateUserPassword, updateUserPin } = useAuth();
 
@@ -116,13 +128,42 @@ export const TopBar: React.FC = () => {
         </div>
       )}
 
-      {/* Cashier & Status Dropdown trigger */}
-      <div className="relative" ref={menuRef}>
-        <StatusDot
-          status="online"
-          cashierName={cashierName}
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-        />
+      {/* Center: Command Palette Trigger */}
+      <button
+        type="button"
+        onClick={onOpenCommandPalette}
+        className="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 transition cursor-pointer"
+      >
+        <Search size={14} className="text-slate-400" />
+        <span className="font-medium">Jump to page, product, or action...</span>
+        <kbd className="px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-[10px] font-bold text-slate-500">
+          Ctrl+K
+        </kbd>
+      </button>
+
+      {/* Right Controls: Bell + Cashier Status */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenNotifications}
+          className="relative p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition"
+          title="Notification Center"
+        >
+          <Bell size={18} />
+          {unreadNotificationsCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-bold text-[9px] flex items-center justify-center animate-pulse">
+              {unreadNotificationsCount}
+            </span>
+          )}
+        </button>
+
+        {/* Cashier & Status Dropdown trigger */}
+        <div className="relative" ref={menuRef}>
+          <StatusDot
+            status="online"
+            cashierName={cashierName}
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          />
 
         {/* Dropdown Menu */}
         {isMenuOpen && (
@@ -269,6 +310,7 @@ export const TopBar: React.FC = () => {
             </button>
           </div>
         )}
+      </div>
       </div>
 
       {/* Change Password Modal */}

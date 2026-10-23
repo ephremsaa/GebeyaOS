@@ -644,4 +644,151 @@ export class InventoryService {
       })),
     };
   }
+
+  /**
+   * Retrieves stock take sessions with summaries.
+   */
+  async getStockTakes(branchId: string, status?: string): Promise<any[]> {
+    let query = `
+      SELECT
+        st.id,
+        st.branch_id,
+        st.count_number,
+        st.scope,
+        st.category_id,
+        c.name_en as category_name,
+        st.status,
+        st.notes,
+        st.conducted_by,
+        u1.full_name as conducted_by_name,
+        st.reconciled_by,
+        u2.full_name as reconciled_by_name,
+        st.started_at,
+        st.completed_at,
+        COUNT(sti.id) as item_count,
+        COALESCE(SUM(sti.variance), 0) as total_variance_units,
+        COALESCE(SUM(sti.variance * sti.unit_cost), 0) as total_variance_cost
+      FROM stock_takes st
+      LEFT JOIN categories c ON st.category_id = c.id
+      LEFT JOIN users u1 ON st.conducted_by = u1.id
+      LEFT JOIN users u2 ON st.reconciled_by = u2.id
+      LEFT JOIN stock_take_items sti ON st.id = sti.stock_take_id
+      WHERE st.branch_id = $1
+    `;
+    const params: any[] = [branchId];
+
+    if (status) {
+      query += ` AND st.status = $2`;
+      params.push(status);
+    }
+
+    query += `
+      GROUP BY st.id, c.name_en, u1.full_name, u2.full_name
+      ORDER BY st.started_at DESC
+    `;
+
+    const res = await this.db.query(query, params);
+    return res.rows.map((r: any) => ({
+      id: r.id,
+      branchId: r.branch_id,
+      countNumber: r.count_number,
+      scope: r.scope,
+      categoryId: r.category_id,
+      categoryName: r.category_name,
+      status: r.status,
+      notes: r.notes,
+      conductedBy: r.conducted_by,
+      conductedByName: r.conducted_by_name,
+      reconciledBy: r.reconciled_by,
+      reconciledByName: r.reconciled_by_name,
+      startedAt: r.started_at ? new Date(r.started_at).toISOString() : null,
+      completedAt: r.completed_at ? new Date(r.completed_at).toISOString() : null,
+      itemCount: parseInt(r.item_count, 10),
+      totalVarianceUnits: parseFloat(r.total_variance_units),
+      totalVarianceCost: parseFloat(r.total_variance_cost),
+    }));
+  }
+
+  /**
+   * Retrieves single stock take session with item details.
+   */
+  async getStockTakeById(stockTakeId: string): Promise<any> {
+    const takeRes = await this.db.query(
+      `SELECT
+         st.*,
+         c.name_en as category_name,
+         u1.full_name as conducted_by_name,
+         u2.full_name as reconciled_by_name
+       FROM stock_takes st
+       LEFT JOIN categories c ON st.category_id = c.id
+       LEFT JOIN users u1 ON st.conducted_by = u1.id
+       LEFT JOIN users u2 ON st.reconciled_by = u2.id
+       WHERE st.id = $1`,
+      [stockTakeId],
+    );
+
+    if (takeRes.rows.length === 0) {
+      throw new NotFoundException(`Stock take ${stockTakeId} not found`);
+    }
+
+    const t = takeRes.rows[0];
+
+    const itemsRes = await this.db.query(
+      `SELECT
+         sti.id,
+         sti.stock_take_id,
+         sti.product_id,
+         p.sku,
+         p.name_en,
+         p.name_am,
+         p.uom_code,
+         sti.batch_id,
+         sti.system_quantity,
+         sti.counted_quantity,
+         sti.variance,
+         sti.unit_cost,
+         ROUND(sti.variance * sti.unit_cost, 2) as variance_value,
+         sti.created_at,
+         COALESCE(ARRAY_AGG(DISTINCT pb.barcode) FILTER (WHERE pb.barcode IS NOT NULL), '{}') as barcodes
+       FROM stock_take_items sti
+       JOIN products p ON sti.product_id = p.id
+       LEFT JOIN product_barcodes pb ON p.id = pb.product_id
+       WHERE sti.stock_take_id = $1
+       GROUP BY sti.id, p.sku, p.name_en, p.name_am, p.uom_code
+       ORDER BY p.name_en ASC`,
+      [stockTakeId],
+    );
+
+    return {
+      id: t.id,
+      branchId: t.branch_id,
+      countNumber: t.count_number,
+      scope: t.scope,
+      categoryId: t.category_id,
+      categoryName: t.category_name,
+      status: t.status,
+      notes: t.notes,
+      conductedBy: t.conducted_by,
+      conductedByName: t.conducted_by_name,
+      reconciledBy: t.reconciled_by,
+      reconciledByName: t.reconciled_by_name,
+      startedAt: t.started_at ? new Date(t.started_at).toISOString() : null,
+      completedAt: t.completed_at ? new Date(t.completed_at).toISOString() : null,
+      items: itemsRes.rows.map((i: any) => ({
+        id: i.id,
+        productId: i.product_id,
+        sku: i.sku,
+        nameEn: i.name_en,
+        nameAm: i.name_am,
+        uomCode: i.uom_code,
+        batchId: i.batch_id,
+        systemQuantity: parseFloat(i.system_quantity),
+        countedQuantity: parseFloat(i.counted_quantity),
+        variance: parseFloat(i.variance),
+        unitCost: parseFloat(i.unit_cost),
+        varianceValue: parseFloat(i.variance_value),
+        barcodes: i.barcodes,
+      })),
+    };
+  }
 }

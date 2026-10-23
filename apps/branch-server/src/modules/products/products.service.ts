@@ -19,6 +19,8 @@ import {
   CreateBarcodeDto,
   SetBranchOverrideDto,
   PriceChangeDto,
+  UpdateProductDto,
+  ProductQueryDto,
 } from './dto/products.dto';
 
 export interface ScannedProductLookupResult {
@@ -371,5 +373,208 @@ export class ProductsService {
 
     const res = await this.db.query<PriceChangeLog>(query, params);
     return res.rows;
+  }
+
+  /**
+   * Retrieves products with search, category filtering, stock on hand, and primary barcodes.
+   */
+  async getProducts(
+    branchId: string,
+    query: ProductQueryDto,
+  ): Promise<{ total: number; rows: any[] }> {
+    let whereClauses = ['1=1'];
+    const params: any[] = [branchId];
+    let idx = 2;
+
+    if (query.active_only !== false) {
+      whereClauses.push(`p.is_active = TRUE`);
+    }
+
+    if (query.category_id) {
+      whereClauses.push(`p.category_id = $${idx++}`);
+      params.push(query.category_id);
+    }
+
+    if (query.search) {
+      whereClauses.push(`(p.name_en ILIKE $${idx} OR p.name_am ILIKE $${idx} OR p.sku ILIKE $${idx} OR EXISTS (
+        SELECT 1 FROM product_barcodes pb WHERE pb.product_id = p.id AND pb.barcode ILIKE $${idx}
+      ))`);
+      params.push(`%${query.search}%`);
+      idx++;
+    }
+
+    const whereSql = whereClauses.join(' AND ');
+
+    let havingSql = '';
+    if (query.low_stock_only) {
+      havingSql = 'HAVING COALESCE(SUM(l.quantity_change), 0) <= p.min_stock_level';
+    }
+
+    const countQuery = `
+      SELECT COUNT(*) as count FROM (
+        SELECT p.id
+        FROM products p
+        LEFT JOIN stock_ledger l ON p.id = l.product_id AND l.branch_id = $1
+        WHERE ${whereSql}
+        GROUP BY p.id
+        ${havingSql}
+      ) as sub
+    `;
+    const countRes = await this.db.query<{ count: string }>(countQuery, params);
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const limit = query.limit || 50;
+    const offset = query.offset || 0;
+
+    const dataQuery = `
+      SELECT
+        p.*,
+        c.name_en as category_name,
+        c.name_am as category_name_am,
+        COALESCE(SUM(l.quantity_change), 0) as stock_on_hand,
+        COALESCE(ARRAY_AGG(DISTINCT b.barcode) FILTER (WHERE b.barcode IS NOT NULL), '{}') as barcodes
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN stock_ledger l ON p.id = l.product_id AND l.branch_id = $1
+      LEFT JOIN product_barcodes b ON p.id = b.product_id
+      WHERE ${whereSql}
+      GROUP BY p.id, c.name_en, c.name_am
+      ${havingSql}
+      ORDER BY p.name_en ASC
+      LIMIT $${idx++} OFFSET $${idx++}
+    `;
+
+    const dataRes = await this.db.query(dataQuery, [...params, limit, offset]);
+
+    return { total, rows: dataRes.rows };
+  }
+
+  /**
+   * Retrieves categories for dropdowns.
+   */
+  async getCategories(): Promise<any[]> {
+    const res = await this.db.query(
+      `SELECT id, code, name_en, name_am FROM categories ORDER BY sort_order ASC, name_en ASC`,
+    );
+    return res.rows;
+  }
+
+  /**
+   * Retrieves units of measure for dropdowns.
+   */
+  async getUoms(): Promise<any[]> {
+    const res = await this.db.query(
+      `SELECT code, name_en, name_am, is_fractional FROM units_of_measure ORDER BY code ASC`,
+    );
+    return res.rows;
+  }
+
+  /**
+   * Updates an existing product.
+   */
+  async updateProduct(id: string, dto: UpdateProductDto): Promise<Product> {
+    const fields: string[] = [];
+    const params: any[] = [id];
+    let idx = 2;
+
+    const updatable: Array<keyof UpdateProductDto> = [
+      'sku', 'name_en', 'name_am', 'category_id', 'uom_code',
+      'base_price', 'cost_price', 'is_vat_applicable', 'vat_rate',
+      'is_weighed', 'scale_plu', 'min_stock_level', 'max_stock_level',
+      'allow_discount', 'is_active',
+    ];
+
+    for (const key of updatable) {
+      if (dto[key] !== undefined) {
+        fields.push(`${key} = $${idx++}`);
+        params.push(dto[key]);
+      }
+    }
+
+    if (fields.length === 0) {
+      const res = await this.db.query<Product>(`SELECT * FROM products WHERE id = $1`, [id]);
+      if (res.rows.length === 0) throw new NotFoundException(`Product ${id} not found`);
+      return res.rows[0];
+    }
+
+    const query = `
+      UPDATE products
+      SET ${fields.join(', ')}, updated_at = clock_timestamp()
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const res = await this.db.query<Product>(query, params);
+    if (res.rows.length === 0) {
+      throw new NotFoundException(`Product ${id} not found`);
+    }
+    return res.rows[0];
+  }
+
+  /**
+   * Calculates intelligent reorder suggestions based on stock on hand and daily sales rate.
+   */
+  async getReorderSuggestions(branchId: string): Promise<any[]> {
+    const query = `
+      SELECT
+        p.id,
+        p.sku,
+        p.name_en,
+        p.name_am,
+        p.category_id,
+        c.name_en as category_name,
+        p.uom_code,
+        p.cost_price,
+        p.base_price,
+        p.min_stock_level,
+        p.max_stock_level,
+        COALESCE(SUM(l.quantity_change), 0) as stock_on_hand,
+        COALESCE(sales_velocity.daily_rate, 0) as daily_sales_rate
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN stock_ledger l ON p.id = l.product_id AND l.branch_id = $1
+      LEFT JOIN (
+        SELECT product_id, ROUND(ABS(SUM(quantity_change)) / 30.0, 2) as daily_rate
+        FROM stock_ledger
+        WHERE branch_id = $1
+          AND movement_type = 'SALE'
+          AND created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY product_id
+      ) sales_velocity ON p.id = sales_velocity.product_id
+      WHERE p.is_active = TRUE
+      GROUP BY p.id, c.name_en, sales_velocity.daily_rate
+      HAVING COALESCE(SUM(l.quantity_change), 0) <= p.min_stock_level
+      ORDER BY (p.min_stock_level - COALESCE(SUM(l.quantity_change), 0)) DESC
+    `;
+
+    const res = await this.db.query(query, [branchId]);
+    return res.rows.map((r: any) => {
+      const stockOnHand = parseFloat(r.stock_on_hand);
+      const minStock = parseFloat(r.min_stock_level);
+      const maxStock = r.max_stock_level ? parseFloat(r.max_stock_level) : minStock * 2;
+      const dailyRate = parseFloat(r.daily_sales_rate);
+
+      // suggested quantity = maxStock - stockOnHand, minimum 5 units
+      const suggestedQty = Math.max(Math.ceil(maxStock - stockOnHand), 5);
+      const daysRemaining = dailyRate > 0 ? Math.round(stockOnHand / dailyRate) : 999;
+
+      return {
+        id: r.id,
+        sku: r.sku,
+        nameEn: r.name_en,
+        nameAm: r.name_am,
+        categoryName: r.category_name,
+        uomCode: r.uom_code,
+        costPrice: parseFloat(r.cost_price),
+        basePrice: parseFloat(r.base_price),
+        minStockLevel: minStock,
+        maxStockLevel: maxStock,
+        stockOnHand,
+        dailySalesRate: dailyRate,
+        daysRemaining: Math.max(0, daysRemaining),
+        suggestedReorderQuantity: suggestedQty,
+        estimatedCost: Number((suggestedQty * parseFloat(r.cost_price)).toFixed(2)),
+      };
+    });
   }
 }

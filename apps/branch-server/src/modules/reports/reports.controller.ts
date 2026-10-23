@@ -7,7 +7,7 @@ import {
 import { ReportsService } from './reports.service';
 import { DateRangeQueryDto, ExpiringStockQueryDto } from './reports.dto';
 
-@Controller('reports')
+@Controller(['reports', 'api/reports'])
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 

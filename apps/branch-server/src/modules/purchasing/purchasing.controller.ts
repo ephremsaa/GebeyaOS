@@ -17,7 +17,7 @@ import {
   CreateGRNDto,
 } from './purchasing.dto';
 
-@Controller('purchasing')
+@Controller(['purchasing', 'api/purchasing'])
 export class PurchasingController {
   constructor(private readonly purchasingService: PurchasingService) {}
 

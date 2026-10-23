@@ -1,23 +1,69 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { I18nProvider } from './i18n/I18nContext';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { TopBar } from './components/TopBar';
 import { NavigationRail, NavTabId } from './components/NavigationRail';
+import { DashboardView } from './components/DashboardView';
 import { PosCheckout } from './components/PosCheckout';
 import { ShiftManagement } from './components/ShiftManagement';
+import { ProductCatalogView } from './components/catalog/ProductCatalogView';
 import { InventoryView } from './components/InventoryView';
+import { StockTakeView } from './components/inventory/StockTakeView';
+import { ReorderSuggestionsView } from './components/inventory/ReorderSuggestionsView';
 import { PurchasingView } from './components/PurchasingView';
 import { ReportsView } from './components/ReportsView';
-import { SyncMonitor } from './components/SyncMonitor';
 import { UserManagementView } from './components/auth/UserManagementView';
+import { SettingsView } from './components/SettingsView';
+import { BackupRestoreView } from './components/BackupRestoreView';
+import { AuditLogView } from './components/AuditLogView';
+import { SyncMonitor } from './components/SyncMonitor';
+import { CommandPalette } from './components/CommandPalette';
+import { NotificationsDrawer } from './components/NotificationsDrawer';
+import { OnboardingHints } from './components/OnboardingHints';
 import { SetupWizard } from './components/auth/SetupWizard';
 import { LoginPage } from './components/auth/LoginPage';
 import { PinPadModal } from './components/auth/PinPadModal';
 
 const MainApp: React.FC = () => {
-  const { isAuthenticated, isLocked, setupStatus } = useAuth();
-  const [activeTab, setActiveTab] = useState<NavTabId>('checkout');
+  const { isAuthenticated, isLocked, setupStatus, currentUser, lockSession } = useAuth();
+  const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
+
+  // Command Palette & Notifications state
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  // Set initial tab based on role
+  useEffect(() => {
+    if (currentUser?.role === 'CASHIER') {
+      setActiveTab('checkout');
+    } else if (currentUser?.role === 'STOREKEEPER') {
+      setActiveTab('inventory');
+    } else {
+      setActiveTab('dashboard');
+    }
+  }, [currentUser?.role]);
+
+  // Global Keyboard Shortcuts (Ctrl+K, F1, F9)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K / Cmd+K -> Toggle Command Palette
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      } else if (e.key === 'F1') {
+        e.preventDefault();
+        setActiveTab('checkout');
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        lockSession();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lockSession]);
 
   // 1. First-Run Setup Wizard Gate
   if (setupStatus && !setupStatus.setupCompleted) {
@@ -44,8 +90,12 @@ const MainApp: React.FC = () => {
       className="flex flex-col h-screen w-screen overflow-hidden font-sans"
       style={{ background: 'var(--bg-page)', color: 'var(--text-main)' }}
     >
-      {/* 1. Slim Top Bar with Active Cashier, Menu, Language & Theme */}
-      <TopBar />
+      {/* 1. Slim Top Bar with Command Search, Notifications, Active Cashier, Menu, Language & Theme */}
+      <TopBar
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onOpenNotifications={() => setIsNotificationsOpen(true)}
+        unreadNotificationsCount={unreadCount}
+      />
 
       {/* 2. Main Workspace: Left Navigation Rail + Active Screen */}
       <div className="flex-1 flex overflow-hidden relative">
@@ -57,12 +107,19 @@ const MainApp: React.FC = () => {
 
         {/* Active Content Pane */}
         <main className="flex-1 flex overflow-hidden" style={{ background: 'var(--bg-page)' }}>
+          {activeTab === 'dashboard'  && <DashboardView onNavigate={setActiveTab} />}
           {activeTab === 'checkout'   && <PosCheckout />}
           {activeTab === 'shifts'     && <ShiftManagement />}
+          {activeTab === 'catalog'    && <ProductCatalogView />}
           {activeTab === 'inventory'  && <InventoryView />}
+          {activeTab === 'stocktake'  && <StockTakeView />}
+          {activeTab === 'reorder'    && <ReorderSuggestionsView onNavigateToPurchasing={() => setActiveTab('purchasing')} />}
           {activeTab === 'purchasing' && <PurchasingView />}
           {activeTab === 'reports'    && <ReportsView />}
           {activeTab === 'users'      && <UserManagementView />}
+          {activeTab === 'audit'      && <AuditLogView />}
+          {activeTab === 'settings'   && <SettingsView />}
+          {activeTab === 'backup'     && <BackupRestoreView />}
           {activeTab === 'sync'       && <SyncMonitor />}
         </main>
 
@@ -74,6 +131,24 @@ const MainApp: React.FC = () => {
           />
         )}
       </div>
+
+      {/* 4. Global Command Palette Modal (Ctrl+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={setActiveTab}
+      />
+
+      {/* 5. Notifications Drawer */}
+      <NotificationsDrawer
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        onNavigate={setActiveTab}
+        onUnreadCountChange={setUnreadCount}
+      />
+
+      {/* 6. Contextual Onboarding Hints */}
+      <OnboardingHints currentTab={activeTab} />
     </div>
   );
 };

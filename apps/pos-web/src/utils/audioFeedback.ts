@@ -74,3 +74,6 @@ class AudioFeedbackEngine {
 }
 
 export const audioFeedback = new AudioFeedbackEngine();
+export const playScanChime = () => audioFeedback.playSuccess();
+export const playErrorBuzz = () => audioFeedback.playError();
+

@@ -19,7 +19,7 @@ import {
   CreateMovementDto,
 } from './inventory.dto';
 
-@Controller('inventory')
+@Controller(['inventory', 'api/inventory'])
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
@@ -122,5 +122,19 @@ export class InventoryController {
   ) {
     const userId = userIdHeader || '00000000-0000-0000-0000-000000000002';
     return this.inventoryService.reconcileStockTake(stockTakeId, userId, dto);
+  }
+
+  @Get('stock-takes')
+  async getStockTakes(
+    @Query('status') status?: string,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    return this.inventoryService.getStockTakes(branchId, status);
+  }
+
+  @Get('stock-takes/:id')
+  async getStockTakeById(@Param('id') stockTakeId: string) {
+    return this.inventoryService.getStockTakeById(stockTakeId);
   }
 }

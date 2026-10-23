@@ -10,6 +10,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { SystemModule } from './modules/system/system.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UsersModule } from './modules/users/users.module';
     TransfersModule,
     ReportsModule,
     SyncModule,
+    SystemModule,
   ],
 })
 export class AppModule {}

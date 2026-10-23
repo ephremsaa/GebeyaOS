@@ -2,9 +2,11 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Param,
   Query,
+  Headers,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -14,16 +16,52 @@ import {
   CreateBarcodeDto,
   SetBranchOverrideDto,
   PriceChangeDto,
+  UpdateProductDto,
+  ProductQueryDto,
 } from './dto/products.dto';
 
-@Controller('api/products')
+@Controller(['products', 'api/products'])
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
+
+  @Get()
+  async getProducts(
+    @Query() query: ProductQueryDto,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    return this.productsService.getProducts(branchId, query);
+  }
+
+  @Get('categories')
+  async getCategories() {
+    return this.productsService.getCategories();
+  }
+
+  @Get('uoms')
+  async getUoms() {
+    return this.productsService.getUoms();
+  }
+
+  @Get('reorder-suggestions')
+  async getReorderSuggestions(@Headers('x-branch-id') branchIdHeader?: string) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    return this.productsService.getReorderSuggestions(branchId);
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createProduct(@Body() dto: CreateProductDto) {
     return this.productsService.createProduct(dto);
+  }
+
+  @Put(':id')
+  @HttpCode(HttpStatus.OK)
+  async updateProduct(
+    @Param('id') productId: string,
+    @Body() dto: UpdateProductDto,
+  ) {
+    return this.productsService.updateProduct(productId, dto);
   }
 
   @Post(':id/barcodes')
