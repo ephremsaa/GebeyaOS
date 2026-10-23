@@ -14,24 +14,25 @@ export const StatusDot: React.FC<StatusDotProps> = ({
   onClick,
 }) => {
   const dotColor = {
-    online: 'bg-emerald-500 shadow-emerald-500/50',
-    offline: 'bg-amber-500 shadow-amber-500/50',
-    syncing: 'bg-blue-500 animate-pulse',
+    online: 'bg-primary shadow-xs shadow-primary/50',
+    offline: 'bg-warning shadow-xs shadow-warning/50',
+    syncing: 'bg-info animate-pulse',
   }[status];
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="min-h-[40px] px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-all flex items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 select-none active:scale-95"
+      className="min-h-[40px] px-3 py-1.5 rounded-xl bg-elevated hover:bg-surface transition-all flex items-center gap-2 text-xs font-semibold text-text-main border border-border-strong select-none active:scale-95 cursor-pointer"
     >
       <span className="relative flex h-2.5 w-2.5">
         {status === 'online' && (
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
         )}
         <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${dotColor}`} />
       </span>
-      {cashierName && <span className="font-semibold text-slate-800 dark:text-slate-100">{cashierName}</span>}
-      <ChevronDown size={14} className="text-slate-400" />
+      {cashierName && <span className="font-bold text-text-main">{cashierName}</span>}
+      <ChevronDown size={14} className="text-text-dim" />
     </button>
   );
 };

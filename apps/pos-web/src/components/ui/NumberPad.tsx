@@ -21,7 +21,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
   return (
-    <div className="flex flex-col gap-3 w-full">
+    <div className="flex flex-col gap-3 w-full select-none">
       {/* Quick Cash Buttons */}
       {onQuickAmount && quickAmounts && quickAmounts.length > 0 && (
         <div className="grid grid-cols-5 gap-2">
@@ -30,7 +30,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
               key={amt}
               type="button"
               onClick={() => onQuickAmount(amt)}
-              className="min-h-[46px] rounded-xl font-bold text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 active:scale-95 transition-all border border-slate-200 dark:border-slate-700"
+              className="min-h-[46px] rounded-xl font-bold text-xs sm:text-sm bg-elevated hover:bg-surface text-text-main active:scale-95 transition-all border border-border-strong cursor-pointer"
             >
               +{amt}
             </button>
@@ -45,7 +45,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
             key={num}
             type="button"
             onClick={() => onDigit(num)}
-            className="min-h-[58px] rounded-2xl font-bold text-2xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-gebeya-500 hover:bg-gebeya-50/50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm active:scale-95 transition-all flex items-center justify-center"
+            className="min-h-[58px] rounded-xl font-bold text-2xl tabular-nums bg-surface border border-border-strong hover:border-primary hover:bg-primary/5 text-text-main shadow-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer"
           >
             {num}
           </button>
@@ -55,7 +55,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
         <button
           type="button"
           onClick={onClear}
-          className="min-h-[58px] rounded-2xl font-bold text-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60 active:scale-95 transition-all flex items-center justify-center"
+          className="min-h-[58px] rounded-xl font-bold text-lg bg-danger/10 hover:bg-danger/20 text-danger border border-danger/25 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
         >
           C
         </button>
@@ -64,7 +64,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
         <button
           type="button"
           onClick={() => onDigit('0')}
-          className="min-h-[58px] rounded-2xl font-bold text-2xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-gebeya-500 hover:bg-gebeya-50/50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm active:scale-95 transition-all flex items-center justify-center"
+          className="min-h-[58px] rounded-xl font-bold text-2xl tabular-nums bg-surface border border-border-strong hover:border-primary hover:bg-primary/5 text-text-main shadow-xs active:scale-95 transition-all flex items-center justify-center cursor-pointer"
         >
           0
         </button>
@@ -74,7 +74,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
           <button
             type="button"
             onClick={() => onDigit('.')}
-            className="min-h-[58px] rounded-2xl font-bold text-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all flex items-center justify-center"
+            className="min-h-[58px] rounded-xl font-bold text-2xl bg-elevated hover:bg-surface text-text-main border border-border-strong active:scale-95 transition-all flex items-center justify-center cursor-pointer"
           >
             .
           </button>
@@ -82,7 +82,8 @@ export const NumberPad: React.FC<NumberPadProps> = ({
           <button
             type="button"
             onClick={onBackspace}
-            className="min-h-[58px] rounded-2xl font-bold text-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all flex items-center justify-center"
+            className="min-h-[58px] rounded-xl font-bold text-lg bg-elevated hover:bg-surface text-text-muted hover:text-text-main border border-border-strong active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+            aria-label="Backspace"
           >
             <Delete size={22} />
           </button>
@@ -93,7 +94,7 @@ export const NumberPad: React.FC<NumberPadProps> = ({
         <button
           type="button"
           onClick={onBackspace}
-          className="min-h-[46px] rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 active:scale-95 transition-all border border-slate-200 dark:border-slate-700"
+          className="min-h-[46px] rounded-xl font-semibold text-sm bg-elevated hover:bg-surface text-text-muted hover:text-text-main flex items-center justify-center gap-2 active:scale-95 transition-all border border-border-strong cursor-pointer"
         >
           <Delete size={18} />
           <span>Backspace</span>

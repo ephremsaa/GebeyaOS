@@ -24,8 +24,14 @@ export const Modal: React.FC<ModalProps> = ({
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -41,27 +47,28 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className={`w-full ${maxWidthClasses} bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] animate-in zoom-in-95 duration-150`}
+        className={`w-full ${maxWidthClasses} bg-surface rounded-2xl shadow-modal border border-border-subtle overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-150`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
+        <div className="px-6 py-4 border-b border-border-subtle flex items-center justify-between flex-shrink-0">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h2>
+            <h2 className="text-lg font-bold text-text-main leading-snug">{title}</h2>
             {subtitle && (
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>
+              <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>
             )}
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-main hover:bg-elevated transition-colors"
             aria-label="Close"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
