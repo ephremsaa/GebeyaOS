@@ -8,11 +8,10 @@ import {
   Printer,
   RotateCcw,
   ShieldCheck,
+  Split,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
-import { Modal } from './ui/Modal';
-import { NumberPad } from './ui/NumberPad';
-import { Button } from './ui/Button';
+import { Modal, NumberPad, Button, Input } from './ui';
 import { playSuccessChime } from '../utils/sound';
 
 export type PaymentMethodType = 'CASH' | 'TELEBIRR' | 'CBE_BIRR' | 'CARD' | 'BANK_TRANSFER';
@@ -45,6 +44,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodType>('CASH');
   const [tenderedStr, setTenderedStr] = useState<string>('');
   const [refCode, setRefCode] = useState<string>('');
+  const [isSplitMode, setIsSplitMode] = useState<boolean>(false);
+  const [splitAmount, setSplitAmount] = useState<number>(0);
 
   // Reset or initialize on open
   useEffect(() => {
@@ -52,6 +53,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setTenderedStr(totalAmount.toFixed(2));
       setSelectedMethod('CASH');
       setRefCode('');
+      setIsSplitMode(false);
+      setSplitAmount(0);
     }
   }, [isOpen, totalAmount, completedReceiptNo]);
 
@@ -67,9 +70,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   }, [completedReceiptNo, onNewSale]);
 
   const tenderedAmount = parseFloat(tenderedStr) || 0;
-  const changeDue = Math.max(0, tenderedAmount - totalAmount);
-  const remainingDue = Math.max(0, totalAmount - tenderedAmount);
-  const isSufficient = selectedMethod !== 'CASH' || tenderedAmount >= totalAmount;
+  const targetDue = isSplitMode ? totalAmount - splitAmount : totalAmount;
+  const changeDue = Math.max(0, tenderedAmount - targetDue);
+  const remainingDue = Math.max(0, targetDue - tenderedAmount);
+  const isSufficient = selectedMethod !== 'CASH' || tenderedAmount >= targetDue;
 
   const handleDigit = (digit: string) => {
     if (digit === '.' && tenderedStr.includes('.')) return;
@@ -85,7 +89,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handleExact = () => {
-    setTenderedStr(totalAmount.toFixed(2));
+    setTenderedStr(targetDue.toFixed(2));
   };
 
   const handleAddQuickCash = (amt: number) => {
@@ -104,12 +108,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     });
   };
 
-  const methods: { id: PaymentMethodType; label: string; icon: React.ReactNode; color: string }[] = [
-    { id: 'CASH', label: t('cash'), icon: <Banknote size={20} />, color: 'text-emerald-600' },
-    { id: 'TELEBIRR', label: t('telebirr'), icon: <Smartphone size={20} />, color: 'text-sky-600' },
-    { id: 'CBE_BIRR', label: t('cbeBirr'), icon: <Smartphone size={20} />, color: 'text-amber-600' },
-    { id: 'CARD', label: t('card'), icon: <CreditCard size={20} />, color: 'text-purple-600' },
-    { id: 'BANK_TRANSFER', label: t('bankTransfer'), icon: <Building size={20} />, color: 'text-indigo-600' },
+  const methods: { id: PaymentMethodType; label: string; icon: React.ReactNode }[] = [
+    { id: 'CASH', label: t('cash'), icon: <Banknote size={20} strokeWidth={1.75} /> },
+    { id: 'TELEBIRR', label: t('telebirr'), icon: <Smartphone size={20} strokeWidth={1.75} /> },
+    { id: 'CBE_BIRR', label: t('cbeBirr'), icon: <Smartphone size={20} strokeWidth={1.75} /> },
+    { id: 'CARD', label: t('card'), icon: <CreditCard size={20} strokeWidth={1.75} /> },
+    { id: 'BANK_TRANSFER', label: t('bankTransfer'), icon: <Building size={20} strokeWidth={1.75} /> },
   ];
 
   return (
@@ -121,30 +125,30 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     >
       {completedReceiptNo ? (
         /* Success State */
-        <div className="flex flex-col items-center justify-center py-6 text-center animate-in zoom-in-95 duration-150">
-          <div className="w-20 h-20 rounded-full bg-gebeya-100 dark:bg-gebeya-950 text-gebeya-600 dark:text-gebeya-400 flex items-center justify-center mb-4">
-            <CheckCircle2 size={44} />
+        <div className="flex flex-col items-center justify-center py-6 text-center animate-in zoom-in-95 duration-200">
+          <div className="w-20 h-20 rounded-full bg-primary-soft text-primary flex items-center justify-center mb-4">
+            <CheckCircle2 size={44} strokeWidth={1.75} />
           </div>
 
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white">
+          <h3 className="text-2xl font-bold text-text-main">
             {t('saleCompleted')}
           </h3>
-          <p className="text-base text-slate-500 dark:text-slate-400 mt-1">
-            {t('receiptNo')}: <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{completedReceiptNo}</span>
+          <p className="text-[15px] text-text-muted mt-1">
+            {t('receiptNo')}: <span className="font-mono font-bold text-text-main">{completedReceiptNo}</span>
           </p>
 
-          <div className="my-6 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 w-full max-w-sm flex justify-between items-center text-sm">
-            <span className="text-slate-500">{t('total')}:</span>
-            <span className="text-xl font-bold text-slate-900 dark:text-white">
+          <div className="my-6 p-4 rounded-xl bg-surface-2 border border-border-subtle w-full max-w-sm flex justify-between items-center text-sm shadow-soft">
+            <span className="text-text-muted">{t('total')}:</span>
+            <span className="text-2xl font-bold text-text-main tabular-nums font-mono">
               {formatCurrency(totalAmount)}
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
             <Button
-              variant="outline"
+              variant="secondary"
               size="lg"
-              leftIcon={<Printer size={20} />}
+              leftIcon={<Printer size={20} strokeWidth={1.75} />}
               onClick={onPrintReceipt}
             >
               {t('printReceipt')}
@@ -152,7 +156,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <Button
               variant="primary"
               size="lg"
-              leftIcon={<RotateCcw size={20} />}
+              leftIcon={<RotateCcw size={20} strokeWidth={1.75} />}
               onClick={onNewSale}
             >
               {t('newSale')}
@@ -161,18 +165,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         </div>
       ) : (
         /* Payment Selection & Cash Keypad */
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           {/* Top Amount Due Header */}
-          <div className="p-4 rounded-2xl bg-gebeya-50 dark:bg-gebeya-950/40 border border-gebeya-200 dark:border-gebeya-900 flex items-center justify-between">
-            <span className="text-sm font-bold text-gebeya-800 dark:text-gebeya-300">
-              {t('amountDue')}
-            </span>
-            <span className="text-3xl font-black text-gebeya-700 dark:text-gebeya-300">
-              {formatCurrency(totalAmount)}
+          <div className="p-4 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between shadow-soft">
+            <div>
+              <span className="text-xs font-semibold text-text-muted uppercase tracking-wider block">
+                {t('amountDue')}
+              </span>
+              {isSplitMode && (
+                <span className="text-xs text-primary font-semibold">
+                  Split: {formatCurrency(splitAmount)} paid
+                </span>
+              )}
+            </div>
+            <span className="text-3xl font-bold text-text-main tabular-nums font-mono">
+              {formatCurrency(targetDue)}
             </span>
           </div>
 
-          {/* Payment Method Tabs (Big Buttons) */}
+          {/* Large Method Buttons */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {methods.map((m) => {
               const isSelected = selectedMethod === m.id;
@@ -181,53 +192,70 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   key={m.id}
                   type="button"
                   onClick={() => setSelectedMethod(m.id)}
-                  className={`min-h-[56px] rounded-2xl p-2 flex flex-col items-center justify-center gap-1 font-bold text-xs transition-all active:scale-95 border-2 ${
+                  className={`min-h-[56px] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1.5 font-semibold text-[13px] transition-all duration-fast active:scale-95 border cursor-pointer ${
                     isSelected
-                      ? 'border-gebeya-600 bg-gebeya-50 dark:bg-gebeya-950/60 text-gebeya-700 dark:text-gebeya-300 shadow-sm'
-                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:border-slate-300'
+                      ? 'border-primary bg-primary-soft text-primary shadow-soft'
+                      : 'border-border-subtle bg-surface hover:bg-surface-2 text-text-muted hover:text-text-main'
                   }`}
                 >
-                  <span className={isSelected ? 'text-gebeya-600 dark:text-gebeya-400' : m.color}>
-                    {m.icon}
-                  </span>
-                  <span>{m.label}</span>
+                  <span>{m.icon}</span>
+                  <span className="truncate max-w-full">{m.label}</span>
                 </button>
               );
             })}
           </div>
 
+          {/* Split Payment Toggle */}
+          <div className="flex items-center justify-between px-1">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSplitMode(!isSplitMode);
+                if (!isSplitMode) {
+                  setSplitAmount(Math.round(totalAmount / 2));
+                } else {
+                  setSplitAmount(0);
+                }
+              }}
+              className="text-xs font-medium text-text-muted hover:text-primary flex items-center gap-1.5 cursor-pointer"
+            >
+              <Split size={14} strokeWidth={1.75} />
+              <span>{isSplitMode ? 'Cancel Split Payment' : t('splitPayment')}</span>
+            </button>
+          </div>
+
           {/* Method Details */}
           {selectedMethod === 'CASH' ? (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               {/* Tendered and Change readouts */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-                  <span className="text-xs font-semibold text-slate-400 block mb-1">
-                    {t('amountTendered')}
-                  </span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-black text-slate-900 dark:text-white">
-                      {formatCurrency(tenderedAmount)}
+                <div className="p-3.5 rounded-xl bg-surface border border-border-subtle shadow-soft">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-text-muted">
+                      {t('amountTendered')}
                     </span>
                     <button
                       type="button"
                       onClick={handleExact}
-                      className="px-2 py-1 rounded-md text-xs font-bold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200 active:scale-95"
+                      className="px-2 py-0.5 rounded text-xs font-bold bg-surface-2 hover:bg-border-subtle text-text-main cursor-pointer"
                     >
                       {t('exact')}
                     </button>
                   </div>
+                  <span className="text-2xl font-bold text-text-main tabular-nums font-mono block">
+                    {formatCurrency(tenderedAmount)}
+                  </span>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-                  <span className="text-xs font-semibold text-slate-400 block mb-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-border-subtle shadow-soft">
+                  <span className="text-xs font-semibold text-text-muted block mb-1">
                     {remainingDue > 0 ? t('remainingDue') : t('changeDue')}
                   </span>
                   <span
-                    className={`text-2xl font-black ${
+                    className={`text-2xl font-bold tabular-nums font-mono block ${
                       remainingDue > 0
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-emerald-600 dark:text-emerald-400'
+                        ? 'text-warning'
+                        : 'text-primary'
                     }`}
                   >
                     {remainingDue > 0 ? formatCurrency(remainingDue) : formatCurrency(changeDue)}
@@ -235,7 +263,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
               </div>
 
-              {/* NumberPad with quick additions */}
+              {/* NumberPad with quick additions & 64px keys */}
               <NumberPad
                 onDigit={handleDigit}
                 onClear={handleClear}
@@ -247,40 +275,35 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
           ) : (
             /* Digital Payments (Telebirr / CBE Birr / Bank Transfer / Card) */
-            <div className="flex flex-col gap-4 py-4">
-              <div className="p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900 flex items-center gap-3">
-                <ShieldCheck size={28} className="text-sky-600 flex-shrink-0" />
-                <div className="text-xs text-sky-800 dark:text-sky-300">
-                  <span className="font-bold block text-sm mb-0.5">Offline-Ready Verification</span>
-                  Cashier can accept confirmation SMS or QR code reference even if telecom data is momentarily slow.
+            <div className="flex flex-col gap-3 py-2">
+              <div className="p-4 rounded-xl bg-info-soft/40 border border-info/20 flex items-center gap-3">
+                <ShieldCheck size={24} strokeWidth={1.75} className="text-info flex-shrink-0" />
+                <div className="text-[13px] text-text-muted">
+                  <span className="font-semibold block text-text-main mb-0.5">Offline-Ready Verification</span>
+                  Cashier can accept confirmation SMS or reference code even if telecom data is momentarily slow.
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                  {t('referenceCode')}
-                </label>
-                <input
-                  type="text"
-                  value={refCode}
-                  onChange={(e) => setRefCode(e.target.value)}
-                  placeholder={t('referenceOptional')}
-                  className="min-h-[52px] px-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-base focus:border-gebeya-500 focus:outline-none"
-                />
-              </div>
+              <Input
+                label={t('referenceCode')}
+                value={refCode}
+                onChange={(e) => setRefCode(e.target.value)}
+                placeholder={t('referenceOptional')}
+                className="font-mono text-base"
+              />
             </div>
           )}
 
           {/* Complete Sale Action Button */}
           <Button
-            size="xl"
+            size="lg"
             variant="primary"
             fullWidth
             onClick={handleComplete}
             disabled={!isSufficient}
-            className="mt-2 shadow-lg shadow-gebeya-600/30"
+            className="mt-1"
           >
-            {t('completeSale')} ({formatCurrency(totalAmount)})
+            {t('completeSale')} · {formatCurrency(targetDue)}
           </Button>
         </div>
       )}

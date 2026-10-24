@@ -54,14 +54,12 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
   const basketHeaderTitle = `${t('currentBasketHeader')} (${itemCount})`;
 
   return (
-    <aside className="w-88 lg:w-96 xl:w-[420px] bg-surface border-l border-border-subtle flex flex-col h-full flex-shrink-0 select-none">
+    <aside className="w-[380px] min-w-[380px] bg-surface border-l border-border-subtle flex flex-col h-full flex-shrink-0 select-none">
       {/* 1. Header: Current basket (n) with Hold and Clear icon buttons */}
-      <div className="h-14 px-4 sm:px-5 border-b border-border-subtle flex items-center justify-between flex-shrink-0 bg-surface/80">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm sm:text-base font-bold text-text-main leading-none">
-            {basketHeaderTitle}
-          </h2>
-        </div>
+      <div className="h-14 px-5 border-b border-border-subtle flex items-center justify-between flex-shrink-0 bg-surface">
+        <h2 className="text-base font-semibold text-text-main leading-none">
+          {basketHeaderTitle}
+        </h2>
 
         {/* Secondary Actions with Tooltips */}
         <div className="flex items-center gap-1">
@@ -69,11 +67,11 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
             <button
               type="button"
               onClick={onResumeBasket}
-              className="p-2 rounded-lg text-warning hover:bg-warning/10 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-warning hover:bg-warning-soft transition-colors duration-fast cursor-pointer"
               title={t('resume')}
               aria-label={t('resume')}
             >
-              <PlayCircle size={18} />
+              <PlayCircle size={18} strokeWidth={1.75} />
             </button>
           )}
 
@@ -82,27 +80,27 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
               <button
                 type="button"
                 onClick={onHoldBasket}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-elevated transition-colors cursor-pointer"
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
                 title={t('hold')}
                 aria-label={t('hold')}
               >
-                <PauseCircle size={18} />
+                <PauseCircle size={18} strokeWidth={1.75} />
               </button>
               <button
                 type="button"
                 onClick={() => setIsClearModalOpen(true)}
-                className="p-2 rounded-lg text-text-dim hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                className="p-2 rounded-lg text-text-dim hover:text-danger hover:bg-danger-soft transition-colors duration-fast cursor-pointer"
                 title={t('clearBasket')}
                 aria-label={t('clearBasket')}
               >
-                <Trash2 size={18} />
+                <Trash2 size={18} strokeWidth={1.75} />
               </button>
             </>
           )}
         </div>
       </div>
 
-      {/* 2. Line Items List (Scrollable) */}
+      {/* 2. Scrollable Line Items */}
       <div className="flex-1 overflow-y-auto divide-y divide-border-subtle">
         {isCartEmpty ? (
           <EmptyState
@@ -117,17 +115,17 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
             return (
               <div
                 key={`${item.product.id}-${index}`}
-                className="p-3.5 sm:p-4 flex items-center justify-between gap-2 sm:gap-3 hover:bg-elevated/40 transition-colors"
+                className="p-4 flex items-center justify-between gap-3 hover:bg-surface-2/40 transition-colors duration-fast"
               >
                 {/* Item Details */}
                 <div className="flex-1 min-w-0 pr-1">
                   <div className="flex items-center gap-1.5">
-                    {isScale && <Scale size={13} className="text-primary flex-shrink-0" />}
-                    <h4 className="text-xs sm:text-sm font-bold text-text-main truncate">
+                    {isScale && <Scale size={14} strokeWidth={1.75} className="text-primary flex-shrink-0" />}
+                    <h4 className="text-[14px] font-semibold text-text-main truncate">
                       {productName}
                     </h4>
                   </div>
-                  <div className="text-xs text-text-muted mt-0.5 tabular-nums">
+                  <div className="text-[13px] text-text-muted mt-0.5 tabular-nums">
                     {isScale ? (
                       <span>
                         {(item.scaleWeightGrams! / 1000).toFixed(3)} kg × {formatCurrency(item.unitPrice)}
@@ -138,17 +136,17 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Quantity Controls (Stepper with 44px buttons and editable input) */}
-                <div className="flex items-center gap-1.5 sm:gap-2">
+                {/* 44px Stepper with Editable Quantity */}
+                <div className="flex items-center gap-2">
                   {!isScale ? (
-                    <div className="flex items-center bg-elevated rounded-lg p-0.5 border border-border-strong">
+                    <div className="flex items-center bg-surface-2 rounded-xl p-0.5 border border-border-subtle">
                       <button
                         type="button"
                         onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                        className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-md flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface active:scale-95 transition-all cursor-pointer"
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface active:scale-95 transition-all duration-fast cursor-pointer"
                         aria-label="Decrease quantity"
                       >
-                        <Minus size={15} />
+                        <Minus size={16} strokeWidth={1.75} />
                       </button>
                       <input
                         type="number"
@@ -160,40 +158,40 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
                             onUpdateQuantity(index, val);
                           }
                         }}
-                        className="w-10 h-10 text-center font-bold text-sm tabular-nums bg-transparent text-text-main focus:outline-none focus:bg-surface rounded"
+                        className="w-11 h-11 text-center font-semibold text-[14px] tabular-nums bg-transparent text-text-main focus:outline-none focus:bg-surface rounded-md"
                         aria-label="Item quantity"
                       />
                       <button
                         type="button"
                         onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                        className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-md flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface active:scale-95 transition-all cursor-pointer"
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface active:scale-95 transition-all duration-fast cursor-pointer"
                         aria-label="Increase quantity"
                       >
-                        <Plus size={15} />
+                        <Plus size={16} strokeWidth={1.75} />
                       </button>
                     </div>
                   ) : (
-                    <span className="text-xs font-bold px-2 py-1.5 rounded-lg bg-elevated text-text-main border border-border-subtle tabular-nums">
+                    <span className="text-[13px] font-semibold px-2.5 py-1.5 rounded-lg bg-surface-2 text-text-main border border-border-subtle tabular-nums">
                       {(item.scaleWeightGrams! / 1000).toFixed(3)} kg
                     </span>
                   )}
 
-                  {/* Line Total */}
-                  <div className="w-20 sm:w-24 text-right">
-                    <span className="text-sm sm:text-base font-bold text-text-main tabular-nums font-mono block">
+                  {/* Line Total (Right-aligned) */}
+                  <div className="w-20 text-right">
+                    <span className="text-[15px] font-semibold text-text-main tabular-nums font-mono block">
                       {formatCurrency(item.lineTotal)}
                     </span>
                   </div>
 
-                  {/* Item Remove Button */}
+                  {/* Remove Icon */}
                   <button
                     type="button"
                     onClick={() => onRemoveItem(index)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-text-dim hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-text-dim hover:text-danger hover:bg-danger-soft transition-colors duration-fast cursor-pointer"
                     aria-label="Remove item"
                     title={t('clearBasket')}
                   >
-                    <Trash2 size={15} />
+                    <Trash2 size={16} strokeWidth={1.75} />
                   </button>
                 </div>
               </div>
@@ -202,20 +200,20 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
         )}
       </div>
 
-      {/* 3. Totals Pinned at the Bottom + Single-line Pay Button */}
-      <div className="p-4 sm:p-5 border-t border-border-subtle bg-surface/90 flex flex-col gap-3">
-        {/* Subtotal & VAT (Right-aligned, VAT hidden when zero) */}
-        <div className="flex flex-col gap-1 text-sm">
-          <div className="flex justify-between items-center text-text-muted text-xs sm:text-sm">
+      {/* 3. Pinned Footer: Subtotal, VAT 15% (included) in muted 14px, divider, Total 32px/700, Pay button 56px */}
+      <div className="p-5 border-t border-border-subtle bg-surface flex flex-col gap-3">
+        {/* Subtotal and VAT in muted 14px */}
+        <div className="flex flex-col gap-1.5 text-[14px]">
+          <div className="flex justify-between items-center text-text-muted">
             <span>{t('subtotal')}</span>
             <span className="tabular-nums font-mono font-medium text-text-main text-right">
               {formatCurrency(subtotal)}
             </span>
           </div>
 
-          {/* Hide the VAT row when zero */}
+          {/* Hide VAT row when zero */}
           {vatTotal > 0 && (
-            <div className="flex justify-between items-center text-text-dim text-xs">
+            <div className="flex justify-between items-center text-text-muted text-[14px]">
               <span>{t('vatIncludedNotice')}</span>
               <span className="tabular-nums font-mono font-medium text-right">
                 {formatCurrency(vatTotal)}
@@ -225,38 +223,36 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
 
           <div className="h-px bg-border-subtle my-1" />
 
-          {/* Total: Large and bold, right-aligned */}
+          {/* Total: 32px/700 */}
           <div className="flex justify-between items-baseline pt-0.5">
-            <span className="text-sm sm:text-base font-extrabold text-text-main">
+            <span className="text-base font-bold text-text-main">
               {t('total')}
             </span>
-            <span className="text-2xl sm:text-3xl font-black text-text-main font-mono tabular-nums tracking-tight text-right">
+            <span className="text-[32px] font-bold text-text-main font-mono tabular-nums tracking-tight text-right leading-none">
               {formatCurrency(total)}
             </span>
           </div>
         </div>
 
-        {/* 4. Single-line Pay Button: "Pay · 110.00 ETB" with F4 badge on right */}
+        {/* 4. Pay Button 56px: "Pay · 110.00 ETB" with F4 hint on the right */}
         <button
           type="button"
           disabled={isCartEmpty}
           onClick={onOpenPayment}
-          className={`w-full min-h-[56px] px-5 rounded-xl font-bold flex items-center justify-between transition-all duration-150 select-none active:scale-[0.99] cursor-pointer ${
+          className={`w-full min-h-[56px] px-5 rounded-xl font-semibold flex items-center justify-between transition-all duration-fast select-none active:scale-[0.98] cursor-pointer ${
             isCartEmpty
-              ? 'bg-elevated text-text-dim border border-border-subtle cursor-not-allowed pointer-events-none'
-              : 'bg-primary hover:bg-primary-hover text-white shadow-md shadow-primary/25'
+              ? 'bg-surface-2 text-text-muted border border-border-subtle cursor-not-allowed pointer-events-none'
+              : 'bg-primary hover:bg-primary-hover text-white shadow-soft'
           }`}
           aria-label="Proceed to payment"
         >
-          {/* One-line: Pay · 110.00 ETB */}
-          <span className="text-base sm:text-lg font-extrabold tracking-tight tabular-nums">
+          <span className="text-[17px] font-bold tracking-tight tabular-nums">
             {t('payActionPrefix')} {formatCurrency(total)}
           </span>
 
-          {/* F4 Keyboard Badge */}
           <KeyboardHint
             shortcut="F4"
-            className={isCartEmpty ? 'opacity-40' : 'bg-white/20 text-white border-white/30'}
+            className={isCartEmpty ? 'opacity-40' : 'bg-white/20 text-white border-white/25'}
           />
         </button>
       </div>
@@ -270,8 +266,8 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
       >
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3 text-warning">
-            <AlertTriangle size={24} className="flex-shrink-0" />
-            <p className="text-xs sm:text-sm text-text-muted leading-relaxed">
+            <AlertTriangle size={24} strokeWidth={1.75} className="flex-shrink-0" />
+            <p className="text-[14px] text-text-muted leading-relaxed">
               {t('clearBasketConfirmMsg')}
             </p>
           </div>

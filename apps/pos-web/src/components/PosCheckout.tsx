@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Scale } from 'lucide-react';
+import { Scale, AlertTriangle } from 'lucide-react';
 import {
   SAMPLE_PRODUCTS,
   SAMPLE_CATEGORIES,
@@ -12,7 +12,7 @@ import {
   generateReceiptNumber,
 } from '@gebeyaos/shared-types';
 import { useI18n } from '../i18n/I18nContext';
-import { Pill, Card, SearchInput, SearchInputHandle } from './ui';
+import { Pill, SearchInput, SearchInputHandle } from './ui';
 import { BasketPanel } from './BasketPanel';
 import { WeightModal } from './WeightModal';
 import { PaymentModal, PaymentMethodType } from './PaymentModal';
@@ -78,7 +78,7 @@ export const PosCheckout: React.FC = () => {
   const addToCart = (product: SampleProduct, quantity: number = 1, scaleWeightGrams?: number) => {
     playScanBeep();
     setRecentlyAddedId(product.id);
-    setTimeout(() => setRecentlyAddedId(null), 350);
+    setTimeout(() => setRecentlyAddedId(null), 300);
 
     setCart((prev) => {
       // If scale item, always add as discrete line
@@ -299,9 +299,9 @@ export const PosCheckout: React.FC = () => {
 
   return (
     <div className="flex-1 flex h-full overflow-hidden bg-page text-text-main">
-      {/* Product Catalog Area (Left) */}
-      <div className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 overflow-hidden min-w-0">
-        {/* 1. Search Bar with F2 badge, clear button, and barcode instant add */}
+      {/* 1. Left (flexible): Search field 52px, Category pills 44px, Product Grid auto-fill minmax(180px, 1fr) gap 12px */}
+      <div className="flex-1 flex flex-col p-6 overflow-hidden min-w-0">
+        {/* Search Field (52px high, search icon, F2 hint, clear button) */}
         <div className="mb-3.5 flex-shrink-0">
           <SearchInput
             ref={searchInputRef}
@@ -314,7 +314,7 @@ export const PosCheckout: React.FC = () => {
           />
         </div>
 
-        {/* 2. Category Pills: translated, 44px high, horizontally scrollable, selected clearly filled */}
+        {/* Category Pills (44px, horizontally scrollable, selected pill filled primary with white text) */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3.5 flex-shrink-0 no-scrollbar select-none">
           <Pill
             active={selectedCategory === 'ALL'}
@@ -339,7 +339,7 @@ export const PosCheckout: React.FC = () => {
           ))}
         </div>
 
-        {/* 3. Product Cards Grid: auto-fill columns (min 180px), name and price only */}
+        {/* Product Grid: auto-fill minmax(180px, 1fr), gap 12px (gap-3) */}
         <div className="flex-1 overflow-y-auto pr-1">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
             {filteredProducts.map((product) => {
@@ -349,61 +349,61 @@ export const PosCheckout: React.FC = () => {
               const isRecentlyAdded = recentlyAddedId === product.id;
 
               return (
-                <Card
+                <div
                   key={product.id}
-                  interactive={!isOut}
-                  onClick={() => handleProductCardClick(product)}
-                  className={`p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px] transition-all relative ${
+                  onClick={() => !isOut && handleProductCardClick(product)}
+                  className={`bg-surface border border-border-subtle rounded-xl min-h-[108px] p-3.5 flex flex-col justify-between transition-all duration-fast shadow-soft select-none ${
                     isOut
-                      ? 'opacity-40 cursor-not-allowed bg-elevated/50 pointer-events-none'
+                      ? 'opacity-40 cursor-not-allowed bg-surface-2/60 pointer-events-none'
                       : isRecentlyAdded
-                      ? 'ring-2 ring-primary bg-primary/5 scale-[0.98]'
-                      : 'hover:shadow-md hover:border-primary/40'
+                      ? 'border-primary ring-2 ring-primary/25 bg-primary-soft/30 scale-[0.98]'
+                      : 'cursor-pointer hover:border-border-strong hover:shadow-md active:scale-[0.98]'
                   }`}
                 >
-                  {/* Top: Name & Badges */}
+                  {/* Top-left Name (2 lines max), Top-right Scale / Low-stock badge */}
                   <div>
                     <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                      <h3 className="font-bold text-xs sm:text-sm text-text-main line-clamp-2 leading-snug">
+                      <h3 className="font-semibold text-[14px] text-text-main line-clamp-2 leading-snug">
                         {productName}
                       </h3>
                       {product.isWeighed && (
-                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded-md bg-warning/15 text-warning text-[10px] font-bold flex items-center gap-1 select-none">
-                          <Scale size={11} />
+                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-warning-soft text-warning text-[11px] font-semibold flex items-center gap-1 select-none">
+                          <Scale size={11} strokeWidth={1.75} />
                           {t('weighedBadge')}
                         </span>
                       )}
                     </div>
 
-                    {/* Stock Alert: low stock badge only when low, out of stock badge when 0 */}
+                    {/* Low stock badge only if low */}
                     {isOut ? (
-                      <span className="text-[11px] font-bold text-danger">
+                      <span className="text-[12px] font-medium text-danger">
                         {t('outOfStock')}
                       </span>
                     ) : isLow ? (
-                      <span className="text-[11px] font-semibold text-warning">
+                      <span className="inline-flex items-center gap-1 text-[12px] font-medium text-warning">
+                        <AlertTriangle size={12} strokeWidth={1.75} />
                         {t('lowStock')} ({product.stockOnHand})
                       </span>
                     ) : null}
                   </div>
 
-                  {/* Bottom: Price in bold with tabular numerals */}
-                  <div className="pt-2 flex items-baseline justify-between mt-auto border-t border-border-subtle/50">
-                    <span className="text-lg sm:text-xl font-extrabold text-text-main tabular-nums font-mono">
+                  {/* Bottom-left Price in 20px/600 with tabular numbers */}
+                  <div className="pt-2 flex items-baseline justify-between mt-auto">
+                    <span className="text-[20px] font-semibold text-text-main tabular-nums font-mono leading-none">
                       {formatCurrency(product.price)}
                     </span>
                     {product.isWeighed && (
-                      <span className="text-xs text-text-muted font-medium">/{t('weighedUnitKg')}</span>
+                      <span className="text-xs text-text-muted font-normal">/{t('weighedUnitKg')}</span>
                     )}
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
         </div>
       </div>
 
-      {/* Basket Panel (Right Side, Full Height, Fixed & Always Visible) */}
+      {/* 2. Right (380px, surface, left border): Basket Panel */}
       <BasketPanel
         cart={cart}
         onUpdateQuantity={handleUpdateQuantity}
@@ -415,7 +415,7 @@ export const PosCheckout: React.FC = () => {
         onOpenPayment={() => setIsPaymentOpen(true)}
       />
 
-      {/* Weighed Item Entry Modal for Scale Items */}
+      {/* 3. Weight Entry Modal for scale items */}
       <WeightModal
         isOpen={!!weighedProduct}
         onClose={() => setWeighedProduct(null)}
@@ -426,7 +426,7 @@ export const PosCheckout: React.FC = () => {
         }}
       />
 
-      {/* Payment & Change Modal */}
+      {/* 4. Payment Modal with Cash Number Pad & Methods */}
       <PaymentModal
         isOpen={isPaymentOpen}
         onClose={() => setIsPaymentOpen(false)}
@@ -439,7 +439,7 @@ export const PosCheckout: React.FC = () => {
         completedReceiptNo={completedReceiptNo}
       />
 
-      {/* 80mm ESC/POS Thermal Receipt Modal */}
+      {/* 5. 80mm ESC/POS Thermal Receipt Modal */}
       {completedReceiptText && (
         <ReceiptModal
           receiptText={completedReceiptText}
