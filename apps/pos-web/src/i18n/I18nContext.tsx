@@ -10,6 +10,7 @@ interface I18nContextType {
   formatMoney: (amount: number) => string;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  setUserThemePreference: (userId: string, isDark: boolean) => void;
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
@@ -20,7 +21,9 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    return localStorage.getItem('gebeya_theme') === 'dark';
+    const activeUserId = localStorage.getItem('gebeya_active_user_id');
+    const userTheme = activeUserId ? localStorage.getItem(`gebeya_theme_${activeUserId}`) : null;
+    return userTheme ? userTheme === 'dark' : localStorage.getItem('gebeya_theme') === 'dark';
   });
 
   useEffect(() => {
@@ -29,7 +32,12 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [language]);
 
   useEffect(() => {
-    localStorage.setItem('gebeya_theme', isDarkMode ? 'dark' : 'light');
+    const themeStr = isDarkMode ? 'dark' : 'light';
+    localStorage.setItem('gebeya_theme', themeStr);
+    const activeUserId = localStorage.getItem('gebeya_active_user_id');
+    if (activeUserId) {
+      localStorage.setItem(`gebeya_theme_${activeUserId}`, themeStr);
+    }
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -43,6 +51,12 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => !prev);
+  };
+
+  const setUserThemePreference = (userId: string, isDark: boolean) => {
+    localStorage.setItem(`gebeya_theme_${userId}`, isDark ? 'dark' : 'light');
+    localStorage.setItem('gebeya_active_user_id', userId);
+    setIsDarkMode(isDark);
   };
 
   const t = (key: TranslationKey): string => {
@@ -64,6 +78,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
         formatMoney: formatCurrency,
         isDarkMode,
         toggleDarkMode,
+        setUserThemePreference,
       }}
     >
       {children}
