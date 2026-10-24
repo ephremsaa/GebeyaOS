@@ -25,7 +25,7 @@ export const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>
       onClear,
       onSearchSubmit,
       shortcut = 'F2',
-      placeholder = 'Search...',
+      placeholder = 'Scan barcode or search item...',
       size = 'lg',
       className = '',
       ...props
@@ -62,13 +62,12 @@ export const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>
       props.onKeyDown?.(e);
     };
 
-    const isLg = size === 'lg';
-
     return (
       <div className={`relative flex items-center w-full ${className}`}>
         <Search
-          size={isLg ? 20 : 18}
-          className="absolute left-3.5 text-text-dim pointer-events-none select-none"
+          size={20}
+          strokeWidth={1.75}
+          className="absolute left-4 text-text-muted pointer-events-none select-none"
         />
         <input
           ref={inputRef}
@@ -77,20 +76,18 @@ export const SearchInput = React.forwardRef<SearchInputHandle, SearchInputProps>
           onChange={(e) => onValueChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className={`w-full rounded-xl bg-surface border border-border-strong text-text-main placeholder:text-text-dim outline-none transition-all duration-150 pl-11 shadow-xs focus:border-primary focus:ring-2 focus:ring-primary/20 ${
-            isLg ? 'min-h-[52px] text-base pr-20' : 'min-h-[44px] text-sm pr-16'
-          }`}
+          className="w-full min-h-[52px] rounded-xl bg-surface border border-border-subtle text-text-main placeholder:text-text-muted outline-none transition-all duration-fast pl-12 pr-20 shadow-soft focus:border-primary focus:ring-2 focus:ring-primary/20 text-[15px]"
           {...props}
         />
-        <div className="absolute right-3 flex items-center gap-1.5 select-none">
+        <div className="absolute right-3.5 flex items-center gap-2 select-none">
           {value && (
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 rounded-full text-text-dim hover:text-text-main hover:bg-elevated transition-colors"
+              className="p-1 rounded-full text-text-muted hover:text-text-main hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
               aria-label="Clear search"
             >
-              <X size={16} />
+              <X size={16} strokeWidth={1.75} />
             </button>
           )}
           {shortcut && <KeyboardHint shortcut={shortcut} />}

@@ -26,30 +26,30 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    'inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-150 select-none cursor-pointer ' +
+    'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-fast select-none cursor-pointer ' +
     'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary active:scale-[0.98] ' +
     'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:active:scale-100';
 
   const sizeClasses: Record<ButtonSize, string> = {
-    sm: 'min-h-[36px] px-3 text-xs gap-1.5',
-    md: 'min-h-[44px] px-4 text-sm gap-2', // 44px touch target standard
-    lg: 'min-h-[56px] px-6 text-base gap-2.5 font-bold', // 56px large target standard
-    xl: 'min-h-[60px] px-8 text-lg gap-3 font-extrabold',
+    sm: 'min-h-[38px] px-3 text-[13px] gap-1.5',
+    md: 'min-h-[44px] px-4 text-[15px] gap-2', // 44px standard touch target
+    lg: 'min-h-[56px] px-6 text-[16px] gap-2.5 font-bold', // 56px primary touch target
+    xl: 'min-h-[64px] px-8 text-lg gap-3 font-extrabold',
   };
 
   const normalizedVariant = variant === 'destructive' ? 'danger' : variant;
 
   const variantClasses: Record<string, string> = {
     primary:
-      'bg-primary text-white hover:bg-primary-hover shadow-sm shadow-primary/25',
+      'bg-primary text-white hover:bg-primary-hover shadow-soft',
     secondary:
-      'bg-elevated text-text-main hover:bg-surface border border-border-strong',
+      'bg-surface-2 text-text-main hover:bg-surface border border-border-subtle shadow-soft',
     danger:
-      'bg-danger text-white hover:bg-danger-hover shadow-sm shadow-danger/25',
+      'bg-danger-soft text-danger hover:bg-danger hover:text-white',
     ghost:
-      'bg-transparent text-text-muted hover:text-text-main hover:bg-elevated',
+      'bg-transparent text-text-muted hover:text-text-main hover:bg-surface-2',
     outline:
-      'bg-transparent border-2 border-border-strong text-text-main hover:bg-elevated',
+      'bg-transparent border border-border-subtle text-text-main hover:bg-surface-2',
   };
 
   const selectedVariantClass = variantClasses[normalizedVariant] || variantClasses.primary;

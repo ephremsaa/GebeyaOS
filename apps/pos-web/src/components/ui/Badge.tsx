@@ -1,4 +1,5 @@
 import React from 'react';
+import { CheckCircle2, AlertTriangle, AlertCircle, Info, HelpCircle } from 'lucide-react';
 
 export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
@@ -16,22 +17,32 @@ export const Badge: React.FC<BadgeProps> = ({
   className = '',
   ...props
 }) => {
-  const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs';
+  const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-[12px] gap-1' : 'px-2.5 py-1 text-[13px] gap-1.5';
+
+  const defaultIcons = {
+    success: <CheckCircle2 size={size === 'sm' ? 12 : 14} className="flex-shrink-0" />,
+    warning: <AlertTriangle size={size === 'sm' ? 12 : 14} className="flex-shrink-0" />,
+    danger: <AlertCircle size={size === 'sm' ? 12 : 14} className="flex-shrink-0" />,
+    info: <Info size={size === 'sm' ? 12 : 14} className="flex-shrink-0" />,
+    neutral: <span className="w-1.5 h-1.5 rounded-full bg-text-muted flex-shrink-0" />,
+  };
 
   const variantClasses: Record<BadgeVariant, string> = {
-    success: 'bg-primary/10 text-primary border border-primary/25',
-    warning: 'bg-warning/10 text-warning border border-warning/25',
-    danger: 'bg-danger/10 text-danger border border-danger/25',
-    info: 'bg-info/10 text-info border border-info/25',
-    neutral: 'bg-elevated text-text-muted border border-border-subtle',
+    success: 'bg-primary-soft text-primary font-semibold',
+    warning: 'bg-warning-soft text-warning font-semibold',
+    danger: 'bg-danger-soft text-danger font-semibold',
+    info: 'bg-info-soft text-info font-semibold',
+    neutral: 'bg-surface-2 text-text-muted font-medium border border-border-subtle',
   };
+
+  const renderedIcon = icon !== undefined ? icon : defaultIcons[variant];
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 font-semibold rounded-full select-none leading-none ${sizeClasses} ${variantClasses[variant]} ${className}`}
+      className={`inline-flex items-center rounded-full select-none leading-none ${sizeClasses} ${variantClasses[variant]} ${className}`}
       {...props}
     >
-      {icon && <span className="flex-shrink-0">{icon}</span>}
+      {renderedIcon}
       <span>{children}</span>
     </span>
   );

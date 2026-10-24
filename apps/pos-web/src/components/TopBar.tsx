@@ -9,9 +9,8 @@ import {
   Lock,
   RotateCcw,
   CheckCircle2,
-  Search,
-  Bell,
   KeyRound,
+  Shield,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
@@ -23,12 +22,8 @@ export interface TopBarProps {
   unreadNotificationsCount?: number;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({
-  onOpenCommandPalette,
-  onOpenNotifications,
-  unreadNotificationsCount = 0,
-}) => {
-  const { language, setLanguage, t, isDarkMode, toggleDarkMode } = useI18n();
+export const TopBar: React.FC<TopBarProps> = () => {
+  const { language, setLanguage, t, isDarkMode, toggleDarkMode, setUserThemePreference } = useI18n();
   const { currentUser, logout, lockSession, switchCashier, updateUserPassword, updateUserPin } = useAuth();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -96,21 +91,30 @@ export const TopBar: React.FC<TopBarProps> = ({
     }
   };
 
+  const handleToggleTheme = () => {
+    const nextDark = !isDarkMode;
+    if (currentUser?.id) {
+      setUserThemePreference(currentUser.id, nextDark);
+    } else {
+      toggleDarkMode();
+    }
+  };
+
   const cashierName = currentUser?.fullName || 'Cashier';
   const roleName = currentUser?.role || 'CASHIER';
 
   return (
-    <header className="h-14 px-4 bg-surface border-b border-border-subtle flex items-center justify-between flex-shrink-0 relative z-30 select-none">
-      {/* Brand & Branch Pill */}
+    <header className="h-14 px-5 bg-surface border-b border-border-subtle flex items-center justify-between flex-shrink-0 relative z-30 select-none">
+      {/* Left: Logo, Wordmark, thin divider, Branch Pill */}
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-xs shadow-primary/25 flex-shrink-0">
-          <Store size={18} />
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-soft flex-shrink-0">
+          <Store size={18} strokeWidth={1.75} />
         </div>
-        <span className="font-extrabold text-lg tracking-tight text-text-main">
+        <span className="font-semibold text-lg tracking-tight text-text-main">
           {t('appName')}
         </span>
         <div className="h-4 w-px bg-border-subtle mx-1 hidden sm:block" />
-        <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md bg-elevated text-text-muted border border-border-subtle">
+        <div className="hidden sm:flex items-center gap-2 text-[13px] font-medium px-3 py-1 rounded-full bg-surface-2 text-text-muted border border-border-subtle">
           <span className="w-2 h-2 rounded-full bg-primary" />
           <span>{currentUser?.branchName || t('branchName')}</span>
         </div>
@@ -118,68 +122,57 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {/* Global Success Banner */}
       {successMsg && (
-        <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-lg bg-primary/10 text-primary border border-primary/25 text-xs font-bold animate-in fade-in">
-          <CheckCircle2 size={14} />
+        <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-lg bg-primary-soft text-primary border border-primary/20 text-xs font-semibold animate-in fade-in">
+          <CheckCircle2 size={14} strokeWidth={1.75} />
           {successMsg}
         </div>
       )}
 
-      {/* Center: Command Palette Trigger */}
-      <button
-        type="button"
-        onClick={onOpenCommandPalette}
-        className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-elevated hover:bg-surface border border-border-subtle text-xs text-text-muted transition-colors cursor-pointer"
-      >
-        <Search size={14} className="text-text-dim" />
-        <span className="font-medium">Jump to page, product, or action...</span>
-        <kbd className="px-1.5 py-0.5 rounded bg-surface border border-border-strong font-mono text-[10px] font-bold text-text-dim">
-          Ctrl+K
-        </kbd>
-      </button>
+      {/* Right: Sync Status Dot, then User Avatar Menu */}
+      <div className="flex items-center gap-3">
+        {/* Sync Status Dot */}
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border-subtle text-xs text-text-muted">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+          </span>
+          <span className="text-[12px] font-medium">{t('online')}</span>
+        </div>
 
-      {/* Right Controls: Bell + Cashier Status Menu */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onOpenNotifications}
-          className="relative p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-elevated transition-colors"
-          title="Notification Center"
-          aria-label="Notification Center"
-        >
-          <Bell size={18} />
-          {unreadNotificationsCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-danger text-white font-bold text-[9px] flex items-center justify-center animate-pulse">
-              {unreadNotificationsCount}
-            </span>
-          )}
-        </button>
-
-        {/* Cashier & Status Dropdown trigger */}
+        {/* User Avatar Menu Trigger */}
         <div className="relative" ref={menuRef}>
-          <StatusDot
-            status="online"
-            cashierName={cashierName}
+          <button
+            type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-          />
+            className="flex items-center gap-2 p-1 pl-2.5 rounded-full bg-surface-2 hover:bg-border-subtle transition-colors duration-fast border border-border-subtle cursor-pointer"
+            aria-label="User profile and settings"
+          >
+            <span className="text-[13px] font-semibold text-text-main max-w-[120px] truncate hidden sm:inline">
+              {cashierName}
+            </span>
+            <div className="w-7 h-7 rounded-full bg-primary-soft text-primary flex items-center justify-center font-bold text-xs select-none">
+              {cashierName.slice(0, 2).toUpperCase()}
+            </div>
+          </button>
 
-          {/* Dropdown Menu */}
+          {/* User Menu Dropdown */}
           {isMenuOpen && (
-            <div className="absolute right-0 top-12 w-80 bg-surface rounded-2xl shadow-modal border border-border-subtle p-3.5 flex flex-col gap-2.5 animate-in fade-in zoom-in-95 duration-100 z-50">
-              {/* User Profile Card */}
-              <div className="p-3 rounded-xl bg-elevated border border-border-subtle flex flex-col gap-2">
+            <div className="absolute right-0 top-11 w-76 bg-surface rounded-2xl shadow-modal border border-border-subtle p-3.5 flex flex-col gap-2.5 animate-in fade-in duration-fast z-50">
+              {/* Profile Card */}
+              <div className="p-3 rounded-xl bg-surface-2 border border-border-subtle flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs select-none">
+                    <div className="w-8 h-8 rounded-full bg-primary-soft text-primary flex items-center justify-center font-bold text-xs select-none">
                       {cashierName.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-bold text-xs text-text-main leading-tight">
+                      <span className="font-semibold text-xs text-text-main leading-tight">
                         {cashierName}
                       </span>
-                      <span className="text-[10px] text-text-muted">@{currentUser?.username || 'user'}</span>
+                      <span className="text-[11px] text-text-muted">@{currentUser?.username || 'user'}</span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-primary text-white">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary-soft text-primary">
                     {roleName}
                   </span>
                 </div>
@@ -188,7 +181,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
                 <div className="flex items-center justify-between text-xs text-text-muted">
                   <span className="flex items-center gap-1.5 text-primary font-medium">
-                    <Wifi size={13} />
+                    <Wifi size={13} strokeWidth={1.75} />
                     {t('online')}
                   </span>
                   <span className="font-mono text-[11px] text-text-dim">Branch LAN</span>
@@ -204,7 +197,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                     setIsMenuOpen(false);
                     switchCashier();
                   }}
-                  leftIcon={<RotateCcw size={13} className="text-primary" />}
+                  leftIcon={<RotateCcw size={13} strokeWidth={1.75} className="text-primary" />}
                 >
                   {t('switchCashier')}
                 </Button>
@@ -216,13 +209,13 @@ export const TopBar: React.FC<TopBarProps> = ({
                     setIsMenuOpen(false);
                     lockSession();
                   }}
-                  leftIcon={<Lock size={13} className="text-warning" />}
+                  leftIcon={<Lock size={13} strokeWidth={1.75} className="text-warning" />}
                 >
                   {t('lockTerminal')}
                 </Button>
               </div>
 
-              {/* Change Credentials */}
+              {/* Credential Options */}
               <div className="flex flex-col gap-1 border-t border-b border-border-subtle py-1.5">
                 <button
                   type="button"
@@ -230,9 +223,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                     setIsMenuOpen(false);
                     setIsPassModalOpen(true);
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-text-muted hover:text-text-main hover:bg-elevated text-left transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                 >
-                  <Lock size={14} className="text-text-dim" />
+                  <Lock size={14} strokeWidth={1.75} className="text-text-dim" />
                   {t('changePassword')}
                 </button>
                 <button
@@ -241,9 +234,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                     setIsMenuOpen(false);
                     setIsPinModalOpen(true);
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-text-muted hover:text-text-main hover:bg-elevated text-left transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                 >
-                  <KeyRound size={14} className="text-text-dim" />
+                  <KeyRound size={14} strokeWidth={1.75} className="text-text-dim" />
                   {t('changePin')}
                 </button>
               </div>
@@ -251,16 +244,16 @@ export const TopBar: React.FC<TopBarProps> = ({
               {/* Language Switcher */}
               <div className="flex items-center justify-between px-2 py-1 text-xs">
                 <span className="flex items-center gap-2 text-text-muted">
-                  <Globe size={14} />
+                  <Globe size={14} strokeWidth={1.75} />
                   {t('language')}
                 </span>
-                <div className="flex bg-elevated p-0.5 rounded-lg border border-border-subtle">
+                <div className="flex bg-surface-2 p-0.5 rounded-lg border border-border-subtle">
                   <button
                     type="button"
                     onClick={() => setLanguage('en')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                       language === 'en'
-                        ? 'bg-surface text-primary shadow-xs'
+                        ? 'bg-surface text-primary shadow-soft'
                         : 'text-text-dim hover:text-text-main'
                     }`}
                   >
@@ -269,9 +262,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                   <button
                     type="button"
                     onClick={() => setLanguage('am')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                       language === 'am'
-                        ? 'bg-surface text-primary shadow-xs'
+                        ? 'bg-surface text-primary shadow-soft'
                         : 'text-text-dim hover:text-text-main'
                     }`}
                   >
@@ -283,13 +276,13 @@ export const TopBar: React.FC<TopBarProps> = ({
               {/* Theme Toggle */}
               <div className="flex items-center justify-between px-2 py-1 text-xs">
                 <span className="flex items-center gap-2 text-text-muted">
-                  {isDarkMode ? <Moon size={14} /> : <Sun size={14} />}
+                  {isDarkMode ? <Moon size={14} strokeWidth={1.75} /> : <Sun size={14} strokeWidth={1.75} />}
                   {t('theme')}
                 </span>
                 <button
                   type="button"
-                  onClick={toggleDarkMode}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-elevated hover:bg-surface text-text-main transition-colors border border-border-subtle cursor-pointer"
+                  onClick={handleToggleTheme}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface-2 hover:bg-surface text-text-main transition-colors border border-border-subtle cursor-pointer shadow-soft"
                 >
                   {isDarkMode ? t('darkMode') : t('lightMode')}
                 </button>
@@ -304,9 +297,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                   setIsMenuOpen(false);
                   logout();
                 }}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold text-danger hover:bg-danger/10 transition-colors text-left cursor-pointer"
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold text-danger hover:bg-danger-soft transition-colors text-left cursor-pointer"
               >
-                <LogOut size={14} />
+                <LogOut size={14} strokeWidth={1.75} />
                 {t('logout')}
               </button>
             </div>
@@ -323,7 +316,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           maxWidth="sm"
         >
           {passError && (
-            <div className="text-xs text-danger bg-danger/10 p-2.5 rounded-lg border border-danger/25 mb-3">
+            <div className="text-xs text-danger bg-danger-soft p-2.5 rounded-lg mb-3">
               {passError}
             </div>
           )}
@@ -369,7 +362,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           maxWidth="sm"
         >
           {pinError && (
-            <div className="text-xs text-danger bg-danger/10 p-2.5 rounded-lg border border-danger/25 mb-3">
+            <div className="text-xs text-danger bg-danger-soft p-2.5 rounded-lg mb-3">
               {pinError}
             </div>
           )}

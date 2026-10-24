@@ -14,3 +14,7 @@ export * from './Skeleton';
 export * from './KeyboardHint';
 export * from './Pill';
 export * from './StatusDot';
+export * from './DataTable';
+export * from '../PageLayout';
+export * from '../TopBar';
+export * from '../NavigationRail';
