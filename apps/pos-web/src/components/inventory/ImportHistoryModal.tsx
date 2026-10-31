@@ -8,46 +8,14 @@ interface ImportHistoryModalProps {
   onRevertSuccess?: (batchId: string) => void;
 }
 
-const DEMO_HISTORY: ImportBatchSummary[] = [
-  {
-    id: 'batch-01',
-    fileName: 'Opening_Store_Stock_Oct2026.xlsx',
-    fileHash: 'sha256-a1b2c3d4e5f6',
-    importMode: 'CREATE_OR_UPDATE',
-    sourceType: 'OPENING_BALANCE',
-    totalRows: 120,
-    createdCount: 85,
-    updatedCount: 35,
-    skippedCount: 0,
-    errorCount: 0,
-    status: 'COMPLETED',
-    userName: 'Abebe Kebede (Owner)',
-    createdAt: '2026-10-23T14:30:00Z',
-  },
-  {
-    id: 'batch-02',
-    fileName: 'Dairy_Supplier_AlmazAgro.xlsx',
-    fileHash: 'sha256-f6e5d4c3b2a1',
-    importMode: 'ADD_STOCK_EXISTING',
-    sourceType: 'GOODS_RECEIVED',
-    supplierName: 'Almaz Agro Dairy PLC',
-    totalRows: 40,
-    createdCount: 0,
-    updatedCount: 40,
-    skippedCount: 0,
-    errorCount: 0,
-    status: 'COMPLETED',
-    userName: 'Bethlehem Tadesse (Cashier)',
-    createdAt: '2026-10-22T10:15:00Z',
-  },
-];
+const DEMO_HISTORY: ImportBatchSummary[] = [];
 
 export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
   isOpen,
   onClose,
   onRevertSuccess,
 }) => {
-  const [batches, setBatches] = useState<ImportBatchSummary[]>(DEMO_HISTORY);
+  const [batches, setBatches] = useState<ImportBatchSummary[]>([]);
   const [confirmUndoId, setConfirmUndoId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 

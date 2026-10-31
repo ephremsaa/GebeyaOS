@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   Headers,
+  Query,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -26,6 +27,29 @@ export class PosController {
     private readonly posService: PosService,
     private readonly heldCartsService: HeldCartsService,
   ) {}
+
+  @Get('shifts/current')
+  async getCurrentShift(
+    @Query('terminalId') terminalId?: string,
+    @Headers('x-terminal-id') headerTerminalId?: string,
+    @Headers('x-branch-id') branchId?: string,
+  ) {
+    const termId = terminalId || headerTerminalId || '018e0000-0000-7000-8000-000000000010';
+    return this.posService.getCurrentShift(termId, branchId);
+  }
+
+  @Get('shifts/:id/x-report')
+  async getXReport(
+    @Param('id') shiftId: string,
+    @Headers('x-user-role') userRole?: string,
+  ) {
+    return this.posService.getXReport(shiftId, userRole);
+  }
+
+  @Get('shifts/:id/movements')
+  async getShiftMovements(@Param('id') shiftId: string) {
+    return this.posService.getShiftMovements(shiftId);
+  }
 
   @Post('shifts/open')
   @HttpCode(HttpStatus.CREATED)
@@ -102,6 +126,10 @@ export class PosController {
       cashierId,
       dto.items,
       dto.customer_identifier,
+      dto.branch_id,
+      dto.subtotal || 0,
+      dto.tax_total || 0,
+      dto.grand_total || 0,
     );
   }
 

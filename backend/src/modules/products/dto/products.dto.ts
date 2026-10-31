@@ -77,9 +77,21 @@ export class CreateProductDto {
   @IsBoolean()
   @IsOptional()
   allow_discount?: boolean;
+
+  @IsString()
+  @IsOptional()
+  barcode?: string;
+
+  @IsString()
+  @IsOptional()
+  image_url?: string;
 }
 
 export class UpdateProductDto {
+  @IsString()
+  @IsOptional()
+  sku?: string;
+
   @IsString()
   @IsOptional()
   name_en?: string;
@@ -95,6 +107,18 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   uom_code?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  base_price?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  cost_price?: number;
 
   @IsBoolean()
   @IsOptional()
@@ -134,6 +158,14 @@ export class UpdateProductDto {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+
+  @IsString()
+  @IsOptional()
+  barcode?: string;
+
+  @IsString()
+  @IsOptional()
+  image_url?: string;
 }
 
 export class CreateBarcodeDto {
@@ -214,3 +246,72 @@ export class BarcodeLookupQueryDto {
   @IsNotEmpty()
   branch_id!: string;
 }
+
+export class ProductQueryDto {
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @IsUUID()
+  @IsOptional()
+  category_id?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  low_stock_only?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  active_only?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  limit?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  offset?: number;
+}
+
+export class CreateCategoryDto {
+  @IsString()
+  @IsNotEmpty()
+  code!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name_en!: string;
+
+  @IsString()
+  @IsOptional()
+  name_am?: string;
+
+  @IsUUID()
+  @IsOptional()
+  parent_id?: string;
+}
+
+export class BulkCategoryDto {
+  @IsArray()
+  @IsNotEmpty()
+  product_ids!: string[];
+
+  @IsUUID()
+  @IsNotEmpty()
+  category_id!: string;
+}
+
+export class BulkArchiveDto {
+  @IsArray()
+  @IsNotEmpty()
+  product_ids!: string[];
+
+  @IsBoolean()
+  @IsNotEmpty()
+  archive!: boolean;
+}
+

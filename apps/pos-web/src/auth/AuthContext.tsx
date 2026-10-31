@@ -1,5 +1,40 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { AuthenticatedUser, RoleName, SetupStatusResponse } from '@gebeyaos/shared-types';
+import {
+  AuthenticatedUser,
+  RoleName,
+  SetupStatusResponse,
+  UserSessionInfo,
+  CashierSummary,
+  TerminalPairRequest,
+  TerminalPairResponse,
+  ManagerOverrideRequest,
+  ManagerOverrideResult,
+} from '@gebeyaos/shared-types';
+
+export interface CompanyInfo {
+  id?: string;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  receiptHeader?: string;
+  isSuspended?: boolean;
+}
+
+export interface AssignedBranch {
+  id: string;
+  name: string;
+  code: string;
+  isDefault?: boolean;
+}
+
+export interface TerminalConfig {
+  terminalId: string;
+  terminalCode: string;
+  terminalName: string;
+  branchId: string;
+  deviceToken?: string;
+  autoLockMinutes: number;
+}
 
 export interface AuthContextType {
   currentUser: AuthenticatedUser | null;
@@ -7,88 +42,131 @@ export interface AuthContextType {
   isLocked: boolean;
   setupStatus: SetupStatusResponse | null;
   isLoading: boolean;
+  companyCode: string;
+  companyInfo: CompanyInfo | null;
+  assignedBranches: AssignedBranch[];
+  isSessionExpired: boolean;
+  terminalConfig: TerminalConfig | null;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (...permissions: string[]) => boolean;
   hasRole: (...roles: RoleName[]) => boolean;
-  login: (usernameOrPhone: string, password: string) => Promise<{ success: boolean; error?: string; remainingSeconds?: number }>;
-  pinLogin: (pin: string) => Promise<{ success: boolean; error?: string }>;
+  setCompanyCode: (code: string) => void;
+  checkCompanyCode: (slug: string) => Promise<{ success: boolean; company?: CompanyInfo; error?: string; isSuspended?: boolean }>;
+  selectBranch: (branchId: string) => void;
+  login: (
+    usernameOrPhone: string,
+    password: string,
+    companyCode?: string,
+    totpCode?: string,
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    remainingSeconds?: number;
+    requires2FA?: boolean;
+    isSuspended?: boolean;
+    branches?: AssignedBranch[];
+    forcePasswordChange?: boolean;
+  }>;
+  reauthenticate: (password: string) => Promise<{ success: boolean; error?: string }>;
+  setIsSessionExpired: (expired: boolean) => void;
+  pinLogin: (pin: string, userId?: string) => Promise<{ success: boolean; error?: string; remainingSeconds?: number }>;
   executeSetup: (dto: any) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   lockSession: () => void;
-  unlockSession: (pin: string) => Promise<{ success: boolean; error?: string }>;
+  unlockSession: (pin: string, userId?: string) => Promise<{ success: boolean; error?: string; remainingSeconds?: number }>;
   switchCashier: () => void;
   updateUserPassword: (currentPass: string, newPass: string) => Promise<{ success: boolean; error?: string }>;
   updateUserPin: (newPin: string) => Promise<{ success: boolean; error?: string }>;
+  forgotPassword: (companyCode: string, usernameOrPhone: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  resetPassword: (companyCode: string, usernameOrPhone: string, code: string, newPassword: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  getUserProfile: () => Promise<any>;
+  updateUserProfile: (dto: { fullName?: string; phone?: string; defaultLanguage?: string; themePreference?: string }) => Promise<{ success: boolean; error?: string }>;
+  getUserSessions: () => Promise<UserSessionInfo[]>;
+  revokeSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+  logoutAll: () => Promise<{ success: boolean; error?: string }>;
+  getCashiers: (branchId?: string) => Promise<CashierSummary[]>;
+  pairTerminal: (dto: TerminalPairRequest) => Promise<{ success: boolean; terminal?: TerminalPairResponse; error?: string }>;
+  managerOverride: (dto: ManagerOverrideRequest) => Promise<ManagerOverrideResult>;
+  fetchWithAuth: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_BASE = '/api';
-const INACTIVITY_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
-
-export const DEMO_DEFAULT_USER: AuthenticatedUser = {
-  id: '018e0000-0000-7000-8000-000000000041',
-  username: 'admin',
-  fullName: 'System Administrator (Owner)',
-  phone: '+251 91 122 3344',
-  role: 'OWNER',
-  roleId: '018e0000-0000-7000-8000-000000000001',
-  branchId: '018e0000-0000-7000-8000-000000000020',
-  branchCode: 'BOLE-01',
-  branchName: 'Bole Medhanialem Branch',
-  permissions: [
-    'pos:shift:open', 'pos:shift:close', 'pos:sale:create', 'pos:sale:hold',
-    'pos:sale:discount', 'pos:sale:refund', 'pos:receipt:reprint', 'pos:cash:movement',
-    'catalog:product:view', 'catalog:product:create', 'catalog:product:edit',
-    'catalog:cost:view', 'inventory:stock:view', 'inventory:adjust:create',
-    'inventory:stocktake:execute', 'inventory:import:execute', 'purchasing:po:create',
-    'purchasing:grn:receive', 'transfers:request', 'transfers:dispatch', 'transfers:receive',
-    'reports:branch:view', 'reports:consolidated:view', 'admin:users:manage',
-    'admin:roles:manage', 'admin:settings:manage'
-  ],
-  forcePasswordChange: false,
-};
-
-export const DEMO_CASHIER_USER: AuthenticatedUser = {
-  id: '018e0000-0000-7000-8000-000000000042',
-  username: 'cashier1',
-  fullName: 'Bethlehem Tadesse',
-  phone: '+251 92 233 4455',
-  role: 'CASHIER',
-  roleId: '018e0000-0000-7000-8000-000000000003',
-  branchId: '018e0000-0000-7000-8000-000000000020',
-  branchCode: 'BOLE-01',
-  branchName: 'Bole Medhanialem Branch',
-  permissions: [
-    'pos:shift:open', 'pos:shift:close', 'pos:sale:create', 'pos:sale:hold',
-    'pos:sale:discount', 'pos:receipt:reprint', 'pos:cash:movement',
-    'catalog:product:view'
-  ],
-  forcePasswordChange: false,
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(() => {
     try {
       const stored = localStorage.getItem('gebeyaos_user');
-      return stored ? JSON.parse(stored) : DEMO_DEFAULT_USER;
+      return stored ? JSON.parse(stored) : null;
     } catch {
-      return DEMO_DEFAULT_USER;
+      return null;
     }
   });
 
-  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>({
-    setupCompleted: true,
-    storeName: 'Gebeya Supermarket',
-    ownerExists: true,
-    defaultBranchCode: 'BOLE-01',
+  const [companyCode, setCompanyCodeState] = useState<string>(() => {
+    return localStorage.getItem('gebeyaos_company_code') || '';
   });
+
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const [assignedBranches, setAssignedBranches] = useState<AssignedBranch[]>(() => {
+    try {
+      const stored = localStorage.getItem('gebeyaos_assigned_branches');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [terminalConfig, setTerminalConfig] = useState<TerminalConfig | null>(() => {
+    try {
+      const stored = localStorage.getItem('gebeyaos_terminal_config');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [isSessionExpired, setIsSessionExpired] = useState<boolean>(false);
+
+  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
 
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Check setup status on load
+  // Set company code and persist
+  const setCompanyCode = useCallback((code: string) => {
+    const trimmed = code.trim().toLowerCase();
+    setCompanyCodeState(trimmed);
+    localStorage.setItem('gebeyaos_company_code', trimmed);
+  }, []);
+
+  // Fetch company info by slug
+  const checkCompanyCode = useCallback(async (slug: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/company-info?slug=${encodeURIComponent(slug.trim())}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCompanyInfo(data);
+        setCompanyCode(slug);
+        return { success: true, company: data };
+      }
+      if (res.status === 403) {
+        const err = await res.json().catch(() => ({}));
+        return {
+          success: false,
+          isSuspended: true,
+          error: err.message || 'This supermarket account is suspended. Please contact platform support.',
+        };
+      }
+      return { success: false, error: 'Supermarket not found for this company code.' };
+    } catch {
+      return { success: false, error: 'Cannot connect to server. Please check your network connection.' };
+    }
+  }, [setCompanyCode]);
+
+  // Initial load check
   useEffect(() => {
     const checkStatus = async () => {
       try {
@@ -101,21 +179,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch {
-        // LAN offline fallback: consider setup completed if demo user exists
+        // LAN offline fallback
       }
     };
     checkStatus();
-  }, []);
 
-  // Inactivity Auto-Lock Timer
+    if (companyCode) {
+      checkCompanyCode(companyCode);
+    }
+  }, [companyCode, checkCompanyCode]);
+
+  // Inactivity Auto-Lock Timer (Configurable per paired terminal)
+  const autoLockMinutes = terminalConfig?.autoLockMinutes && terminalConfig.autoLockMinutes > 0
+    ? terminalConfig.autoLockMinutes
+    : 3;
+  const inactivityTimeoutMs = autoLockMinutes * 60 * 1000;
+
   const resetInactivityTimer = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     if (!currentUser || isLocked) return;
 
     idleTimerRef.current = setTimeout(() => {
       setIsLocked(true);
-    }, INACTIVITY_TIMEOUT_MS);
-  }, [currentUser, isLocked]);
+    }, inactivityTimeoutMs);
+  }, [currentUser, isLocked, inactivityTimeoutMs]);
 
   useEffect(() => {
     const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll'];
@@ -148,14 +235,120 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return roles.includes(currentUser.role);
   }, [currentUser]);
 
+  // Select Branch
+  const selectBranch = useCallback((branchId: string) => {
+    if (!currentUser) return;
+    const targetBranch = assignedBranches.find((b) => b.id === branchId);
+    if (targetBranch) {
+      const updated: AuthenticatedUser = {
+        ...currentUser,
+        branchId: targetBranch.id,
+        branchCode: targetBranch.code,
+        branchName: targetBranch.name,
+      };
+      setCurrentUser(updated);
+      localStorage.setItem('gebeyaos_user', JSON.stringify(updated));
+    }
+  }, [currentUser, assignedBranches]);
+
   // Back-office Login
-  const login = async (usernameOrPhone: string, password: string) => {
+  const login = async (
+    usernameOrPhone: string,
+    password: string,
+    providedCompanyCode?: string,
+    totpCode?: string,
+  ) => {
     setIsLoading(true);
+    const targetCode = providedCompanyCode || companyCode;
+
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernameOrPhone, password }),
+        body: JSON.stringify({
+          usernameOrPhone,
+          password,
+          companyCode: targetCode,
+          totpCode,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+
+        if (data.requires2FA) {
+          setIsLoading(false);
+          return {
+            success: false,
+            requires2FA: true,
+          };
+        }
+
+        localStorage.setItem('gebeyaos_access_token', data.accessToken);
+        localStorage.setItem('gebeyaos_refresh_token', data.refreshToken);
+        localStorage.setItem('gebeyaos_user', JSON.stringify(data.user));
+
+        if (data.assignedBranches) {
+          setAssignedBranches(data.assignedBranches);
+          localStorage.setItem('gebeyaos_assigned_branches', JSON.stringify(data.assignedBranches));
+        }
+
+        setCurrentUser(data.user);
+        setIsLocked(false);
+        setIsSessionExpired(false);
+        setIsLoading(false);
+
+        return {
+          success: true,
+          user: data.user,
+          branches: data.assignedBranches || [],
+          forcePasswordChange: data.user.forcePasswordChange,
+        };
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setIsLoading(false);
+
+        const isSuspended =
+          res.status === 403 ||
+          (err.message && err.message.toLowerCase().includes('suspended'));
+
+        return {
+          success: false,
+          error: err.message || 'Login failed. Please check your credentials.',
+          remainingSeconds: err.remainingSeconds,
+          isSuspended,
+        };
+      }
+    } catch {
+      setIsLoading(false);
+      return { success: false, error: 'Cannot connect to authentication service. Please check network connection.' };
+    }
+  };
+
+  // Re-authenticate when session expired (preserves basket and state)
+  const reauthenticate = async (password: string) => {
+    if (!currentUser) return { success: false, error: 'No active user' };
+    const res = await login(currentUser.username, password, companyCode);
+    if (res.success) {
+      setIsSessionExpired(false);
+      return { success: true };
+    }
+    return { success: false, error: res.error || 'Authentication failed' };
+  };
+
+  // Fast Cashier PIN Login (with per-user lockout, terminal binding, 12h expiry)
+  const pinLogin = async (pin: string, userId?: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/pin-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pin,
+          userId,
+          terminalCode: terminalConfig?.terminalCode || 'POS-01',
+          deviceToken: terminalConfig?.deviceToken,
+        }),
       });
 
       if (res.ok) {
@@ -165,6 +358,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('gebeyaos_user', JSON.stringify(data.user));
         setCurrentUser(data.user);
         setIsLocked(false);
+        setIsSessionExpired(false);
         setIsLoading(false);
         return { success: true };
       } else {
@@ -172,69 +366,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
         return {
           success: false,
-          error: err.message || 'Login failed. Please check your credentials.',
+          error: err.message || 'Invalid cashier PIN',
           remainingSeconds: err.remainingSeconds,
         };
       }
     } catch {
-      // Offline fallback for demo / LAN local testing
-      if (
-        (usernameOrPhone.toLowerCase() === 'admin' || usernameOrPhone === '+251 91 122 3344') &&
-        password === 'Admin@123456'
-      ) {
-        setCurrentUser(DEMO_DEFAULT_USER);
-        localStorage.setItem('gebeyaos_user', JSON.stringify(DEMO_DEFAULT_USER));
-        setIsLocked(false);
-        setIsLoading(false);
-        return { success: true };
-      }
-      if (usernameOrPhone.toLowerCase() === 'cashier1' && password === 'Admin@123456') {
-        setCurrentUser(DEMO_CASHIER_USER);
-        localStorage.setItem('gebeyaos_user', JSON.stringify(DEMO_CASHIER_USER));
-        setIsLocked(false);
-        setIsLoading(false);
-        return { success: true };
-      }
       setIsLoading(false);
-      return { success: false, error: 'Invalid credentials. Please try again.' };
-    }
-  };
-
-  // Fast Cashier PIN Login
-  const pinLogin = async (pin: string) => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/auth/pin-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin, terminalCode: 'POS-01' }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('gebeyaos_access_token', data.accessToken);
-        localStorage.setItem('gebeyaos_refresh_token', data.refreshToken);
-        localStorage.setItem('gebeyaos_user', JSON.stringify(data.user));
-        setCurrentUser(data.user);
-        setIsLocked(false);
-        setIsLoading(false);
-        return { success: true };
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setIsLoading(false);
-        return { success: false, error: err.message || 'Invalid cashier PIN' };
-      }
-    } catch {
-      // Offline demo fallback: PIN '1234' matches demo cashier
-      if (pin === '1234' || pin === '0000') {
-        setCurrentUser(DEMO_CASHIER_USER);
-        localStorage.setItem('gebeyaos_user', JSON.stringify(DEMO_CASHIER_USER));
-        setIsLocked(false);
-        setIsLoading(false);
-        return { success: true };
-      }
-      setIsLoading(false);
-      return { success: false, error: 'Invalid cashier PIN. Try 1234 for demo.' };
+      return { success: false, error: 'Cannot connect to branch server for PIN verification.' };
     }
   };
 
@@ -264,25 +402,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: err.message || 'Setup wizard failed.' };
       }
     } catch {
-      // Offline client simulation
-      const newOwner: AuthenticatedUser = {
-        id: 'owner-local-id',
-        username: dto.ownerUsername,
-        fullName: dto.ownerFullName,
-        phone: dto.ownerPhone,
-        role: 'OWNER',
-        roleId: '018e0000-0000-7000-8000-000000000001',
-        branchId: '018e0000-0000-7000-8000-000000000020',
-        branchCode: dto.branchCode,
-        branchName: dto.companyName,
-        permissions: DEMO_DEFAULT_USER.permissions,
-        forcePasswordChange: false,
-      };
-      setCurrentUser(newOwner);
-      setSetupStatus({ setupCompleted: true, ownerExists: true, storeName: dto.companyName });
-      setIsLocked(false);
       setIsLoading(false);
-      return { success: true };
+      return { success: false, error: 'Cannot reach server to complete initial setup.' };
     }
   };
 
@@ -308,6 +429,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('gebeyaos_user');
       setCurrentUser(null);
       setIsLocked(false);
+      setIsSessionExpired(false);
     }
   };
 
@@ -315,8 +437,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLocked(true);
   };
 
-  const unlockSession = async (pin: string) => {
-    const res = await pinLogin(pin);
+  const unlockSession = async (pin: string, userId?: string) => {
+    const res = await pinLogin(pin, userId);
     if (res.success) {
       setIsLocked(false);
     }
@@ -324,6 +446,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchCashier = () => {
+    // Preserve current held basket state and lock session
     setIsLocked(true);
   };
 
@@ -372,6 +495,220 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Forgot Password: SMS / Email code request
+  const forgotPassword = async (code: string, usernameOrPhone: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyCode: code, usernameOrPhone }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data.message || 'Failed to send reset code' };
+    } catch {
+      return { success: true, message: 'If the account exists, a reset code has been sent.' };
+    }
+  };
+
+  // Reset Password using 6-digit code
+  const resetPassword = async (code: string, usernameOrPhone: string, resetCode: string, newPassword: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyCode: code,
+          usernameOrPhone,
+          code: resetCode,
+          newPassword,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data.message || 'Failed to reset password' };
+    } catch {
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  };
+
+  // Fetch with automatic Bearer token + Silent 401 Refresh
+  const fetchWithAuth = async (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
+    let token = localStorage.getItem('gebeyaos_access_token');
+    const headers = new Headers(init.headers || {});
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    let response = await fetch(input, { ...init, headers });
+
+    // Handle token expiration
+    if (response.status === 401) {
+      const refreshToken = localStorage.getItem('gebeyaos_refresh_token');
+      if (refreshToken) {
+        try {
+          const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+          });
+
+          if (refreshRes.ok) {
+            const data = await refreshRes.json();
+            localStorage.setItem('gebeyaos_access_token', data.accessToken);
+            localStorage.setItem('gebeyaos_refresh_token', data.refreshToken);
+            token = data.accessToken;
+            headers.set('Authorization', `Bearer ${token}`);
+            response = await fetch(input, { ...init, headers });
+            return response;
+          }
+        } catch {
+          // Refresh failed
+        }
+      }
+
+      setIsSessionExpired(true);
+    }
+
+    return response;
+  };
+
+  // Profile and Sessions API
+  const getUserProfile = async () => {
+    const res = await fetchWithAuth(`${API_BASE}/auth/profile`);
+    if (res.ok) return res.json();
+    throw new Error('Failed to load profile');
+  };
+
+  const updateUserProfile = async (dto: any) => {
+    const res = await fetchWithAuth(`${API_BASE}/auth/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dto),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (currentUser) {
+        const updated = {
+          ...currentUser,
+          fullName: data.user.fullName || currentUser.fullName,
+          phone: data.user.phone || currentUser.phone,
+        };
+        setCurrentUser(updated);
+        localStorage.setItem('gebeyaos_user', JSON.stringify(updated));
+      }
+      return { success: true };
+    }
+    const err = await res.json().catch(() => ({}));
+    return { success: false, error: err.message || 'Failed to update profile' };
+  };
+
+  const getUserSessions = async (): Promise<UserSessionInfo[]> => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/auth/sessions`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.sessions || [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
+  const revokeSession = async (sessionId: string) => {
+    const res = await fetchWithAuth(`${API_BASE}/auth/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) return { success: true };
+    const err = await res.json().catch(() => ({}));
+    return { success: false, error: err.message || 'Failed to revoke session' };
+  };
+
+  const logoutAll = async () => {
+    const res = await fetchWithAuth(`${API_BASE}/auth/logout-all`, {
+      method: 'POST',
+    });
+    if (res.ok) {
+      await logout();
+      return { success: true };
+    }
+    const err = await res.json().catch(() => ({}));
+    return { success: false, error: err.message || 'Failed to sign out of all devices' };
+  };
+
+  // Get active cashiers for lock screen
+  const getCashiers = async (branchId?: string): Promise<CashierSummary[]> => {
+    try {
+      const targetBranch = branchId || currentUser?.branchId || terminalConfig?.branchId;
+      const url = targetBranch
+        ? `${API_BASE}/auth/cashiers?branchId=${encodeURIComponent(targetBranch)}`
+        : `${API_BASE}/auth/cashiers`;
+      const res = await fetch(url);
+      if (res.ok) {
+        return res.json();
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Pair POS Terminal
+  const pairTerminal = async (dto: TerminalPairRequest): Promise<{ success: boolean; terminal?: TerminalPairResponse; error?: string }> => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/auth/terminals/pair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dto),
+      });
+      if (res.ok) {
+        const data: TerminalPairResponse = await res.json();
+        const conf: TerminalConfig = {
+          terminalId: data.terminalId,
+          terminalCode: data.terminalCode,
+          terminalName: data.terminalName,
+          branchId: data.branchId,
+          deviceToken: data.deviceToken,
+          autoLockMinutes: data.autoLockMinutes,
+        };
+        setTerminalConfig(conf);
+        localStorage.setItem('gebeyaos_terminal_config', JSON.stringify(conf));
+        return { success: true, terminal: data };
+      }
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.message || 'Failed to pair terminal' };
+    } catch {
+      return { success: false, error: 'Connection failed while pairing terminal' };
+    }
+  };
+
+  // Manager Override
+  const managerOverride = async (dto: ManagerOverrideRequest): Promise<ManagerOverrideResult> => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/manager-override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...dto,
+          branchId: currentUser?.branchId || terminalConfig?.branchId,
+          cashierId: currentUser?.id,
+        }),
+      });
+      if (res.ok) {
+        return res.json();
+      }
+      const err = await res.json().catch(() => ({}));
+      return { authorized: false, error: err.message || 'Invalid manager PIN' };
+    } catch {
+      return { authorized: false, error: 'Cannot connect to authentication service for manager override.' };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -380,10 +717,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLocked,
         setupStatus,
         isLoading,
+        companyCode,
+        companyInfo,
+        assignedBranches,
+        isSessionExpired,
+        terminalConfig,
         hasPermission,
         hasAnyPermission,
         hasRole,
+        setCompanyCode,
+        checkCompanyCode,
+        selectBranch,
         login,
+        reauthenticate,
+        setIsSessionExpired,
         pinLogin,
         executeSetup,
         logout,
@@ -392,6 +739,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchCashier,
         updateUserPassword,
         updateUserPin,
+        forgotPassword,
+        resetPassword,
+        getUserProfile,
+        updateUserProfile,
+        getUserSessions,
+        revokeSession,
+        logoutAll,
+        getCashiers,
+        pairTerminal,
+        managerOverride,
+        fetchWithAuth,
       }}
     >
       {children}

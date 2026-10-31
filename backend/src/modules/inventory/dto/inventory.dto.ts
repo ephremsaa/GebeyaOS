@@ -42,6 +42,14 @@ export class CreateAdjustmentDto {
   @IsNotEmpty()
   notes!: string;
 
+  @IsString()
+  @IsOptional()
+  approved_by?: string;
+
+  @IsString()
+  @IsOptional()
+  manager_pin?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AdjustmentItemDto)
@@ -54,13 +62,17 @@ export class StartStockTakeDto {
   branch_id!: string;
 
   @IsString()
-  @IsIn(['FULL', 'CATEGORY', 'RANDOM_SAMPLE'])
+  @IsIn(['FULL', 'CATEGORY', 'LOCATION', 'RANDOM_SAMPLE'])
   @IsOptional()
-  scope?: 'FULL' | 'CATEGORY' | 'RANDOM_SAMPLE';
+  scope?: 'FULL' | 'CATEGORY' | 'LOCATION' | 'RANDOM_SAMPLE';
 
   @IsUUID()
   @IsOptional()
   category_id?: string;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
 
   @IsString()
   @IsOptional()
@@ -92,6 +104,14 @@ export class ReconcileStockTakeDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsString()
+  @IsOptional()
+  manager_pin?: string;
+
+  @IsString()
+  @IsOptional()
+  approved_by?: string;
 }
 
 export class InventoryQueryDto {

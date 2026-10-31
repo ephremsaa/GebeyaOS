@@ -23,11 +23,30 @@ import { OnboardingHints } from './components/OnboardingHints';
 import { SetupWizard } from './components/auth/SetupWizard';
 import { LoginPage } from './components/auth/LoginPage';
 import { PinPadModal } from './components/auth/PinPadModal';
+import { SessionExpiredDialog } from './components/auth/SessionExpiredDialog';
+import { PlatformAdminConsole } from './components/platform/PlatformAdminConsole';
+import { TenantOnboardingWizard } from './components/onboarding/TenantOnboardingWizard';
 
 const MainApp: React.FC = () => {
   const { isAuthenticated, isLocked, setupStatus, currentUser, lockSession } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
+  const [isPlatformRoute, setIsPlatformRoute] = useState<boolean>(
+    () => window.location.hash === '#platform' || window.location.pathname.startsWith('/platform'),
+  );
+
+  // Sync hash routing
+  useEffect(() => {
+    const handleHashChange = () => {
+      const isPlatform = window.location.hash === '#platform' || window.location.pathname.startsWith('/platform');
+      setIsPlatformRoute(isPlatform);
+      if (isPlatform) {
+        setActiveTab('platform');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Command Palette & Notifications state
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
@@ -64,6 +83,47 @@ const MainApp: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [lockSession]);
+
+  // Check for Tenant Onboarding Token (#onboarding?token=... or /onboarding?token=...)
+  const getOnboardingToken = () => {
+    const hash = window.location.hash;
+    const search = window.location.search;
+    if (hash.startsWith('#onboarding') && hash.includes('token=')) {
+      const match = hash.match(/token=([^&]+)/);
+      return match ? match[1] : null;
+    }
+    if (window.location.pathname.startsWith('/onboarding') || search.includes('token=')) {
+      const params = new URLSearchParams(search);
+      return params.get('token');
+    }
+    return null;
+  };
+
+  const onboardingToken = getOnboardingToken();
+  if (onboardingToken) {
+    return (
+      <TenantOnboardingWizard
+        token={onboardingToken}
+        onComplete={() => {
+          window.location.hash = '';
+          window.location.href = '/';
+        }}
+      />
+    );
+  }
+
+  // 0. Platform Admin Console Route (#platform or activeTab === 'platform')
+  if (isPlatformRoute || activeTab === 'platform') {
+    return (
+      <PlatformAdminConsole
+        onExit={() => {
+          window.location.hash = '';
+          setIsPlatformRoute(false);
+          setActiveTab('dashboard');
+        }}
+      />
+    );
+  }
 
   // 1. First-Run Setup Wizard Gate
   if (setupStatus && !setupStatus.setupCompleted) {
@@ -146,6 +206,9 @@ const MainApp: React.FC = () => {
 
       {/* 6. Contextual Onboarding Hints */}
       <OnboardingHints currentTab={activeTab} />
+
+      {/* 7. Session Expired Dialog (preserves held basket/drafts) */}
+      <SessionExpiredDialog />
     </div>
   );
 };

@@ -32,16 +32,33 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   async query<T extends QueryResultRow = any>(
     text: string,
     params?: any[],
+    overrideTenantId?: string,
   ): Promise<QueryResult<T>> {
+    if (overrideTenantId) {
+      const client = await this.pool.connect();
+      try {
+        await client.query('SELECT set_tenant_context($1)', [overrideTenantId]);
+        return await client.query<T>(text, params);
+      } finally {
+        try {
+          await client.query("SELECT set_config('app.current_tenant', '', FALSE)");
+        } catch {}
+        client.release();
+      }
+    }
     return this.pool.query<T>(text, params);
   }
 
   async withTransaction<T>(
     callback: (client: PoolClient) => Promise<T>,
+    overrideTenantId?: string,
   ): Promise<T> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      if (overrideTenantId) {
+        await client.query('SELECT set_tenant_context($1)', [overrideTenantId]);
+      }
       const result = await callback(client);
       await client.query('COMMIT');
       return result;
@@ -49,6 +66,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await client.query('ROLLBACK');
       throw error;
     } finally {
+      if (overrideTenantId) {
+        try {
+          await client.query("SELECT set_config('app.current_tenant', '', FALSE)");
+        } catch {}
+      }
       client.release();
     }
   }

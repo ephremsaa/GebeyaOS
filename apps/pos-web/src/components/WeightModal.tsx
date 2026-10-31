@@ -2,13 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Scale } from 'lucide-react';
 import { Modal, NumberPad, Button } from './ui';
 import { useI18n } from '../i18n/I18nContext';
-import { SampleProduct } from '../sample-data';
+
+export interface WeighedProduct {
+  id: string;
+  nameEn: string;
+  nameAm?: string;
+  effectivePrice?: number;
+  basePrice?: number;
+  price?: number;
+  barcode?: string;
+  [key: string]: any;
+}
 
 export interface WeightModalProps {
   isOpen: boolean;
   onClose: () => void;
-  product: SampleProduct | null;
-  onConfirm: (product: SampleProduct, weightKg: number) => void;
+  product: WeighedProduct | null;
+  onConfirm: (product: any, weightKg: number) => void;
 }
 
 export const WeightModal: React.FC<WeightModalProps> = ({
@@ -28,9 +38,10 @@ export const WeightModal: React.FC<WeightModalProps> = ({
 
   if (!product) return null;
 
+  const unitPrice = product.effectivePrice ?? product.price ?? product.basePrice ?? 0;
   const productName = language === 'am' && product.nameAm ? product.nameAm : product.nameEn;
   const weightKg = parseFloat(weightStr) || 0;
-  const calculatedPrice = Number((weightKg * product.price).toFixed(2));
+  const calculatedPrice = Number((weightKg * unitPrice).toFixed(2));
 
   const handleDigit = (digit: string) => {
     if (digit === '.' && weightStr.includes('.')) return;
@@ -64,7 +75,7 @@ export const WeightModal: React.FC<WeightModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={productName}
-      subtitle={`${formatCurrency(product.price)} / ${t('weighedUnitKg')}`}
+      subtitle={`${formatCurrency(unitPrice)} / ${t('weighedUnitKg')}`}
       maxWidth="md"
     >
       <div className="flex flex-col gap-4">

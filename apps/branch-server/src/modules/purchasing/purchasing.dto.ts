@@ -147,8 +147,105 @@ export class CreateGRNDto {
   @Min(0)
   landedOtherCost?: number;
 
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  landedDutyCost?: number;
+
+  @IsString()
+  @IsOptional()
+  allocationMethod?: 'BY_VALUE' | 'BY_QUANTITY';
+
+  @IsOptional()
+  applyWithholdingTax?: boolean;
+
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => GRNItemDto)
   items!: GRNItemDto[];
 }
+
+export class ApprovePurchaseOrderDto {
+  @IsString()
+  @IsNotEmpty()
+  managerPin!: string;
+}
+
+export class RecordSupplierPaymentDto {
+  @IsUUID()
+  @IsNotEmpty()
+  branchId!: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  supplierId!: string;
+
+  @IsUUID()
+  @IsOptional()
+  payableId?: string;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  paymentMethod!: string;
+
+  @IsString()
+  @IsOptional()
+  referenceNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+export class ReturnItemInputDto {
+  @IsUUID()
+  @IsNotEmpty()
+  productId!: string;
+
+  @IsUUID()
+  @IsOptional()
+  batchId?: string;
+
+  @IsString()
+  @IsOptional()
+  batchNumber?: string;
+
+  @IsNumber()
+  @Min(0.001)
+  quantity!: number;
+
+  @IsNumber()
+  @Min(0)
+  unitCost!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+}
+
+export class CreateSupplierReturnDto {
+  @IsUUID()
+  @IsNotEmpty()
+  branchId!: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  supplierId!: string;
+
+  @IsUUID()
+  @IsOptional()
+  grnId?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+
+  @ValidateNested({ each: true })
+  @Type(() => ReturnItemInputDto)
+  items!: ReturnItemInputDto[];
+}
+

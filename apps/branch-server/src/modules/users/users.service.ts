@@ -3,13 +3,17 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { DatabaseService } from '../../common/database/database.service';
+import { TenantContextService } from '../../common/tenant/tenant-context.service';
 import {
   CreateStaffUserDto,
   UpdateStaffUserDto,
+  CreateRoleDto,
   AdminResetPasswordDto,
   AdminResetPinDto,
   UpdateRolePermissionsDto,
@@ -20,7 +24,10 @@ import { generateUuidV7 } from '@gebeyaos/shared-types';
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    @Optional() private readonly tenantContextService?: TenantContextService,
+  ) {}
 
   /**
    * Helper: Hash with Argon2id
@@ -87,19 +94,45 @@ export class UsersService {
    * 2. Create Staff Member (Restricted to Owner/Manager, NO public signup)
    */
   async createUser(creatorId: string, dto: CreateStaffUserDto) {
+    // Enforce Plan Licensing Limit (max_users) when tenant context is active
+    const activeTenantId = this.tenantContextService?.getTenantId();
+    if (activeTenantId) {
+      try {
+        const quotaRes = await this.db.query(
+          `SELECT t.max_users, COUNT(u.id)::int as current_users
+           FROM tenants t
+           LEFT JOIN users u ON u.tenant_id = t.id
+           WHERE t.id = $1
+           GROUP BY t.max_users`,
+          [activeTenantId],
+          activeTenantId,
+        );
+        if (quotaRes && quotaRes.rows && quotaRes.rows.length > 0) {
+          const { max_users, current_users } = quotaRes.rows[0];
+          if (current_users >= max_users) {
+            throw new ForbiddenException(
+              `Subscription plan user limit reached (${current_users}/${max_users}). Upgrade your supermarket plan in the Platform Console to add more staff users.`,
+            );
+          }
+        }
+      } catch (err) {
+        if (err instanceof ForbiddenException) throw err;
+      }
+    }
+
     const existing = await this.db.query(
       `SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR phone = $2 LIMIT 1`,
       [dto.username.trim(), dto.phone.trim()],
     );
-    if (existing.rows.length > 0) {
+    if (existing && existing.rows && existing.rows.length > 0) {
       throw new ConflictException('Username or phone number is already registered.');
     }
 
     const roleRes = await this.db.query(
-      `SELECT id FROM roles WHERE name = $1 LIMIT 1`,
+      `SELECT id FROM roles WHERE LOWER(name) = LOWER($1) LIMIT 1`,
       [dto.role],
     );
-    if (roleRes.rows.length === 0) {
+    if (!roleRes || !roleRes.rows || roleRes.rows.length === 0) {
       throw new NotFoundException(`Role ${dto.role} does not exist.`);
     }
     const roleId = roleRes.rows[0].id;
@@ -109,13 +142,15 @@ export class UsersService {
     const userId = generateUuidV7();
 
     const branchId = dto.branchId || (await this.getDefaultBranchId());
+    const tenantId = activeTenantId || '01900000-0000-7000-8000-000000000001';
 
     await this.db.withTransaction(async (client) => {
       await client.query(
-        `INSERT INTO users (id, username, full_name, email, phone, password_hash, pin_hash, role_id, default_branch_id, is_active, force_password_change)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, $10)`,
+        `INSERT INTO users (id, tenant_id, username, full_name, email, phone, password_hash, pin_hash, role_id, default_branch_id, is_active, force_password_change)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11)`,
         [
           userId,
+          tenantId,
           dto.username.toLowerCase().trim(),
           dto.fullName.trim(),
           dto.email?.trim() || null,
@@ -130,17 +165,18 @@ export class UsersService {
 
       if (branchId) {
         await client.query(
-          `INSERT INTO user_branch_assignments (user_id, branch_id)
-           VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-          [userId, branchId],
+          `INSERT INTO user_branch_assignments (tenant_id, user_id, branch_id)
+           VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+          [tenantId, userId, branchId],
         );
       }
 
       await client.query(
-        `INSERT INTO audit_logs (id, branch_id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, $3, 'USER_CREATED', 'users', $4, $5)`,
+        `INSERT INTO audit_logs (id, tenant_id, branch_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, $4, 'USER_CREATED', 'users', $5, $6)`,
         [
           generateUuidV7(),
+          tenantId,
           branchId,
           creatorId,
           userId,
@@ -165,18 +201,46 @@ export class UsersService {
   }
 
   /**
-   * 3. Update Staff Member
+   * 3. Update Staff Member (Enforces Last-Owner Rule)
    */
   async updateUser(adminId: string, userId: string, dto: UpdateStaffUserDto) {
     const userRes = await this.db.query(
-      `SELECT id, role_id, default_branch_id FROM users WHERE id = $1`,
+      `SELECT u.id, u.role_id, u.default_branch_id, u.is_active, u.tenant_id, r.name as role_name
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1`,
       [userId],
     );
     if (userRes.rows.length === 0) throw new NotFoundException('User not found.');
+    const currentUser = userRes.rows[0];
+
+    // LAST-OWNER RULE ENFORCEMENT
+    const isDeactivating = dto.isActive === false;
+    const isDemoting = !!dto.role && dto.role.toUpperCase() !== 'OWNER';
+    if (currentUser.role_name === 'OWNER' && currentUser.is_active) {
+      if (isDeactivating || isDemoting) {
+        const ownersCountRes = await this.db.query(
+          `SELECT count(*)::int as count
+           FROM users u
+           JOIN roles r ON r.id = u.role_id
+           WHERE (u.tenant_id = $1 OR $1 IS NULL) AND r.name = 'OWNER' AND u.is_active = true`,
+          [currentUser.tenant_id],
+        );
+        const activeOwnersCount = ownersCountRes.rows[0]?.count || 0;
+        if (activeOwnersCount <= 1) {
+          if (isDeactivating) {
+            throw new BadRequestException('The last active Owner cannot be deactivated or removed.');
+          }
+          if (isDemoting) {
+            throw new BadRequestException('The last active Owner cannot be demoted.');
+          }
+        }
+      }
+    }
 
     let newRoleId: string | undefined;
     if (dto.role) {
-      const r = await this.db.query(`SELECT id FROM roles WHERE name = $1`, [dto.role]);
+      const r = await this.db.query(`SELECT id FROM roles WHERE LOWER(name) = LOWER($1)`, [dto.role]);
       if (r.rows.length > 0) newRoleId = r.rows[0].id;
     }
 
@@ -205,8 +269,30 @@ export class UsersService {
       // If deactivated, immediately revoke all active refresh tokens for forced logout!
       if (dto.isActive === false) {
         await client.query(
+          `UPDATE users SET token_version = token_version + 1 WHERE id = $1`,
+          [userId],
+        );
+        await client.query(
           `UPDATE refresh_tokens SET revoked_at = clock_timestamp() WHERE user_id = $1 AND revoked_at IS NULL`,
           [userId],
+        );
+
+        // Queue USER deactivation into sync_outbox
+        const branchId = currentUser.default_branch_id || '00000000-0000-0000-0000-000000000001';
+        const idempotencyKey = `USER:${userId}:DEACTIVATED:${Date.now()}`;
+        await client.query(
+          `INSERT INTO sync_outbox (
+             id, branch_id, tenant_id, aggregate_type, aggregate_id, event_type, payload, idempotency_key, status
+           ) VALUES ($1, $2, $3, 'USER', $4, 'DELETED', $5, $6, 'PENDING')
+           ON CONFLICT (idempotency_key) DO NOTHING`,
+          [
+            generateUuidV7(),
+            branchId,
+            currentUser.tenant_id,
+            userId,
+            JSON.stringify({ userId, isActive: false, updatedBy: adminId }),
+            idempotencyKey,
+          ],
         );
       }
 
@@ -226,12 +312,41 @@ export class UsersService {
   }
 
   /**
-   * 4. Toggle Active / Inactive (Instant Forced Logout when deactivated)
+   * 4. Toggle Active / Inactive (Enforces Last-Owner Rule & Instant Session Revocation)
    */
   async setUserActiveStatus(adminId: string, userId: string, isActive: boolean) {
+    const userRes = await this.db.query(
+      `SELECT u.id, u.is_active, u.default_branch_id, u.tenant_id, r.name as role_name
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1`,
+      [userId],
+    );
+    if (userRes.rows.length === 0) throw new NotFoundException('User not found.');
+    const currentUser = userRes.rows[0];
+
+    // LAST-OWNER RULE ENFORCEMENT
+    if (!isActive && currentUser.role_name === 'OWNER' && currentUser.is_active) {
+      const ownersCountRes = await this.db.query(
+        `SELECT count(*)::int as count
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+         WHERE (u.tenant_id = $1 OR $1 IS NULL) AND r.name = 'OWNER' AND u.is_active = true`,
+        [currentUser.tenant_id],
+      );
+      const activeOwnersCount = ownersCountRes.rows[0]?.count || 0;
+      if (activeOwnersCount <= 1) {
+        throw new BadRequestException('The last active Owner cannot be deactivated or removed.');
+      }
+    }
+
     await this.db.withTransaction(async (client) => {
       await client.query(
-        `UPDATE users SET is_active = $1, updated_at = clock_timestamp() WHERE id = $2`,
+        `UPDATE users
+         SET is_active = $1,
+             token_version = token_version + 1,
+             updated_at = clock_timestamp()
+         WHERE id = $2`,
         [isActive, userId],
       );
 
@@ -243,11 +358,39 @@ export class UsersService {
         );
       }
 
+      // Queue USER status change into sync_outbox for HQ synchronization
+      const branchId = currentUser.default_branch_id || '00000000-0000-0000-0000-000000000001';
+      const eventType = isActive ? 'UPDATED' : 'DELETED';
+      const idempotencyKey = `USER:${userId}:${eventType}:${Date.now()}`;
       await client.query(
-        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, $3, 'users', $4, $5)`,
+        `INSERT INTO sync_outbox (
+           id, branch_id, tenant_id, aggregate_type, aggregate_id, event_type, payload, idempotency_key, status
+         ) VALUES ($1, $2, $3, 'USER', $4, $5, $6, $7, 'PENDING')
+         ON CONFLICT (idempotency_key) DO NOTHING`,
         [
           generateUuidV7(),
+          branchId,
+          currentUser.tenant_id,
+          userId,
+          eventType,
+          JSON.stringify({
+            userId,
+            isActive,
+            action: isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+            updatedBy: adminId,
+            timestamp: new Date().toISOString(),
+          }),
+          idempotencyKey,
+        ],
+      );
+
+      await client.query(
+        `INSERT INTO audit_logs (id, tenant_id, branch_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, $4, $5, 'users', $6, $7)`,
+        [
+          generateUuidV7(),
+          currentUser.tenant_id,
+          branchId,
           adminId,
           isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
           userId,
@@ -257,6 +400,77 @@ export class UsersService {
     });
 
     return { success: true, isActive };
+  }
+
+  /**
+   * 4b. Delete / Decommission Staff Member (Enforces Last-Owner Rule)
+   */
+  async deleteUser(adminId: string, userId: string) {
+    const userRes = await this.db.query(
+      `SELECT u.id, u.is_active, u.default_branch_id, u.tenant_id, r.name as role_name
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1`,
+      [userId],
+    );
+    if (userRes.rows.length === 0) throw new NotFoundException('User not found.');
+    const currentUser = userRes.rows[0];
+
+    // LAST-OWNER RULE ENFORCEMENT
+    if (currentUser.role_name === 'OWNER' && currentUser.is_active) {
+      const ownersCountRes = await this.db.query(
+        `SELECT count(*)::int as count
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+         WHERE (u.tenant_id = $1 OR $1 IS NULL) AND r.name = 'OWNER' AND u.is_active = true`,
+        [currentUser.tenant_id],
+      );
+      const activeOwnersCount = ownersCountRes.rows[0]?.count || 0;
+      if (activeOwnersCount <= 1) {
+        throw new BadRequestException('The last active Owner cannot be deactivated or removed.');
+      }
+    }
+
+    await this.db.withTransaction(async (client) => {
+      await client.query(
+        `UPDATE users
+         SET is_active = false,
+             token_version = token_version + 1,
+             updated_at = clock_timestamp()
+         WHERE id = $1`,
+        [userId],
+      );
+      await client.query(
+        `UPDATE refresh_tokens SET revoked_at = clock_timestamp() WHERE user_id = $1 AND revoked_at IS NULL`,
+        [userId],
+      );
+
+      // Queue USER deletion into sync_outbox
+      const branchId = currentUser.default_branch_id || '00000000-0000-0000-0000-000000000001';
+      const idempotencyKey = `USER:${userId}:DELETED:${Date.now()}`;
+      await client.query(
+        `INSERT INTO sync_outbox (
+           id, branch_id, tenant_id, aggregate_type, aggregate_id, event_type, payload, idempotency_key, status
+         ) VALUES ($1, $2, $3, 'USER', $4, 'DELETED', $5, $6, 'PENDING')
+         ON CONFLICT (idempotency_key) DO NOTHING`,
+        [
+          generateUuidV7(),
+          branchId,
+          currentUser.tenant_id,
+          userId,
+          JSON.stringify({ userId, isDeleted: true, updatedBy: adminId }),
+          idempotencyKey,
+        ],
+      );
+
+      await client.query(
+        `INSERT INTO audit_logs (id, tenant_id, branch_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, $4, 'USER_DELETED', 'users', $5, $6)`,
+        [generateUuidV7(), currentUser.tenant_id, branchId, adminId, userId, JSON.stringify({ userId })],
+      );
+    });
+
+    return { success: true, message: 'User deleted and sessions terminated.' };
   }
 
   /**
@@ -272,6 +486,7 @@ export class UsersService {
              failed_login_attempts = 0,
              locked_until = NULL,
              force_password_change = $2,
+             token_version = token_version + 1,
              updated_at = clock_timestamp()
          WHERE id = $3`,
         [newHash, dto.forcePasswordChange ?? true, userId],
@@ -306,7 +521,13 @@ export class UsersService {
 
     await this.db.withTransaction(async (client) => {
       await client.query(
-        `UPDATE users SET pin_hash = $1, updated_at = clock_timestamp() WHERE id = $2`,
+        `UPDATE users
+         SET pin_hash = $1,
+             pin_failed_attempts = 0,
+             pin_locked_until = NULL,
+             token_version = token_version + 1,
+             updated_at = clock_timestamp()
+         WHERE id = $2`,
         [pinHash, userId],
       );
 
@@ -344,7 +565,95 @@ export class UsersService {
   }
 
   /**
-   * 8. Update Role Permissions
+   * 8. Create Custom Role
+   */
+  async createRole(adminId: string, dto: CreateRoleDto) {
+    const roleName = dto.name.toUpperCase().trim();
+    const existing = await this.db.query(
+      `SELECT id FROM roles WHERE UPPER(name) = $1`,
+      [roleName],
+    );
+    if (existing.rows.length > 0) {
+      throw new ConflictException(`Role '${roleName}' already exists.`);
+    }
+
+    const roleId = generateUuidV7();
+    const maxDiscount = dto.maxDiscountPercentage !== undefined ? dto.maxDiscountPercentage : 0;
+
+    await this.db.withTransaction(async (client) => {
+      await client.query(
+        `INSERT INTO roles (id, name, description, is_system, max_discount_percentage)
+         VALUES ($1, $2, $3, FALSE, $4)`,
+        [roleId, roleName, dto.description || '', maxDiscount],
+      );
+
+      if (dto.permissions && dto.permissions.length > 0) {
+        for (const permId of dto.permissions) {
+          await client.query(
+            `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [roleId, permId],
+          );
+        }
+      }
+
+      await client.query(
+        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, 'ROLE_CREATED', 'roles', $3, $4)`,
+        [
+          generateUuidV7(),
+          adminId,
+          roleId,
+          JSON.stringify({ name: roleName, permissions: dto.permissions || [] }),
+        ],
+      );
+    });
+
+    return {
+      id: roleId,
+      name: roleName,
+      description: dto.description || '',
+      isSystem: false,
+      maxDiscountPercentage: maxDiscount,
+      permissions: dto.permissions || [],
+    };
+  }
+
+  /**
+   * 8b. Delete Custom Role (System roles cannot be deleted)
+   */
+  async deleteRole(adminId: string, roleId: string) {
+    const roleRes = await this.db.query(
+      `SELECT id, name, is_system FROM roles WHERE id = $1`,
+      [roleId],
+    );
+    if (roleRes.rows.length === 0) throw new NotFoundException('Role not found.');
+    if (roleRes.rows[0].is_system) {
+      throw new BadRequestException('System roles cannot be deleted.');
+    }
+
+    const assignedCountRes = await this.db.query(
+      `SELECT count(*)::int as count FROM users WHERE role_id = $1`,
+      [roleId],
+    );
+    if ((assignedCountRes.rows[0]?.count || 0) > 0) {
+      throw new BadRequestException('Cannot delete role with assigned users. Reassign users first.');
+    }
+
+    await this.db.withTransaction(async (client) => {
+      await client.query(`DELETE FROM role_permissions WHERE role_id = $1`, [roleId]);
+      await client.query(`DELETE FROM roles WHERE id = $1`, [roleId]);
+      await client.query(
+        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, 'ROLE_DELETED', 'roles', $3, $4)`,
+        [generateUuidV7(), adminId, roleId, JSON.stringify({ name: roleRes.rows[0].name })],
+      );
+    });
+
+    return { success: true, message: 'Role deleted successfully' };
+  }
+
+  /**
+   * 8c. Update Role Permissions & Discount Limit
    */
   async updateRolePermissions(adminId: string, roleId: string, dto: UpdateRolePermissionsDto) {
     const roleRes = await this.db.query(`SELECT id, name FROM roles WHERE id = $1`, [roleId]);
@@ -362,6 +671,13 @@ export class UsersService {
         );
       }
 
+      if (dto.maxDiscountPercentage !== undefined) {
+        await client.query(
+          `UPDATE roles SET max_discount_percentage = $1, updated_at = clock_timestamp() WHERE id = $2`,
+          [dto.maxDiscountPercentage, roleId],
+        );
+      }
+
       await client.query(
         `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
          VALUES ($1, $2, 'ROLE_PERMISSIONS_CHANGED', 'roles', $3, $4)`,
@@ -372,6 +688,7 @@ export class UsersService {
           JSON.stringify({
             role: roleRes.rows[0].name,
             permissionsCount: dto.permissionIds.length,
+            maxDiscountPercentage: dto.maxDiscountPercentage,
           }),
         ],
       );

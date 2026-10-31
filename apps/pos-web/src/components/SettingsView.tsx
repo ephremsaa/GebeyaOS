@@ -11,9 +11,11 @@ import {
   Building2,
   Smartphone,
   Shield,
+  Key,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
+import { BranchActivationModal } from './settings/BranchActivationModal';
 
 export const SettingsView: React.FC = () => {
   const { language } = useI18n();
@@ -23,14 +25,15 @@ export const SettingsView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
 
   // Settings state
   const [storeInfo, setStoreInfo] = useState({
-    name: 'Gebeya Supermarket',
-    code: 'BOLE-01',
+    name: '',
+    code: '',
     tradeName: 'Gebeya Retail PLC',
-    tinNumber: '0012345678',
-    vatNumber: '9988776655',
+    tinNumber: '',
+    vatNumber: '',
     phone: '+251 911 234567',
     address: 'Bole Medhanialem, Addis Ababa, Ethiopia',
   });
@@ -272,7 +275,7 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
 
-              <div className="pt-3">
+              <div className="pt-3 flex items-center gap-3">
                 <button
                   onClick={() => handleSave('store_info', storeInfo)}
                   disabled={saving}
@@ -280,6 +283,15 @@ export const SettingsView: React.FC = () => {
                 >
                   <Save size={15} />
                   {saving ? 'Saving...' : 'Save Branch Details'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsActivationModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-2 border border-slate-200 dark:border-slate-700 transition"
+                >
+                  <Key size={14} className="text-emerald-500" />
+                  Branch Activation Codes
                 </button>
               </div>
             </div>
@@ -546,6 +558,11 @@ export const SettingsView: React.FC = () => {
           )}
         </div>
       </div>
+
+      <BranchActivationModal
+        isOpen={isActivationModalOpen}
+        onClose={() => setIsActivationModalOpen(false)}
+      />
     </div>
   );
 };

@@ -12,8 +12,22 @@ import {
   Volume2,
   Calendar,
 } from 'lucide-react';
-import { SAMPLE_PRODUCTS, SampleProduct } from '../../sample-data';
 import { audioFeedback } from '../../utils/audioFeedback';
+
+export interface ScanProductItem {
+  id: string;
+  sku: string;
+  barcode?: string;
+  barcodes?: string[];
+  nameEn: string;
+  nameAm?: string;
+  category?: string;
+  price?: number;
+  costPrice?: number;
+  stockOnHand?: number;
+  minStock?: number;
+  isWeighed?: boolean;
+}
 
 interface ScannedIntakeRow {
   barcode: string;
@@ -34,8 +48,8 @@ interface ScannedIntakeRow {
 interface ScanStockDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onCommitSuccess: (message: string, updatedProducts: SampleProduct[]) => void;
-  existingProducts: SampleProduct[];
+  onCommitSuccess: (message: string, updatedProducts: any[]) => void;
+  existingProducts: any[];
 }
 
 export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({

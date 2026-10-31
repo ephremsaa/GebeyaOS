@@ -21,6 +21,10 @@ export class OpenShiftDto {
   @Min(0)
   @Type(() => Number)
   opening_cash_float!: number;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
 }
 
 export class CloseShiftDto {
@@ -32,6 +36,14 @@ export class CloseShiftDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsUUID()
+  @IsOptional()
+  authorized_by?: string;
+
+  @IsString()
+  @IsOptional()
+  manager_pin?: string;
 }
 
 export class CashMovementDto {
@@ -124,6 +136,10 @@ export class CreateSaleDto {
   @IsNotEmpty()
   shift_id!: string;
 
+  @IsString()
+  @IsOptional()
+  idempotency_key?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SaleItemInputDto)
@@ -188,6 +204,10 @@ export class CreateRefundDto {
 
 export class HoldCartDto {
   @IsUUID()
+  @IsOptional()
+  branch_id?: string;
+
+  @IsUUID()
   @IsNotEmpty()
   terminal_id!: string;
 
@@ -197,6 +217,21 @@ export class HoldCartDto {
 
   @IsArray()
   items!: any[];
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  subtotal?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  tax_total?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  grand_total?: number;
 }
 
 export class ReprintReceiptDto {

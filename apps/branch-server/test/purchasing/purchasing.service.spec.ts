@@ -300,4 +300,262 @@ describe('PurchasingService', () => {
       );
     });
   });
+
+  describe('getPurchaseOrders and getGRNList', () => {
+    it('returns mapped purchase orders for a branch', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'po-01',
+            branch_id: 'b-01',
+            order_number: 'PO-20261021-0005',
+            supplier_id: 'sup-01',
+            supplier_name: 'Almaz Agro Industries',
+            supplier_code: 'SUP-ALMAZ',
+            supplier_phone: '+251 91 100 2233',
+            item_count: '2',
+            status: 'ISSUED',
+            expected_delivery_date: new Date('2026-10-25'),
+            subtotal: '10000.0000',
+            tax_total: '1500.0000',
+            grand_total: '11500.0000',
+            notes: 'Weekly fresh milk delivery',
+            created_by: 'purchaser-01',
+            created_at: new Date('2026-10-21T10:00:00Z'),
+            updated_at: new Date('2026-10-21T10:00:00Z'),
+          },
+        ],
+      });
+
+      const orders = await service.getPurchaseOrders('b-01');
+      expect(orders).toHaveLength(1);
+      expect(orders[0].orderNumber).toBe('PO-20261021-0005');
+      expect(orders[0].supplierName).toBe('Almaz Agro Industries');
+      expect(orders[0].grandTotal).toBe(11500);
+      expect(orders[0].itemCount).toBe(2);
+    });
+
+    it('returns mapped GRN list for a branch', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'grn-01',
+            branch_id: 'b-01',
+            grn_number: 'GRN-20261021-0003',
+            purchase_order_id: 'po-01',
+            po_order_number: 'PO-20261021-0005',
+            supplier_id: 'sup-01',
+            supplier_name: 'Almaz Agro Industries',
+            supplier_code: 'SUP-ALMAZ',
+            supplier_invoice_no: 'INV-7890',
+            supplier_invoice_date: new Date('2026-10-21'),
+            landed_freight_cost: '1000.0000',
+            landed_other_cost: '0.0000',
+            total_received_cost: '11000.0000',
+            withholding_tax_amount: '220.0000',
+            item_count: '1',
+            received_by: 'receiver-01',
+            created_at: new Date('2026-10-21T11:00:00Z'),
+          },
+        ],
+      });
+
+      const grns = await service.getGRNList('b-01');
+      expect(grns).toHaveLength(1);
+      expect(grns[0].grnNumber).toBe('GRN-20261021-0003');
+      expect(grns[0].poOrderNumber).toBe('PO-20261021-0005');
+      expect(grns[0].totalReceivedCost).toBe(11000);
+      expect(grns[0].withholdingTaxAmount).toBe(220);
+    });
+  });
+
+  describe('approval workflow, payables, payments, and returns', () => {
+    it('sets status to DRAFT and requires_approval=true if PO grand total > 50,000 ETB', async () => {
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [{ id: 'sup-01' }] }) // supplier check
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // PO count
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'po-high-val',
+              branch_id: 'b-01',
+              order_number: 'PO-20261029-0001',
+              supplier_id: 'sup-01',
+              status: 'DRAFT',
+              subtotal: '50000.0000',
+              tax_total: '7500.0000',
+              grand_total: '57500.0000',
+              requires_approval: true,
+              notes: 'High value inventory',
+              created_by: 'u-1',
+              created_at: new Date(),
+              updated_at: new Date(),
+            },
+          ],
+        }) // po insert
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'poi-1',
+              purchase_order_id: 'po-high-val',
+              product_id: 'prod-01',
+              ordered_quantity: '500',
+              received_quantity: '0',
+              unit_cost: '100',
+              tax_rate: '0.15',
+              total_cost: '57500',
+            },
+          ],
+        }); // item insert
+
+      const po = await service.createPurchaseOrder('b-01', 'u-1', {
+        supplierId: 'sup-01',
+        items: [{ productId: 'prod-01', orderedQuantity: 500, unitCost: 100, taxRate: 0.15 }],
+      });
+
+      expect(po.status).toBe('DRAFT');
+    });
+
+    it('approves PO when valid manager PIN 1234 is provided', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 'po-high-val', status: 'APPROVED', approved_by: 'mgr-01' }],
+      });
+
+      const res = await service.approvePurchaseOrder('mgr-01', 'po-high-val', '1234');
+      expect(res.status).toBe('APPROVED');
+    });
+
+    it('rejects approval when wrong manager PIN is provided', async () => {
+      await expect(
+        service.approvePurchaseOrder('mgr-01', 'po-high-val', '9999'),
+      ).rejects.toThrow('Invalid manager authorization PIN');
+    });
+
+    it('sends approved PO to supplier', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 'po-01', status: 'SENT' }],
+      });
+
+      const res = await service.sendPurchaseOrder('po-01');
+      expect(res.status).toBe('SENT');
+    });
+
+    it('lists payables and correctly categorizes aging buckets', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'pay-1',
+            branch_id: 'b-01',
+            supplier_id: 'sup-01',
+            supplier_name: 'Almaz Agro',
+            supplier_code: 'SUP-ALMAZ',
+            net_payable: '10000.0000',
+            paid_amount: '0.0000',
+            aging_days: '-5', // not due yet
+          },
+          {
+            id: 'pay-2',
+            branch_id: 'b-01',
+            supplier_id: 'sup-02',
+            supplier_name: 'Adaa Teff',
+            supplier_code: 'SUP-ADAA',
+            net_payable: '20000.0000',
+            paid_amount: '5000.0000',
+            aging_days: '15', // 1-30 days
+          },
+          {
+            id: 'pay-3',
+            branch_id: 'b-01',
+            supplier_id: 'sup-03',
+            supplier_name: 'Tomoca',
+            supplier_code: 'SUP-TOMOCA',
+            net_payable: '15000.0000',
+            paid_amount: '0.0000',
+            aging_days: '45', // 31-60 days
+          },
+          {
+            id: 'pay-4',
+            branch_id: 'b-01',
+            supplier_id: 'sup-04',
+            supplier_name: 'Highland',
+            supplier_code: 'SUP-HIGHLAND',
+            net_payable: '8000.0000',
+            paid_amount: '0.0000',
+            aging_days: '75', // 60+ days
+          },
+        ],
+      });
+
+      const payables = await service.listPayables('b-01');
+      expect(payables).toHaveLength(4);
+      expect(payables[0].aging_bucket).toBe('CURRENT');
+      expect(payables[1].aging_bucket).toBe('1-30');
+      expect(payables[1].remaining_balance).toBe(15000);
+      expect(payables[2].aging_bucket).toBe('31-60');
+      expect(payables[3].aging_bucket).toBe('60+');
+    });
+
+    it('records supplier payment and updates payable status to PAID', async () => {
+      mockClient.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'pmt-1', amount: '10000', payment_number: 'PAY-001' }],
+        }) // payment insert
+        .mockResolvedValueOnce({
+          rows: [{ net_payable: '10000.0000', paid_amount: '0.0000' }],
+        }) // payable lock query
+        .mockResolvedValueOnce({ rowCount: 1 }); // payable update
+
+      const payment = await service.recordSupplierPayment('u-1', {
+        branchId: 'b-01',
+        supplierId: 'sup-01',
+        payableId: 'pay-1',
+        amount: 10000,
+        paymentMethod: 'CASH',
+      });
+
+      expect(payment.id).toBe('pmt-1');
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE supplier_payables'),
+        expect.arrayContaining([10000, 'PAID', 'pay-1']),
+      );
+    });
+
+    it('processes supplier return and records negative stock movement', async () => {
+      mockClient.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'ret-01', return_number: 'RET-001', total_return_value: '850.0000' }],
+        }) // return header
+        .mockResolvedValueOnce({
+          rows: [{ id: 'reti-01' }],
+        }); // return item
+
+      const result = await service.processSupplierReturn('u-1', {
+        branchId: 'b-01',
+        supplierId: 'sup-01',
+        reason: 'Damaged packaging during transit',
+        items: [
+          {
+            productId: 'p-milk',
+            quantity: 10,
+            unitCost: 85,
+            reason: 'Damaged seals',
+          },
+        ],
+      });
+
+      expect(result.return_number).toBe('RET-001');
+      expect(mockInventoryService.recordMovementInTransaction).toHaveBeenCalledWith(
+        mockClient,
+        'b-01',
+        expect.objectContaining({
+          productId: 'p-milk',
+          quantityChange: -10,
+          movementType: 'PURCHASE_RETURN',
+        }),
+      );
+    });
+  });
 });
+

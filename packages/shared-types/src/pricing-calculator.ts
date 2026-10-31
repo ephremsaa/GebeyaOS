@@ -157,3 +157,82 @@ export function calculatePricing(
     total: netTotal,
   };
 }
+
+/**
+ * Standard rounding to 2 decimal places using half-up EPSILON correction.
+ */
+export function round2(num: number): number {
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Calculates Ethiopian retail tax-inclusive 15% VAT for a single line item.
+ * Rule: VAT = round2(gross * 15 / 115) for taxable items, 0 for exempt.
+ */
+export function calculateTaxInclusiveLineVat(gross: number, isVatApplicable: boolean): number {
+  if (!isVatApplicable || gross <= 0) {
+    return 0;
+  }
+  return round2((gross * 15) / 115);
+}
+
+export interface BasketLineInput {
+  quantity: number;
+  unitPrice: number;
+  discountAmount?: number;
+  isVatApplicable: boolean;
+}
+
+export interface BasketFinancialTotals {
+  subtotal: number;
+  discountTotal: number;
+  taxableSubtotal: number;
+  taxExemptSubtotal: number;
+  vatTotal: number;
+  grandTotal: number;
+}
+
+/**
+ * Calculates basket totals following the strict Ethiopian retail rule:
+ * 1. Compute net gross for each line (quantity * unitPrice - discount).
+ * 2. Compute VAT for each line rounded to 2 decimal places (gross * 15 / 115 or 0).
+ * 3. Sum line VATs and line totals to produce authoritative grand totals.
+ */
+export function calculateBasketFinancials(lines: BasketLineInput[]): BasketFinancialTotals {
+  let subtotal = 0;
+  let discountTotal = 0;
+  let vatTotal = 0;
+  let taxableSubtotal = 0;
+  let taxExemptSubtotal = 0;
+  let grandTotal = 0;
+
+  for (const line of lines) {
+    const rawGross = round2(line.quantity * line.unitPrice);
+    const discount = round2(Math.min(line.discountAmount || 0, rawGross));
+    const netLine = round2(rawGross - discount);
+
+    subtotal = round2(subtotal + rawGross);
+    discountTotal = round2(discountTotal + discount);
+
+    if (line.isVatApplicable) {
+      const lineVat = calculateTaxInclusiveLineVat(netLine, true);
+      const lineNetExVat = round2(netLine - lineVat);
+      vatTotal = round2(vatTotal + lineVat);
+      taxableSubtotal = round2(taxableSubtotal + lineNetExVat);
+    } else {
+      taxExemptSubtotal = round2(taxExemptSubtotal + netLine);
+    }
+
+    grandTotal = round2(grandTotal + netLine);
+  }
+
+  return {
+    subtotal,
+    discountTotal,
+    taxableSubtotal,
+    taxExemptSubtotal,
+    vatTotal,
+    grandTotal,
+  };
+}
+

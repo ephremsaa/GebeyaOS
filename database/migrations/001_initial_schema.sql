@@ -17,7 +17,6 @@ RETURNS uuid AS $$
 DECLARE
   v_time timestamp with time zone:= clock_timestamp();
   v_epoch_ms bigint;
-  v_rand bytes;
   v_uuid text;
 BEGIN
   v_epoch_ms := (extract(epoch from v_time) * 1000)::bigint;

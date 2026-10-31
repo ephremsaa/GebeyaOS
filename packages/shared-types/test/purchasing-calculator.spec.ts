@@ -75,6 +75,25 @@ describe('Purchasing Calculator', () => {
       expect(apportioned[1].finalUnitCost).toBe(55);
     });
 
+    it('apportions landed costs by quantity when BY_QUANTITY allocation method is chosen', () => {
+      // Item 1: 10 units at 100 ETB (10/30 = 33.33% of units)
+      // Item 2: 20 units at 50 ETB (20/30 = 66.67% of units)
+      // Total freight: 120, duty: 60, other: 30 -> total landed = 210 ETB
+      // Item 1 gets 210 * (10 / 30) = 70 ETB -> 7 ETB/unit -> final unit cost = 107 ETB
+      // Item 2 gets 210 * (20 / 30) = 140 ETB -> 7 ETB/unit -> final unit cost = 57 ETB
+      const items = [
+        { productId: 'p1', receivedQuantity: 10, purchaseUnitCost: 100 },
+        { productId: 'p2', receivedQuantity: 20, purchaseUnitCost: 50 },
+      ];
+
+      const apportioned = apportionLandedCost(items, 120, 30, 60, 'BY_QUANTITY');
+
+      expect(apportioned[0].apportionedLandedCost).toBe(70);
+      expect(apportioned[0].finalUnitCost).toBe(107);
+      expect(apportioned[1].apportionedLandedCost).toBe(140);
+      expect(apportioned[1].finalUnitCost).toBe(57);
+    });
+
     it('handles zero landed cost cleanly', () => {
       const items = [
         { productId: 'p1', receivedQuantity: 5, purchaseUnitCost: 20 },

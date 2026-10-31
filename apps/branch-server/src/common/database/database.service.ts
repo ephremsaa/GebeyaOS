@@ -1,10 +1,19 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@nestjs/common';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DatabaseService.name);
   private pool!: Pool;
+
+  private readonly tenantContextService: TenantContextService;
+
+  constructor(
+    @Optional() tenantContextService?: TenantContextService,
+  ) {
+    this.tenantContextService = tenantContextService || new TenantContextService();
+  }
 
   onModuleInit() {
     this.pool = new Pool({
@@ -32,16 +41,35 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   async query<T extends QueryResultRow = any>(
     text: string,
     params?: any[],
+    overrideTenantId?: string,
   ): Promise<QueryResult<T>> {
+    const tenantId = overrideTenantId || this.tenantContextService?.getTenantId();
+    if (tenantId) {
+      const client = await this.pool.connect();
+      try {
+        await client.query('SELECT set_tenant_context($1)', [tenantId]);
+        return await client.query<T>(text, params);
+      } finally {
+        try {
+          await client.query("SELECT set_config('app.current_tenant', '', FALSE)");
+        } catch {}
+        client.release();
+      }
+    }
     return this.pool.query<T>(text, params);
   }
 
   async withTransaction<T>(
     callback: (client: PoolClient) => Promise<T>,
+    overrideTenantId?: string,
   ): Promise<T> {
     const client = await this.pool.connect();
+    const tenantId = overrideTenantId || this.tenantContextService?.getTenantId();
     try {
       await client.query('BEGIN');
+      if (tenantId) {
+        await client.query('SELECT set_tenant_context($1)', [tenantId]);
+      }
       const result = await callback(client);
       await client.query('COMMIT');
       return result;
@@ -49,6 +77,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await client.query('ROLLBACK');
       throw error;
     } finally {
+      try {
+        await client.query("SELECT set_config('app.current_tenant', '', FALSE)");
+      } catch {}
       client.release();
     }
   }

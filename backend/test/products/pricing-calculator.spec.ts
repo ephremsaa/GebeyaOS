@@ -116,8 +116,27 @@ describe('PricingCalculatorService', () => {
       expect(result.grossAmount).toBe(100.0);
       expect(result.discountAmount).toBe(10.0);
       expect(result.lineTotal).toBe(90.0);
-      expect(result.taxableSubtotal).toBeCloseTo(78.2609, 2);
-      expect(result.taxAmount).toBeCloseTo(11.7391, 2);
+      expect(result.taxableSubtotal).toBe(78.26);
+      expect(result.taxAmount).toBe(11.74);
+    });
+
+    it('implements VAT = gross x 15/115 for taxable items, 0 for exempt, rounding per line then summing', () => {
+      // Line 1: Taxable item gross = 100 ETB. VAT = round2(100 * 15 / 115) = 13.04 ETB, base = 86.96 ETB
+      // Line 2: Taxable item gross = 50 ETB. VAT = round2(50 * 15 / 115) = 6.52 ETB, base = 43.48 ETB
+      // Line 3: Exempt item gross = 80 ETB. VAT = 0 ETB, exempt base = 80 ETB
+      const basket = PricingCalculatorService.calculateBasketTotals([
+        { quantity: 1, unitPrice: 100, isVatApplicable: true },
+        { quantity: 1, unitPrice: 50, isVatApplicable: true },
+        { quantity: 1, unitPrice: 80, isVatApplicable: false },
+      ]);
+
+      expect(basket.subtotal).toBe(230.0);
+      expect(basket.grandTotal).toBe(230.0);
+      expect(basket.totalVatAmount).toBe(19.56); // 13.04 + 6.52
+      expect(basket.taxableSubtotal).toBe(130.44); // 86.96 + 43.48
+      expect(basket.taxExemptSubtotal).toBe(80.0);
+      // Sum of taxable base + VAT + exempt base must equal grandTotal
+      expect(basket.taxableSubtotal + basket.totalVatAmount + basket.taxExemptSubtotal).toBe(230.0);
     });
   });
 });

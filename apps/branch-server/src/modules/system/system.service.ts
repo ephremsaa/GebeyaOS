@@ -2,6 +2,8 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
@@ -294,9 +296,10 @@ export class SystemService {
       `SELECT
          a.id, a.branch_id, a.user_id, a.action, a.entity_name, a.entity_id,
          a.ip_address, a.details, a.created_at,
-         u.full_name as user_name, u.username, u.role as user_role
+         u.full_name as user_name, u.username, r.name as user_role
        FROM audit_logs a
        LEFT JOIN users u ON a.user_id = u.id
+       LEFT JOIN roles r ON u.role_id = r.id
        WHERE ${whereSql}
        ORDER BY a.created_at DESC
        LIMIT $${idx++} OFFSET $${idx++}`,
@@ -527,5 +530,75 @@ export class SystemService {
       message: 'Backup integrity verified (SHA-256 matched) and configuration restored successfully.',
       verifiedSha256: computedSha,
     };
+  }
+
+  /**
+   * Terminal Management & Plan Quota Enforcement (max_terminals)
+   */
+  async createTerminal(dto: {
+    code: string;
+    name: string;
+    branchId: string;
+    deviceType?: string;
+    ipAddress?: string;
+  }) {
+    const quotaRes = await this.db.query(
+      `SELECT t.max_terminals, COUNT(tm.id)::int as current_terminals
+       FROM tenants t
+       LEFT JOIN terminals tm ON tm.tenant_id = t.id
+       WHERE t.id = NULLIF(current_setting('app.current_tenant', TRUE), '')::uuid
+       GROUP BY t.max_terminals`,
+    );
+
+    if (quotaRes.rows.length > 0) {
+      const { max_terminals, current_terminals } = quotaRes.rows[0];
+      if (current_terminals >= max_terminals) {
+        throw new ForbiddenException(
+          `Subscription plan terminal limit reached (${current_terminals}/${max_terminals}). Upgrade your supermarket plan in the Platform Console to register additional POS terminals.`,
+        );
+      }
+    }
+
+    const cleanCode = dto.code.trim().toUpperCase();
+    const existing = await this.db.query(
+      `SELECT id FROM terminals WHERE branch_id = $1 AND code = $2`,
+      [dto.branchId, cleanCode],
+    );
+    if (existing.rows.length > 0) {
+      throw new ConflictException(`Terminal code ${cleanCode} already exists in this branch.`);
+    }
+
+    const branchRes = await this.db.query(`SELECT tenant_id FROM branches WHERE id = $1`, [dto.branchId]);
+    const tenantId = branchRes.rows[0]?.tenant_id || '01900000-0000-7000-8000-000000000001';
+
+    const terminalId = generateUuidV7();
+    const res = await this.db.query(
+      `INSERT INTO terminals (id, tenant_id, branch_id, code, name, device_type, ip_address, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+       RETURNING id, code, name, device_type, ip_address, is_active`,
+      [
+        terminalId,
+        tenantId,
+        dto.branchId,
+        cleanCode,
+        dto.name.trim(),
+        dto.deviceType || 'POS_STATION',
+        dto.ipAddress || null,
+      ],
+    );
+
+    return res.rows[0];
+  }
+
+  async listTerminals(branchId?: string) {
+    let sql = `SELECT id, branch_id, code, name, device_type, ip_address, is_active, last_active_at, created_at FROM terminals`;
+    const params: any[] = [];
+    if (branchId) {
+      sql += ` WHERE branch_id = $1`;
+      params.push(branchId);
+    }
+    sql += ` ORDER BY code ASC`;
+    const res = await this.db.query(sql, params);
+    return res.rows;
   }
 }

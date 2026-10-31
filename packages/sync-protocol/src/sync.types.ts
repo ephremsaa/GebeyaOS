@@ -7,7 +7,10 @@ export type SyncAggregateType =
   | 'PRODUCT'
   | 'CATEGORY'
   | 'SUPPLIER'
-  | 'PRICE_OVERRIDE';
+  | 'PRICE_OVERRIDE'
+  | 'AUDIT_LOG'
+  | 'USER'
+  | 'ROLE';
 
 export type SyncEventType = 'CREATED' | 'UPDATED' | 'DELETED';
 
@@ -24,6 +27,7 @@ export type ConflictResolutionPolicy =
 
 export interface SyncEvent {
   id: string; // UUIDv7
+  tenantId?: string;
   sourceBranchId: string;
   aggregateType: SyncAggregateType;
   aggregateId: string;
@@ -34,6 +38,7 @@ export interface SyncEvent {
 }
 
 export interface SyncBatchPushRequest {
+  tenantId?: string;
   sourceBranchId: string;
   batchId: string;
   cursor?: string | null;
@@ -66,7 +71,7 @@ export interface SyncPullRequest {
 }
 
 export interface CatalogDeltaItem {
-  aggregateType: 'PRODUCT' | 'CATEGORY' | 'SUPPLIER';
+  aggregateType: 'PRODUCT' | 'CATEGORY' | 'SUPPLIER' | 'USER' | 'ROLE';
   aggregateId: string;
   eventType: SyncEventType;
   data: Record<string, any>;

@@ -1,9 +1,13 @@
 export type PurchaseOrderStatus =
   | 'DRAFT'
-  | 'ISSUED'
+  | 'APPROVED'
+  | 'SENT'
   | 'PARTIALLY_RECEIVED'
-  | 'COMPLETED'
+  | 'RECEIVED'
+  | 'CLOSED'
   | 'CANCELLED';
+
+export type LandedCostAllocationMethod = 'BY_VALUE' | 'BY_QUANTITY';
 
 export interface Supplier {
   id: string;
@@ -16,6 +20,7 @@ export interface Supplier {
   email?: string | null;
   address?: string | null;
   paymentTermsDays: number;
+  withholdingEligible?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -38,6 +43,9 @@ export interface PurchaseOrder {
   orderNumber: string;
   supplierId: string;
   status: PurchaseOrderStatus;
+  requiresApproval?: boolean;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
   expectedDeliveryDate?: string | null;
   subtotal: number;
   taxTotal: number;
@@ -71,7 +79,9 @@ export interface GoodsReceivedNote {
   supplierInvoiceNo?: string | null;
   supplierInvoiceDate?: string | null;
   landedFreightCost: number;
+  landedDutyCost?: number;
   landedOtherCost: number;
+  allocationMethod?: LandedCostAllocationMethod;
   totalReceivedCost: number;
   withholdingTaxAmount: number;
   receivedBy: string;
@@ -103,4 +113,68 @@ export interface LandedCostApportionResultItem {
   purchaseTotal: number;
   apportionedLandedCost: number;
   finalUnitCost: number;
+}
+
+export interface SupplierPayable {
+  id: string;
+  branchId: string;
+  supplierId: string;
+  supplierName: string;
+  grnId?: string | null;
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  totalAmount: number;
+  withholdingAmount: number;
+  netPayable: number;
+  paidAmount: number;
+  remainingBalance: number;
+  status: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED';
+  agingDays: number;
+  agingBucket: 'CURRENT' | '1-30' | '31-60' | '60+';
+  createdAt: string;
+}
+
+export interface SupplierPayment {
+  id: string;
+  branchId: string;
+  supplierId: string;
+  payableId?: string | null;
+  paymentNumber: string;
+  amount: number;
+  paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'TELEBIRR' | 'CBE_BIRR' | 'CHECK';
+  referenceNumber?: string | null;
+  paymentDate: string;
+  notes?: string | null;
+  paidBy: string;
+  createdAt: string;
+}
+
+export interface SupplierReturnItem {
+  id: string;
+  returnId: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  batchId?: string | null;
+  batchNumber?: string | null;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  reason: string;
+}
+
+export interface SupplierReturn {
+  id: string;
+  returnNumber: string;
+  branchId: string;
+  supplierId: string;
+  supplierName: string;
+  grnId?: string | null;
+  status: 'CONFIRMED' | 'CANCELLED';
+  totalReturnValue: number;
+  reason: string;
+  createdBy: string;
+  createdAt: string;
+  items: SupplierReturnItem[];
 }

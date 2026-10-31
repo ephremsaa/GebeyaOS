@@ -10,6 +10,7 @@ import {
   Settings,
   HardDrive,
   ShieldCheck,
+  ShieldAlert,
   Tag,
   ClipboardList,
 } from 'lucide-react';
@@ -30,7 +31,8 @@ export type NavTabId =
   | 'audit'
   | 'settings'
   | 'backup'
-  | 'sync';
+  | 'sync'
+  | 'platform';
 
 export interface NavigationRailProps {
   activeTab: NavTabId;
@@ -96,7 +98,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
       id: 'stocktake' as NavTabId,
       label: language === 'am' ? 'ቆጠራ' : 'Stocktake',
       icon: <ClipboardList size={20} strokeWidth={1.75} />,
-      allowed: hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
+      allowed: hasPermission('inventory:stocktake:execute') || hasRole('CASHIER', 'STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'users' as NavTabId,
@@ -109,6 +111,12 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
       label: language === 'am' ? 'ቅንብሮች' : 'Settings',
       icon: <Settings size={20} strokeWidth={1.75} />,
       allowed: hasRole('BRANCH_MANAGER', 'OWNER'),
+    },
+    {
+      id: 'platform' as NavTabId,
+      label: 'Platform',
+      icon: <ShieldAlert size={20} strokeWidth={1.75} />,
+      allowed: true,
     },
   ];
 

@@ -84,4 +84,22 @@ export class SystemController {
   ) {
     return this.systemService.restoreBackup(dto, userIdHeader);
   }
+
+  @Get('terminals')
+  async listTerminals(@Headers('x-branch-id') branchIdHeader?: string) {
+    return this.systemService.listTerminals(branchIdHeader);
+  }
+
+  @Post('terminals')
+  @HttpCode(HttpStatus.CREATED)
+  async createTerminal(
+    @Body() dto: { code: string; name: string; deviceType?: string; ipAddress?: string; branchId?: string },
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = dto.branchId || branchIdHeader || '00000000-0000-0000-0000-000000000001';
+    return this.systemService.createTerminal({
+      ...dto,
+      branchId,
+    });
+  }
 }

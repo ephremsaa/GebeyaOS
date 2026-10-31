@@ -94,11 +94,13 @@ export interface CreateSaleRequest {
   terminalId: string;
   shiftId: string;
   cashierId: string;
+  idempotencyKey?: string;
   clientTimestamp?: string;
   items: SaleLineItemInput[];
   payments: SalePaymentInput[];
   bypassFiscal?: boolean;
 }
+
 
 export interface SaleItemRecord {
   id: string;
@@ -151,6 +153,7 @@ export interface SaleRecord {
   fiscalMrc?: string | null;
   fiscalSignature?: string | null;
   reprintCount: number;
+  idempotencyKey?: string | null;
   clientTimestamp: string;
   serverTimestamp: string;
   createdAt: string;
@@ -222,3 +225,58 @@ export interface ElectronicJournalEntry {
   payments: Array<{ method: string; amount: number; reference?: string }>;
   hashSignature: string;
 }
+
+export interface HeldBasketItem {
+  productId: string;
+  name: string;
+  barcode?: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  lineTotal: number;
+  isVat: boolean;
+  scaleWeightGrams?: number;
+}
+
+export interface HeldBasketRecord {
+  id: string;
+  branchId: string;
+  terminalId: string;
+  cashierId: string;
+  customerIdentifier?: string | null;
+  items: HeldBasketItem[];
+  subtotal: number;
+  taxTotal: number;
+  grandTotal: number;
+  heldAt: string;
+  resumedAt?: string | null;
+}
+
+export interface HoldBasketInput {
+  terminalId: string;
+  customerIdentifier?: string;
+  items: HeldBasketItem[];
+  subtotal: number;
+  taxTotal: number;
+  grandTotal: number;
+}
+
+export interface ManagerPinVerifyRequest {
+  pin: string;
+  actionRequired?: string; // e.g., 'DISCOUNT_OVERRIDE' | 'REFUND_AUTH'
+}
+
+export interface ManagerPinVerifyResponse {
+  authorized: boolean;
+  authorizedBy?: string;
+  role?: string;
+  maxDiscountPercentage?: number;
+  message?: string;
+}
+
+export interface ReceiptReprintResponse {
+  sale: SaleRecord;
+  thermalReceipt: string;
+  reprintCount: number;
+}
+

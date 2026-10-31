@@ -3,6 +3,7 @@ import {
   AVCOCalculationResult,
   LandedCostItemInput,
   LandedCostApportionResultItem,
+  LandedCostAllocationMethod,
 } from './purchasing.types';
 
 /**
@@ -44,16 +45,19 @@ export function calculateAVCO(input: AVCOCalculationInput): AVCOCalculationResul
 }
 
 /**
- * Apportions landed costs (freight, offloading, insurance) across GRN line items.
- * Uses value-based allocation proportional to total purchase cost of each item.
+ * Apportions landed costs (freight, duty, offloading, insurance) across GRN line items.
+ * Supports allocation either BY_VALUE (proportional to total purchase value)
+ * or BY_QUANTITY (proportional to total received units).
  */
 export function apportionLandedCost(
   items: LandedCostItemInput[],
   totalLandedFreight: number,
   totalLandedOther: number,
+  totalLandedDuty = 0,
+  allocationMethod: LandedCostAllocationMethod = 'BY_VALUE',
 ): LandedCostApportionResultItem[] {
   const r4 = (n: number) => Number(n.toFixed(4));
-  const totalLanded = totalLandedFreight + totalLandedOther;
+  const totalLanded = (totalLandedFreight || 0) + (totalLandedOther || 0) + (totalLandedDuty || 0);
 
   if (items.length === 0) {
     return [];
@@ -77,14 +81,20 @@ export function apportionLandedCost(
     let apportionedLanded = 0;
 
     if (totalLanded > 0) {
-      if (totalPurchaseValue > 0) {
-        // Apportion by purchase value share
-        const share = item.purchaseTotal / totalPurchaseValue;
-        apportionedLanded = r4(totalLanded * share);
-      } else if (totalQuantity > 0) {
-        // Fallback: apportion by quantity share if items had 0 base cost
-        const share = item.receivedQuantity / totalQuantity;
-        apportionedLanded = r4(totalLanded * share);
+      if (allocationMethod === 'BY_QUANTITY') {
+        if (totalQuantity > 0) {
+          const share = item.receivedQuantity / totalQuantity;
+          apportionedLanded = r4(totalLanded * share);
+        }
+      } else {
+        // BY_VALUE
+        if (totalPurchaseValue > 0) {
+          const share = item.purchaseTotal / totalPurchaseValue;
+          apportionedLanded = r4(totalLanded * share);
+        } else if (totalQuantity > 0) {
+          const share = item.receivedQuantity / totalQuantity;
+          apportionedLanded = r4(totalLanded * share);
+        }
       }
     }
 

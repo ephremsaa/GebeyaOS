@@ -15,6 +15,9 @@ import {
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
 import { StatusDot, Modal, Button, Input } from './ui';
+import { UserProfileModal } from './auth/UserProfileModal';
+import { TerminalPairModal } from './auth/TerminalPairModal';
+import { Terminal } from 'lucide-react';
 
 export interface TopBarProps {
   onOpenCommandPalette?: () => void;
@@ -27,6 +30,8 @@ export const TopBar: React.FC<TopBarProps> = () => {
   const { currentUser, logout, lockSession, switchCashier, updateUserPassword, updateUserPin } = useAuth();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isTerminalPairModalOpen, setIsTerminalPairModalOpen] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -111,7 +116,7 @@ export const TopBar: React.FC<TopBarProps> = () => {
           <Store size={18} strokeWidth={1.75} />
         </div>
         <span className="font-semibold text-lg tracking-tight text-text-main">
-          {t('appName')}
+          {currentUser?.tenantName || t('appName')}
         </span>
         <div className="h-4 w-px bg-border-subtle mx-1 hidden sm:block" />
         <div className="hidden sm:flex items-center gap-2 text-[13px] font-medium px-3 py-1 rounded-full bg-surface-2 text-text-muted border border-border-subtle">
@@ -215,8 +220,19 @@ export const TopBar: React.FC<TopBarProps> = () => {
                 </Button>
               </div>
 
-              {/* Credential Options */}
+              {/* Profile & Security Options */}
               <div className="flex flex-col gap-1 border-t border-b border-border-subtle py-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
+                >
+                  <Shield size={14} strokeWidth={1.75} className="text-primary" />
+                  {t('profileModalTitle')}
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -239,6 +255,19 @@ export const TopBar: React.FC<TopBarProps> = () => {
                   <KeyRound size={14} strokeWidth={1.75} className="text-text-dim" />
                   {t('changePin')}
                 </button>
+                {(currentUser?.role === 'OWNER' || currentUser?.role === 'BRANCH_MANAGER') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsTerminalPairModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
+                  >
+                    <Terminal size={14} strokeWidth={1.75} className="text-primary" />
+                    {t('pairTerminalTitle')}
+                  </button>
+                )}
               </div>
 
               {/* Language Switcher */}
@@ -392,6 +421,18 @@ export const TopBar: React.FC<TopBarProps> = () => {
           </form>
         </Modal>
       )}
+
+      {/* User Profile & Security Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
+
+      {/* Terminal Registration & Pairing Modal */}
+      <TerminalPairModal
+        isOpen={isTerminalPairModalOpen}
+        onClose={() => setIsTerminalPairModalOpen(false)}
+      />
     </header>
   );
 };

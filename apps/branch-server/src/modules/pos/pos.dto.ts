@@ -118,6 +118,10 @@ export class CreateSaleDto {
 
   @IsString()
   @IsOptional()
+  idempotencyKey?: string;
+
+  @IsString()
+  @IsOptional()
   clientTimestamp?: string;
 
   @ArrayMinSize(1)
@@ -134,6 +138,87 @@ export class CreateSaleDto {
   @IsOptional()
   bypassFiscal?: boolean;
 }
+
+export class HeldBasketLineItemDto {
+  @IsUUID()
+  @IsNotEmpty()
+  productId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsString()
+  @IsOptional()
+  barcode?: string;
+
+  @IsNumber()
+  @Min(0.001)
+  quantity!: number;
+
+  @IsNumber()
+  @Min(0)
+  unitPrice!: number;
+
+  @IsNumber()
+  @Min(0)
+  discount!: number;
+
+  @IsNumber()
+  @Min(0)
+  lineTotal!: number;
+
+  @IsBoolean()
+  isVat!: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  scaleWeightGrams?: number;
+}
+
+export class HoldBasketDto {
+  @IsUUID()
+  @IsNotEmpty()
+  terminalId!: string;
+
+  @IsString()
+  @IsOptional()
+  customerIdentifier?: string;
+
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => HeldBasketLineItemDto)
+  items!: HeldBasketLineItemDto[];
+
+  @IsNumber()
+  @Min(0)
+  subtotal!: number;
+
+  @IsNumber()
+  @Min(0)
+  taxTotal!: number;
+
+  @IsNumber()
+  @Min(0)
+  grandTotal!: number;
+}
+
+export class ManagerPinVerifyDto {
+  @IsString()
+  @IsNotEmpty()
+  pin!: string;
+
+  @IsString()
+  @IsOptional()
+  actionRequired?: string;
+}
+
+export class ReprintReceiptDto {
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+}
+
 
 export class RefundLineItemDto {
   @IsUUID()

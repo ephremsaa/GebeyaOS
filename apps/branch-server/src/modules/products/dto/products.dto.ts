@@ -8,6 +8,7 @@ import {
   Min,
   Max,
   IsIn,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -250,4 +251,43 @@ export class ProductQueryDto {
   @Type(() => Number)
   offset?: number;
 }
+
+export class CreateCategoryDto {
+  @IsString()
+  @IsNotEmpty()
+  code!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name_en!: string;
+
+  @IsString()
+  @IsOptional()
+  name_am?: string;
+
+  @IsUUID()
+  @IsOptional()
+  parent_id?: string;
+}
+
+export class BulkCategoryDto {
+  @IsArray()
+  @IsNotEmpty()
+  product_ids!: string[];
+
+  @IsUUID()
+  @IsNotEmpty()
+  category_id!: string;
+}
+
+export class BulkArchiveDto {
+  @IsArray()
+  @IsNotEmpty()
+  product_ids!: string[];
+
+  @IsBoolean()
+  @IsNotEmpty()
+  archive!: boolean;
+}
+
 

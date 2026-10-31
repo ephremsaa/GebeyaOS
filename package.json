@@ -8,10 +8,13 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w apps/pos-web",
+    "dev": "node scripts/dev-all.js",
+    "dev:all": "node scripts/dev-all.js",
     "dev:pos": "npm run dev -w apps/pos-web",
     "dev:branch": "npm run start:dev -w apps/branch-server",
     "dev:hq": "npm run start:dev -w apps/hq-server",
+    "seed:dev": "node scripts/seed-dev.js",
+    "create-platform-admin": "node scripts/create-platform-admin.js",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },

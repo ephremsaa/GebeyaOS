@@ -381,6 +381,10 @@ describe('PosService', () => {
       // 11. Insert fiscal_receipt_logs
       mockClient.query.mockResolvedValueOnce({ rows: [] });
 
+      // 12. Insert sync_outbox
+      mockClient.query.mockResolvedValueOnce({ rows: [] });
+
+
       const result = await service.checkoutSale('b-01', 'cashier-01', {
         terminalId: 'term-01',
         shiftId: 'shift-01',
@@ -548,4 +552,341 @@ describe('PosService', () => {
       );
     });
   });
+
+  describe('idempotency and double-tap prevention', () => {
+    it('returns previously completed sale without deducting inventory when same idempotencyKey is used', async () => {
+      // Return existing sale when querying with idempotency_key
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sale-existing-01',
+            branch_id: 'b-01',
+            terminal_id: 'term-01',
+            shift_id: 'shift-01',
+            receipt_number: 'BOLE01-POS01-20261021-01-0005',
+            cashier_id: 'cashier-01',
+            subtotal: '100.0000',
+            discount_total: '0.0000',
+            taxable_subtotal: '86.9600',
+            tax_exempt_subtotal: '0.0000',
+            tax_total: '13.0400',
+            grand_total: '100.0000',
+            total_paid: '100.0000',
+            change_given: '0.0000',
+            payment_status: 'PAID',
+            fiscal_status: 'FISCALIZED',
+            fiscal_receipt_no: 'FRN-0005',
+            fiscal_mrc: 'MOR-BOLE',
+            fiscal_signature: null,
+            reprint_count: 0,
+            idempotency_key: 'idemp-uuid-999',
+            client_timestamp: new Date('2026-10-21T10:00:00Z'),
+            server_timestamp: new Date('2026-10-21T10:00:01Z'),
+            created_at: new Date('2026-10-21T10:00:01Z'),
+          },
+        ],
+      });
+
+      // sale_items
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'item-01',
+            sale_id: 'sale-existing-01',
+            product_id: 'prod-01',
+            item_name_snapshot: 'Test Item',
+            quantity: '1.000',
+            unit_price: '100.0000',
+            unit_cost: '60.0000',
+            discount_amount: '0.0000',
+            is_vat_applicable: true,
+            tax_rate: '0.1500',
+            tax_amount: '13.0400',
+            line_total: '100.0000',
+            created_at: new Date('2026-10-21T10:00:01Z'),
+          },
+        ],
+      });
+
+      // sale_payments
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'pay-01',
+            sale_id: 'sale-existing-01',
+            payment_method: 'CASH',
+            amount: '100.0000',
+            provider_reference: null,
+            is_offline_verified: false,
+            metadata: null,
+            created_at: new Date('2026-10-21T10:00:01Z'),
+          },
+        ],
+      });
+
+      const res = await service.checkoutSale('b-01', 'cashier-01', {
+        terminalId: 'term-01',
+        shiftId: 'shift-01',
+        idempotencyKey: 'idemp-uuid-999',
+        items: [{ productId: 'prod-01', quantity: 1 }],
+        payments: [{ paymentMethod: 'CASH', amount: 100 }],
+      });
+
+      expect(res.sale.id).toBe('sale-existing-01');
+      expect(res.sale.idempotencyKey).toBe('idemp-uuid-999');
+      // Must NOT allocate batches or deduct inventory on replayed sale
+      expect(mockInventoryService.allocateBatchesForSale).not.toHaveBeenCalled();
+      expect(mockInventoryService.recordMovementInTransaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('negative-stock rule', () => {
+    it('blocks checkout when branch disallows negative stock and inventory is insufficient', async () => {
+      // 1. Shift
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ id: 'shift-01', shift_number: 1 }],
+      });
+      // 2. Branch with allow_negative_stock = false
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            code: 'BOLE01',
+            name_en: 'Bole',
+            settings: { allow_negative_stock: false },
+          },
+        ],
+      });
+      // 3. Term
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ code: 'POS01' }],
+      });
+      // 4. Sales count
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ count: '0' }],
+      });
+      // 5. UUID
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ id: 'sale-neg-01' }],
+      });
+      // 6. Product
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'p-sugar',
+            name_en: 'Wonji Sugar 1kg',
+            base_price: '80.0000',
+            cost_price: '65.0000',
+            is_vat_applicable: true,
+            vat_rate: '0.1500',
+            effective_price: '80.0000',
+          },
+        ],
+      });
+
+      // Mock inventory service to throw BadRequestException on insufficient stock
+      mockInventoryService.allocateBatchesForSale.mockRejectedValueOnce(
+        new BadRequestException('Insufficient stock for product p-sugar. Current balance: 0, Change: -5'),
+      );
+
+      await expect(
+        service.checkoutSale('b-01', 'cashier-01', {
+          terminalId: 'term-01',
+          shiftId: 'shift-01',
+          items: [{ productId: 'p-sugar', quantity: 5 }],
+          payments: [{ paymentMethod: 'CASH', amount: 400 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('held baskets persistence', () => {
+    it('persists a held basket and resumes it from the database', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rows: [{ id: 'held-uuid-01' }],
+      });
+
+      mockDb.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'held-uuid-01',
+            branch_id: 'b-01',
+            terminal_id: 'term-01',
+            cashier_id: 'cashier-01',
+            customer_identifier: 'Customer #4',
+            cart_items: JSON.stringify([
+              { productId: 'prod-01', name: 'Bread', quantity: 2, unitPrice: 20, discount: 0, lineTotal: 40, isVat: false },
+            ]),
+            subtotal: '40.0000',
+            tax_total: '0.0000',
+            grand_total: '40.0000',
+            held_at: new Date('2026-10-21T11:00:00Z'),
+            resumed_at: null,
+          },
+        ],
+      });
+
+      const held = await service.holdBasket('b-01', 'cashier-01', {
+        terminalId: 'term-01',
+        customerIdentifier: 'Customer #4',
+        items: [
+          { productId: 'prod-01', name: 'Bread', quantity: 2, unitPrice: 20, discount: 0, lineTotal: 40, isVat: false },
+        ],
+        subtotal: 40,
+        taxTotal: 0,
+        grandTotal: 40,
+      });
+
+      expect(held.id).toBe('held-uuid-01');
+      expect(held.customerIdentifier).toBe('Customer #4');
+      expect(held.grandTotal).toBe(40);
+      expect(held.items).toHaveLength(1);
+
+      // Now resume
+      mockDb.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'held-uuid-01',
+            branch_id: 'b-01',
+            terminal_id: 'term-01',
+            cashier_id: 'cashier-01',
+            customer_identifier: 'Customer #4',
+            cart_items: JSON.stringify([
+              { productId: 'prod-01', name: 'Bread', quantity: 2, unitPrice: 20, discount: 0, lineTotal: 40, isVat: false },
+            ]),
+            subtotal: '40.0000',
+            tax_total: '0.0000',
+            grand_total: '40.0000',
+            held_at: new Date('2026-10-21T11:00:00Z'),
+            resumed_at: new Date('2026-10-21T11:15:00Z'),
+          },
+        ],
+      });
+
+      const resumed = await service.resumeHeldBasket('b-01', 'held-uuid-01');
+      expect(resumed.resumedAt).toBeDefined();
+    });
+  });
+
+  describe('manager PIN verification', () => {
+    it('authorizes supervisor with valid manager PIN', async () => {
+      const bcrypt = await import('bcryptjs');
+      const pinHash = bcrypt.hashSync('8822', 10);
+
+      mockDb.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'mgr-01',
+            username: 'abebe.manager',
+            full_name: 'Abebe Bikila',
+            pin_hash: pinHash,
+            quick_pin_hash: pinHash,
+            role_name: 'BRANCH_MANAGER',
+            max_discount_percentage: '25.00',
+          },
+        ],
+      });
+
+      const result = await service.verifyManagerPin('b-01', { pin: '8822' });
+      expect(result.authorized).toBe(true);
+      expect(result.authorizedBy).toBe('mgr-01');
+      expect(result.role).toBe('BRANCH_MANAGER');
+      expect(result.maxDiscountPercentage).toBe(25);
+    });
+
+    it('rejects incorrect manager PIN', async () => {
+      const bcrypt = await import('bcryptjs');
+      const pinHash = bcrypt.hashSync('8822', 10);
+
+      mockDb.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'mgr-01',
+            username: 'abebe.manager',
+            full_name: 'Abebe Bikila',
+            pin_hash: pinHash,
+            quick_pin_hash: pinHash,
+            role_name: 'BRANCH_MANAGER',
+            max_discount_percentage: '25.00',
+          },
+        ],
+      });
+
+      const result = await service.verifyManagerPin('b-01', { pin: '0000' });
+      expect(result.authorized).toBe(false);
+    });
+  });
+
+  describe('receipt reprint audit', () => {
+    it('increments reprint count and logs to audit_logs', async () => {
+      // 1. UPDATE sales reprint_count
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sale-01',
+            branch_id: 'b-01',
+            terminal_id: 'term-01',
+            shift_id: 'shift-01',
+            receipt_number: 'BOLE01-POS01-20261021-01-0001',
+            cashier_id: 'cashier-01',
+            subtotal: '100.0000',
+            discount_total: '0.0000',
+            taxable_subtotal: '86.9600',
+            tax_exempt_subtotal: '0.0000',
+            tax_total: '13.0400',
+            grand_total: '100.0000',
+            total_paid: '100.0000',
+            change_given: '0.0000',
+            payment_status: 'PAID',
+            fiscal_status: 'FISCALIZED',
+            fiscal_receipt_no: 'FRN-0001',
+            fiscal_mrc: 'MOR-BOLE',
+            reprint_count: 1,
+            client_timestamp: new Date('2026-10-21T10:00:00Z'),
+            server_timestamp: new Date('2026-10-21T10:00:01Z'),
+            created_at: new Date('2026-10-21T10:00:01Z'),
+          },
+        ],
+      });
+
+      // 2. INSERT audit_logs
+      mockClient.query.mockResolvedValueOnce({ rows: [] });
+
+      // 3. SELECT sale_items
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'item-01',
+            item_name_snapshot: 'Test Item',
+            quantity: '1',
+            unit_price: '100.00',
+            discount_amount: '0',
+            line_total: '100.00',
+            is_vat_applicable: true,
+          },
+        ],
+      });
+
+      // 4. SELECT sale_payments
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ payment_method: 'CASH', amount: '100.00', provider_reference: null }],
+      });
+
+      // 5. SELECT branches
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ code: 'BOLE01', name_en: 'Bole Store' }],
+      });
+
+      const res = await service.reprintReceipt('b-01', 'sale-01', 'cashier-01', {
+        reason: 'Customer requested copy',
+      });
+
+      expect(res.reprintCount).toBe(1);
+      expect(res.thermalReceipt).toContain('COPY #1');
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO audit_logs'),
+        expect.arrayContaining(['b-01', 'cashier-01', 'sale-01', expect.stringContaining('Customer requested copy')]),
+      );
+    });
+  });
 });
+

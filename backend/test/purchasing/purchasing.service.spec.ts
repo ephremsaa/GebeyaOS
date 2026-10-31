@@ -135,4 +135,83 @@ describe('PurchasingService', () => {
       );
     });
   });
+
+  describe('queries & status updates', () => {
+    it('lists purchase orders with item counts', async () => {
+      mockDb.query = vi.fn().mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            id: 'po-1',
+            order_number: 'PO-12345678',
+            supplier_name: 'Almaz Agro',
+            supplier_code: 'SUP-ALMAZ',
+            item_count: '3',
+            grand_total: '15000.0000',
+          },
+        ],
+      });
+
+      const list = await service.listPurchaseOrders('branch-1');
+      expect(list).toHaveLength(1);
+      expect(list[0].order_number).toBe('PO-12345678');
+      expect(list[0].item_count).toBe('3');
+    });
+
+    it('retrieves single purchase order with line items', async () => {
+      mockDb.query = vi
+        .fn()
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [
+            {
+              id: 'po-1',
+              order_number: 'PO-12345678',
+              supplier_name: 'Almaz Agro',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rowCount: 2,
+          rows: [
+            { id: 'poi-1', product_id: 'prod-1', ordered_quantity: '50.000', name_en: 'Milk' },
+            { id: 'poi-2', product_id: 'prod-2', ordered_quantity: '20.000', name_en: 'Oil' },
+          ],
+        });
+
+      const po = await service.getPurchaseOrderById('po-1');
+      expect(po.order_number).toBe('PO-12345678');
+      expect(po.items).toHaveLength(2);
+      expect(po.items[0].name_en).toBe('Milk');
+    });
+
+    it('updates purchase order status', async () => {
+      mockDb.query = vi.fn().mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 'po-1', status: 'ISSUED' }],
+      });
+
+      const updated = await service.updatePOStatus('po-1', 'ISSUED');
+      expect(updated.status).toBe('ISSUED');
+    });
+
+    it('lists goods received notes', async () => {
+      mockDb.query = vi.fn().mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            id: 'grn-1',
+            grn_number: 'GRN-12345678',
+            supplier_name: 'Almaz Agro',
+            total_received_cost: '11000.0000',
+            item_count: '1',
+          },
+        ],
+      });
+
+      const grns = await service.listGRNs('branch-1');
+      expect(grns).toHaveLength(1);
+      expect(grns[0].grn_number).toBe('GRN-12345678');
+    });
+  });
 });

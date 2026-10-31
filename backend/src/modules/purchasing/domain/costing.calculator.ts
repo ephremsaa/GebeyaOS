@@ -14,12 +14,13 @@ export interface ApportionedLandedCostResult {
 
 export class CostingCalculator {
   /**
-   * Apportions total landed costs (freight, handling, transport) across received line items.
-   * Standard method in supermarket receiving is Value-Weighted apportionment.
+   * Apportions total landed costs (freight, duty, handling) across received line items.
+   * Supports 'BY_VALUE' (value-weighted) or 'BY_QUANTITY' (unit-weighted).
    */
   public static apportionLandedCosts(
     items: LandedCostItemInput[],
     totalLandedCost: number,
+    allocationMethod: 'BY_VALUE' | 'BY_QUANTITY' = 'BY_VALUE',
   ): ApportionedLandedCostResult[] {
     if (totalLandedCost <= 0 || items.length === 0) {
       return items.map((item) => ({
@@ -31,18 +32,24 @@ export class CostingCalculator {
       }));
     }
 
-    // Calculate total purchase value
     const totalPurchaseValue = items.reduce(
       (sum, item) => sum + item.quantity * item.purchaseUnitCost,
       0,
     );
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
     return items.map((item) => {
-      const lineValue = item.quantity * item.purchaseUnitCost;
-      const itemLandedShare =
-        totalPurchaseValue > 0
-          ? (lineValue / totalPurchaseValue) * totalLandedCost
-          : totalLandedCost / items.length;
+      let itemLandedShare = 0;
+      if (allocationMethod === 'BY_QUANTITY') {
+        itemLandedShare =
+          totalQuantity > 0 ? (item.quantity / totalQuantity) * totalLandedCost : 0;
+      } else {
+        const lineValue = item.quantity * item.purchaseUnitCost;
+        itemLandedShare =
+          totalPurchaseValue > 0
+            ? (lineValue / totalPurchaseValue) * totalLandedCost
+            : totalLandedCost / items.length;
+      }
 
       const apportionedPerUnit =
         item.quantity > 0 ? itemLandedShare / item.quantity : 0;

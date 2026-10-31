@@ -21,6 +21,9 @@ import {
   PriceChangeDto,
   UpdateProductDto,
   ProductQueryDto,
+  CreateCategoryDto,
+  BulkCategoryDto,
+  BulkArchiveDto,
 } from './dto/products.dto';
 
 export interface ScannedProductLookupResult {
@@ -577,4 +580,94 @@ export class ProductsService {
       };
     });
   }
+
+  /**
+   * Checks whether a barcode is already registered in the catalog.
+   */
+  async checkBarcode(barcode: string): Promise<{ exists: boolean; product: any | null }> {
+    const res = await this.db.query(
+      `SELECT p.id, p.sku, p.name_en, p.name_am, b.pack_multiplier
+       FROM product_barcodes b
+       JOIN products p ON p.id = b.product_id
+       WHERE b.barcode = $1
+       LIMIT 1`,
+      [barcode.trim()],
+    );
+
+    if (res.rowCount === 0) {
+      return { exists: false, product: null };
+    }
+    return { exists: true, product: res.rows[0] };
+  }
+
+  /**
+   * Creates a new category.
+   */
+  async createCategory(dto: CreateCategoryDto): Promise<any> {
+    const id = generateUuidV7();
+    const res = await this.db.query(
+      `INSERT INTO categories (id, code, name_en, name_am, parent_id, is_active)
+       VALUES ($1, $2, $3, $4, $5, TRUE)
+       RETURNING *`,
+      [id, dto.code, dto.name_en, dto.name_am || null, dto.parent_id || null],
+    );
+
+    return res.rows[0];
+  }
+
+  /**
+   * Archives a product (soft delete) and verifies stock on hand.
+   */
+  async archiveProduct(
+    id: string,
+    branchId?: string,
+  ): Promise<{ product: Product; stockOnHand: number; warning?: string }> {
+    let stockOnHand = 0;
+    let warning: string | undefined;
+
+    if (branchId) {
+      const stockRes = await this.db.query<{ stock: string }>(
+        `SELECT COALESCE(SUM(quantity_change), 0) as stock FROM stock_ledger WHERE product_id = $1 AND branch_id = $2`,
+        [id, branchId],
+      );
+      stockOnHand = parseFloat(stockRes.rows[0]?.stock || '0');
+      if (stockOnHand > 0) {
+        warning = `Product has ${stockOnHand} units in stock. Archiving will hide it from the POS register while stock remains.`;
+      }
+    }
+
+    const res = await this.db.query<Product>(
+      `UPDATE products SET is_active = FALSE, updated_at = clock_timestamp() WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    if (res.rowCount === 0) {
+      throw new NotFoundException(`Product '${id}' not found.`);
+    }
+
+    return { product: res.rows[0], stockOnHand, warning };
+  }
+
+  /**
+   * Bulk updates category for multiple products.
+   */
+  async bulkUpdateCategory(productIds: string[], categoryId: string): Promise<{ updatedCount: number }> {
+    const res = await this.db.query(
+      `UPDATE products SET category_id = $1, updated_at = clock_timestamp() WHERE id = ANY($2::uuid[])`,
+      [categoryId, productIds],
+    );
+    return { updatedCount: res.rowCount || 0 };
+  }
+
+  /**
+   * Bulk archives or activates multiple products.
+   */
+  async bulkArchive(productIds: string[], archive: boolean): Promise<{ updatedCount: number }> {
+    const isActive = !archive;
+    const res = await this.db.query(
+      `UPDATE products SET is_active = $1, updated_at = clock_timestamp() WHERE id = ANY($2::uuid[])`,
+      [isActive, productIds],
+    );
+    return { updatedCount: res.rowCount || 0 };
+  }
 }
+

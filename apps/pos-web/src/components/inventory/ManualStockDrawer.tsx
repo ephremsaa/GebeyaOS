@@ -1,6 +1,19 @@
 import React, { useState } from 'react';
 import { Edit3, Plus, Trash2, CheckCircle2, AlertTriangle, X, Search } from 'lucide-react';
-import { SampleProduct } from '../../sample-data';
+
+export interface ManualStockProduct {
+  id: string;
+  sku: string;
+  nameEn: string;
+  nameAm?: string;
+  category?: string;
+  price?: number;
+  costPrice?: number;
+  isVat?: boolean;
+  stockOnHand?: number;
+  minStock?: number;
+  isWeighed?: boolean;
+}
 
 interface ManualDraftRow {
   productId: string;
@@ -18,8 +31,8 @@ interface ManualDraftRow {
 interface ManualStockDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onCommitSuccess: (message: string, updatedProducts: SampleProduct[]) => void;
-  existingProducts: SampleProduct[];
+  onCommitSuccess: (message: string, updatedProducts: any[]) => void;
+  existingProducts: any[];
 }
 
 export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
@@ -35,12 +48,13 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSelectProduct = (prod: SampleProduct) => {
+  const handleSelectProduct = (prod: ManualStockProduct) => {
+    const categoryName = prod.category || '';
     const isPerishable =
-      prod.category.includes('Dairy') ||
-      prod.category.includes('Produce') ||
-      prod.category.includes('Bakery') ||
-      prod.category.includes('Meat');
+      categoryName.includes('Dairy') ||
+      categoryName.includes('Produce') ||
+      categoryName.includes('Bakery') ||
+      categoryName.includes('Meat');
 
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 6);
@@ -49,10 +63,10 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
       productId: prod.id,
       sku: prod.sku,
       nameEn: prod.nameEn,
-      category: prod.category,
+      category: prod.category || 'General',
       unit: prod.isWeighed ? 'KG' : 'PCS',
       quantity: 10,
-      unitCost: prod.costPrice,
+      unitCost: prod.costPrice || 0,
       batchNumber: `M-${Date.now().toString().slice(-4)}`,
       expiryDate: futureDate.toISOString().slice(0, 10),
       isPerishable,

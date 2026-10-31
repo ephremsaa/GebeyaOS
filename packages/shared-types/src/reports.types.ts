@@ -13,6 +13,65 @@ export interface CashierAuditSummary {
   netVariance: number; // positive = over, negative = short
 }
 
+export interface SalesByHourItem {
+  hour: number;
+  hourLabel: string; // e.g. "08:00 - 09:00"
+  transactionCount: number;
+  grossAmount: number;
+}
+
+export interface SalesByCategoryItem {
+  categoryId: string;
+  categoryName: string;
+  grossRevenue: number;
+  netRevenue: number;
+  cogs: number;
+  grossProfit: number;
+  marginPercentage: number;
+  // Units explicitly kept separate (never added together)
+  unitsPcs: number;
+  unitsKg: number;
+  otherUnits: number;
+}
+
+export interface CashierPerformanceItem {
+  cashierId: string;
+  cashierName: string;
+  shiftsCount: number;
+  transactionsProcessed: number;
+  openingFloatTotal: number;
+  closingCountedTotal: number;
+  expectedCashTotal: number;
+  totalVariance: number;
+  totalSales: number;
+  accuracyRate: number; // Percentage where variance == 0
+}
+
+export interface VatReconciliationSummary {
+  taxableSales: number; // 15% standard base
+  taxExemptSales: number; // 0% exempt base
+  vatCollected: number; // Total VAT on sales
+  sumOfLineVat: number; // Sum of line-item tax amounts
+  isVatReconciled: boolean; // vatCollected == sumOfLineVat (within 0.05 ETB)
+  grossSales: number; // Total sales revenue
+  sumOfPayments: number; // Sum of payment records
+  isPaymentReconciled: boolean; // grossSales == sumOfPayments (within 0.05 ETB)
+}
+
+export interface BranchSyncFreshness {
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  lastSyncedAt: string | null;
+  minutesSinceSync: number | null;
+  status: 'LIVE' | 'DELAYED' | 'STALE' | 'OFFLINE';
+  isOnline: boolean;
+  todaySales: number;
+  todayTransactions: number;
+}
+
+export type ReportTimeRange = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
+
 export interface DailySalesReport {
   branchId: string;
   startDate: string;
@@ -26,12 +85,16 @@ export interface DailySalesReport {
   netSalesAmount: number;
   paymentBreakdown: PaymentMethodBreakdown[];
   cashierAudits: CashierAuditSummary[];
+  hourlyBreakdown?: SalesByHourItem[];
+  categoryBreakdown?: SalesByCategoryItem[];
+  vatReconciliation?: VatReconciliationSummary;
 }
 
 export interface ProductProfitabilityItem {
   productId: string;
   sku: string;
   nameEn: string;
+  uom?: string;
   quantitySold: number;
   grossRevenue: number;
   discountAmount: number;
@@ -57,6 +120,9 @@ export interface CategoryValuationSummary {
   categoryName: string;
   productCount: number;
   totalQuantity: number;
+  // Units explicitly segregated by Unit of Measure (pcs vs kg)
+  totalQuantityPcs: number;
+  totalQuantityKg: number;
   totalValuation: number;
 }
 
@@ -81,6 +147,7 @@ export interface ExpiringBatchItem {
   unitCost: number;
   potentialLossValue: number;
   isExpired: boolean;
+  uom?: string;
 }
 
 export interface ExpiringStockReport {

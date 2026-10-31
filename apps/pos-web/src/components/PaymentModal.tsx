@@ -9,26 +9,40 @@ import {
   RotateCcw,
   ShieldCheck,
   Split,
+  Plus,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { Modal, NumberPad, Button, Input } from './ui';
 import { playSuccessChime } from '../utils/sound';
+import { round2 } from '@gebeyaos/shared-types';
 
 export type PaymentMethodType = 'CASH' | 'TELEBIRR' | 'CBE_BIRR' | 'CARD' | 'BANK_TRANSFER';
+
+export interface PaymentLine {
+  method: PaymentMethodType;
+  amount: number;
+  reference?: string;
+}
+
+export interface CompleteSaleDetails {
+  method: PaymentMethodType;
+  amountPaid: number;
+  change: number;
+  refCode?: string;
+  payments: PaymentLine[];
+}
 
 export interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   totalAmount: number;
-  onCompleteSale: (details: {
-    method: PaymentMethodType;
-    amountPaid: number;
-    change: number;
-    refCode?: string;
-  }) => void;
+  onCompleteSale: (details: CompleteSaleDetails) => Promise<void> | void;
   onPrintReceipt?: () => void;
   onNewSale?: () => void;
   completedReceiptNo?: string | null;
+  isSubmitting?: boolean;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -39,22 +53,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onPrintReceipt,
   onNewSale,
   completedReceiptNo,
+  isSubmitting = false,
 }) => {
   const { t, formatCurrency } = useI18n();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodType>('CASH');
   const [tenderedStr, setTenderedStr] = useState<string>('');
   const [refCode, setRefCode] = useState<string>('');
   const [isSplitMode, setIsSplitMode] = useState<boolean>(false);
-  const [splitAmount, setSplitAmount] = useState<number>(0);
+  const [splitPayments, setSplitPayments] = useState<PaymentLine[]>([]);
 
-  // Reset or initialize on open
+  // Reset or initialize on modal open
   useEffect(() => {
     if (isOpen && !completedReceiptNo) {
       setTenderedStr(totalAmount.toFixed(2));
       setSelectedMethod('CASH');
       setRefCode('');
       setIsSplitMode(false);
-      setSplitAmount(0);
+      setSplitPayments([]);
     }
   }, [isOpen, totalAmount, completedReceiptNo]);
 
@@ -70,10 +85,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   }, [completedReceiptNo, onNewSale]);
 
   const tenderedAmount = parseFloat(tenderedStr) || 0;
-  const targetDue = isSplitMode ? totalAmount - splitAmount : totalAmount;
-  const changeDue = Math.max(0, tenderedAmount - targetDue);
-  const remainingDue = Math.max(0, targetDue - tenderedAmount);
-  const isSufficient = selectedMethod !== 'CASH' || tenderedAmount >= targetDue;
+  const recordedSplitTotal = round2(splitPayments.reduce((sum, p) => sum + p.amount, 0));
+  const remainingTarget = Math.max(0, round2(totalAmount - recordedSplitTotal));
+
+  // If in split mode, target is the remaining balance
+  const currentTarget = isSplitMode ? remainingTarget : totalAmount;
+  const changeDue = selectedMethod === 'CASH' ? Math.max(0, round2(tenderedAmount - currentTarget)) : 0;
+  const remainingDue = Math.max(0, round2(currentTarget - tenderedAmount));
+
+  // Determine if payment can be finalized
+  const isSufficient = isSplitMode
+    ? remainingTarget === 0 || (tenderedAmount >= remainingTarget)
+    : selectedMethod !== 'CASH' || tenderedAmount >= totalAmount;
 
   const handleDigit = (digit: string) => {
     if (digit === '.' && tenderedStr.includes('.')) return;
@@ -89,7 +112,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handleExact = () => {
-    setTenderedStr(targetDue.toFixed(2));
+    setTenderedStr(currentTarget.toFixed(2));
   };
 
   const handleAddQuickCash = (amt: number) => {
@@ -97,14 +120,73 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setTenderedStr((current + amt).toFixed(2));
   };
 
-  const handleComplete = () => {
-    if (!isSufficient) return;
+  const handleAddSplitTender = () => {
+    const amtToAdd = round2(selectedMethod === 'CASH' ? Math.min(tenderedAmount, currentTarget) : currentTarget);
+    if (amtToAdd <= 0) return;
+
+    setSplitPayments((prev) => [
+      ...prev,
+      {
+        method: selectedMethod,
+        amount: amtToAdd,
+        reference: refCode || undefined,
+      },
+    ]);
+
+    const newRemaining = Math.max(0, round2(currentTarget - amtToAdd));
+    setTenderedStr(newRemaining.toFixed(2));
+    setRefCode('');
+  };
+
+  const handleRemoveSplitTender = (idx: number) => {
+    const removed = splitPayments[idx];
+    setSplitPayments((prev) => prev.filter((_, i) => i !== idx));
+    const newRemaining = round2(remainingTarget + removed.amount);
+    setTenderedStr(newRemaining.toFixed(2));
+  };
+
+  const handleComplete = async () => {
+    if (!isSufficient || isSubmitting) return;
     playSuccessChime();
-    onCompleteSale({
-      method: selectedMethod,
-      amountPaid: selectedMethod === 'CASH' ? tenderedAmount : totalAmount,
-      change: selectedMethod === 'CASH' ? changeDue : 0,
+
+    let finalPayments: PaymentLine[] = [];
+    let finalAmountPaid = 0;
+    let finalChange = 0;
+
+    if (isSplitMode && splitPayments.length > 0) {
+      if (remainingTarget > 0) {
+        finalPayments = [
+          ...splitPayments,
+          {
+            method: selectedMethod,
+            amount: selectedMethod === 'CASH' ? tenderedAmount : remainingTarget,
+            reference: refCode || undefined,
+          },
+        ];
+      } else {
+        finalPayments = [...splitPayments];
+      }
+      finalAmountPaid = round2(finalPayments.reduce((sum, p) => sum + p.amount, 0));
+      finalChange = changeDue;
+    } else {
+      const paid = selectedMethod === 'CASH' ? tenderedAmount : totalAmount;
+      finalPayments = [
+        {
+          method: selectedMethod,
+          amount: paid,
+          reference: refCode || undefined,
+        },
+      ];
+      finalAmountPaid = paid;
+      finalChange = changeDue;
+    }
+
+    await onCompleteSale({
+      method: finalPayments[0]?.method || selectedMethod,
+      amountPaid: finalAmountPaid,
+      change: finalChange,
       refCode: refCode || undefined,
+      payments: finalPayments,
     });
   };
 
@@ -164,7 +246,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
         </div>
       ) : (
-        /* Payment Selection & Cash Keypad */
+        /* Payment Selection & Tender Entry */
         <div className="flex flex-col gap-4">
           {/* Top Amount Due Header */}
           <div className="p-4 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between shadow-soft">
@@ -174,16 +256,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </span>
               {isSplitMode && (
                 <span className="text-xs text-primary font-semibold">
-                  Split: {formatCurrency(splitAmount)} paid
+                  Split Paid: {formatCurrency(recordedSplitTotal)} / Total: {formatCurrency(totalAmount)}
                 </span>
               )}
             </div>
             <span className="text-3xl font-bold text-text-main tabular-nums font-mono">
-              {formatCurrency(targetDue)}
+              {formatCurrency(currentTarget)}
             </span>
           </div>
 
-          {/* Large Method Buttons */}
+          {/* Payment Method Selectors */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {methods.map((m) => {
               const isSelected = selectedMethod === m.id;
@@ -191,7 +273,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => setSelectedMethod(m.id)}
+                  onClick={() => {
+                    setSelectedMethod(m.id);
+                    if (m.id !== 'CASH') {
+                      setTenderedStr(currentTarget.toFixed(2));
+                    }
+                  }}
                   className={`min-h-[56px] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1.5 font-semibold text-[13px] transition-all duration-fast active:scale-95 border cursor-pointer ${
                     isSelected
                       ? 'border-primary bg-primary-soft text-primary shadow-soft'
@@ -205,26 +292,62 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             })}
           </div>
 
-          {/* Split Payment Toggle */}
-          <div className="flex items-center justify-between px-1">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSplitMode(!isSplitMode);
-                if (!isSplitMode) {
-                  setSplitAmount(Math.round(totalAmount / 2));
-                } else {
-                  setSplitAmount(0);
-                }
-              }}
-              className="text-xs font-medium text-text-muted hover:text-primary flex items-center gap-1.5 cursor-pointer"
-            >
-              <Split size={14} strokeWidth={1.75} />
-              <span>{isSplitMode ? 'Cancel Split Payment' : t('splitPayment')}</span>
-            </button>
+          {/* Split Payment Toggle & Active Splits */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between px-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isSplitMode;
+                  setIsSplitMode(next);
+                  if (!next) {
+                    setSplitPayments([]);
+                    setTenderedStr(totalAmount.toFixed(2));
+                  }
+                }}
+                className="text-xs font-medium text-text-muted hover:text-primary flex items-center gap-1.5 cursor-pointer"
+              >
+                <Split size={14} strokeWidth={1.75} />
+                <span>{isSplitMode ? 'Cancel Split Payment' : t('splitPayment')}</span>
+              </button>
+            </div>
+
+            {isSplitMode && splitPayments.length > 0 && (
+              <div className="bg-surface-2 rounded-xl p-3 border border-border-subtle flex flex-col gap-2">
+                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                  Recorded Tenders ({splitPayments.length})
+                </span>
+                <div className="flex flex-col gap-1.5 max-h-28 overflow-y-auto">
+                  {splitPayments.map((p, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 rounded-lg bg-surface text-xs font-semibold text-text-main border border-border-subtle"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="px-1.5 py-0.5 rounded bg-surface-2 text-text-muted">
+                          {p.method}
+                        </span>
+                        {p.reference && <span className="font-mono text-text-muted">Ref: {p.reference}</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono tabular-nums">{formatCurrency(p.amount)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSplitTender(idx)}
+                          className="text-danger hover:opacity-80 p-1 cursor-pointer"
+                          aria-label="Remove split"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Method Details */}
+          {/* Tender Entry: Cash Keypad or Reference Input */}
           {selectedMethod === 'CASH' ? (
             <div className="flex flex-col gap-3">
               {/* Tendered and Change readouts */}
@@ -237,7 +360,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <button
                       type="button"
                       onClick={handleExact}
-                      className="px-2 py-0.5 rounded text-xs font-bold bg-surface-2 hover:bg-border-subtle text-text-main cursor-pointer"
+                      className="px-2.5 py-1 rounded-md text-xs font-bold bg-primary-soft text-primary hover:bg-primary-soft/80 cursor-pointer transition-colors"
                     >
                       {t('exact')}
                     </button>
@@ -253,9 +376,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   </span>
                   <span
                     className={`text-2xl font-bold tabular-nums font-mono block ${
-                      remainingDue > 0
-                        ? 'text-warning'
-                        : 'text-primary'
+                      remainingDue > 0 ? 'text-warning' : 'text-primary'
                     }`}
                   >
                     {remainingDue > 0 ? formatCurrency(remainingDue) : formatCurrency(changeDue)}
@@ -272,6 +393,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 quickAmounts={[50, 100, 200, 500, 1000]}
                 showDecimal={true}
               />
+
+              {isSplitMode && currentTarget > 0 && tenderedAmount > 0 && (
+                <Button
+                  size="md"
+                  variant="secondary"
+                  leftIcon={<Plus size={16} />}
+                  onClick={handleAddSplitTender}
+                >
+                  Add Cash Tender ({formatCurrency(Math.min(tenderedAmount, currentTarget))})
+                </Button>
+              )}
             </div>
           ) : (
             /* Digital Payments (Telebirr / CBE Birr / Bank Transfer / Card) */
@@ -280,7 +412,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <ShieldCheck size={24} strokeWidth={1.75} className="text-info flex-shrink-0" />
                 <div className="text-[13px] text-text-muted">
                   <span className="font-semibold block text-text-main mb-0.5">Offline-Ready Verification</span>
-                  Cashier can accept confirmation SMS or reference code even if telecom data is momentarily slow.
+                  Enter SMS confirmation code or payment transaction reference.
                 </div>
               </div>
 
@@ -291,6 +423,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 placeholder={t('referenceOptional')}
                 className="font-mono text-base"
               />
+
+              {isSplitMode && currentTarget > 0 && (
+                <Button
+                  size="md"
+                  variant="secondary"
+                  leftIcon={<Plus size={16} />}
+                  onClick={handleAddSplitTender}
+                >
+                  Add {selectedMethod} Tender ({formatCurrency(currentTarget)})
+                </Button>
+              )}
             </div>
           )}
 
@@ -300,10 +443,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             variant="primary"
             fullWidth
             onClick={handleComplete}
-            disabled={!isSufficient}
+            disabled={!isSufficient || isSubmitting}
             className="mt-1"
           >
-            {t('completeSale')} · {formatCurrency(targetDue)}
+            {isSubmitting ? (
+              <span className="flex items-center gap-2">
+                <Loader2 size={18} className="animate-spin" />
+                <span>Processing Transaction...</span>
+              </span>
+            ) : (
+              <span>
+                {t('completeSale')} · {formatCurrency(currentTarget)}
+              </span>
+            )}
           </Button>
         </div>
       )}

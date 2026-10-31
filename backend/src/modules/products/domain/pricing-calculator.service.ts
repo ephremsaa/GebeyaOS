@@ -75,6 +75,72 @@ export class PricingCalculatorService {
   }
 
   /**
+   * Standard rounding to 2 decimal places using half-up EPSILON correction.
+   */
+  public static round2(val: number): number {
+    return Math.round((val + Number.EPSILON) * 100) / 100;
+  }
+
+  /**
+   * Calculates Ethiopian retail tax-inclusive 15% VAT for a single line item.
+   * Rule: VAT = round2(gross * 15 / 115) for taxable items, 0 for exempt.
+   */
+  public static calculateTaxInclusiveLineVat(gross: number, isVatApplicable: boolean): number {
+    if (!isVatApplicable || gross <= 0) {
+      return 0;
+    }
+    return PricingCalculatorService.round2((gross * 15) / 115);
+  }
+
+  /**
+   * Calculates basket totals following Ethiopian retail rule:
+   * Rule: Calculate VAT per line rounded to 2 decimals, then sum across all lines.
+   */
+  public static calculateBasketTotals(
+    lines: Array<{
+      quantity: number;
+      unitPrice: number;
+      discountAmount?: number;
+      isVatApplicable: boolean;
+    }>,
+  ) {
+    let subtotal = 0;
+    let discountTotal = 0;
+    let taxableSubtotal = 0;
+    let taxExemptSubtotal = 0;
+    let totalVatAmount = 0;
+    let grandTotal = 0;
+
+    for (const line of lines) {
+      const gross = PricingCalculatorService.round2(line.quantity * line.unitPrice);
+      const discount = PricingCalculatorService.round2(Math.min(line.discountAmount || 0, gross));
+      const lineTotal = PricingCalculatorService.round2(gross - discount);
+
+      subtotal = PricingCalculatorService.round2(subtotal + gross);
+      discountTotal = PricingCalculatorService.round2(discountTotal + discount);
+      grandTotal = PricingCalculatorService.round2(grandTotal + lineTotal);
+
+      if (line.isVatApplicable) {
+        const lineVat = PricingCalculatorService.calculateTaxInclusiveLineVat(lineTotal, true);
+        const lineTaxable = PricingCalculatorService.round2(lineTotal - lineVat);
+        totalVatAmount = PricingCalculatorService.round2(totalVatAmount + lineVat);
+        taxableSubtotal = PricingCalculatorService.round2(taxableSubtotal + lineTaxable);
+      } else {
+        taxExemptSubtotal = PricingCalculatorService.round2(taxExemptSubtotal + lineTotal);
+      }
+    }
+
+    return {
+      subtotal,
+      discountTotal,
+      taxableSubtotal,
+      taxExemptSubtotal,
+      totalVatAmount,
+      grandTotal,
+    };
+  }
+
+  /**
    * Calculates line item financials with Ethiopian 15% tax-inclusive VAT standard.
    */
   public calculateLineItem(input: LineItemCalculationInput): LineItemCalculationResult {
@@ -87,7 +153,7 @@ export class PricingCalculatorService {
       throw new Error('Unit price cannot be negative');
     }
 
-    const grossAmount = Number((quantity * unitPrice).toFixed(4));
+    const grossAmount = PricingCalculatorService.round2(quantity * unitPrice);
 
     // Calculate discount
     let discountAmount = 0;
@@ -98,24 +164,24 @@ export class PricingCalculatorService {
     }
 
     // Ensure discount does not exceed gross
-    discountAmount = Number(Math.min(discountAmount, grossAmount).toFixed(4));
-    const netAmount = Number((grossAmount - discountAmount).toFixed(4));
+    discountAmount = PricingCalculatorService.round2(Math.min(discountAmount, grossAmount));
+    const netAmount = PricingCalculatorService.round2(grossAmount - discountAmount);
 
     // Tax calculation
     // Ethiopian supermarket shelf prices are tax-inclusive by law:
     // netAmount = taxableSubtotal + taxAmount
-    // taxableSubtotal = netAmount / (1 + vatRate)
+    // VAT = gross x 15/115 for taxable items, 0 for exempt
     let taxableSubtotal = netAmount;
     let taxAmount = 0;
 
     if (isVatApplicable && vatRate > 0) {
-      taxableSubtotal = Number((netAmount / (1 + vatRate)).toFixed(4));
-      taxAmount = Number((netAmount - taxableSubtotal).toFixed(4));
+      taxAmount = PricingCalculatorService.calculateTaxInclusiveLineVat(netAmount, true);
+      taxableSubtotal = PricingCalculatorService.round2(netAmount - taxAmount);
     }
 
     return {
       quantity: Number(quantity.toFixed(3)),
-      unitPrice: Number(unitPrice.toFixed(4)),
+      unitPrice: PricingCalculatorService.round2(unitPrice),
       grossAmount,
       discountAmount,
       netAmount,

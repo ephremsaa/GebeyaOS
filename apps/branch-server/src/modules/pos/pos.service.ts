@@ -2,8 +2,11 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 import { DatabaseService } from '../../common/database/database.service';
 import { InventoryService } from '../inventory/inventory.service';
 import {
@@ -18,6 +21,7 @@ import {
   SaleRecord,
   SaleItemRecord,
   SalePaymentRecord,
+  HeldBasketRecord,
 } from '@gebeyaos/shared-types';
 import {
   OpenShiftDto,
@@ -25,7 +29,16 @@ import {
   CloseShiftDto,
   CreateSaleDto,
   CreateSaleRefundDto,
+  HoldBasketDto,
+  ManagerPinVerifyDto,
+  ReprintReceiptDto,
 } from './pos.dto';
+
+const round2 = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;
+const calculateTaxInclusiveLineVat = (gross: number, isVat: boolean): number =>
+  isVat && gross > 0 ? round2((gross * 15) / 115) : 0;
+
+
 
 @Injectable()
 export class PosService {
@@ -37,6 +50,41 @@ export class PosService {
   ) {}
 
   /**
+   * License verification & Grace Period Enforcement for Suspended Tenants
+   */
+  async verifyTenantLicense(): Promise<{ notice?: string }> {
+    try {
+      const res = await this.db.query(
+        `SELECT status, suspended_at, grace_period_days FROM tenants
+         WHERE id = NULLIF(current_setting('app.current_tenant', TRUE), '')::uuid`,
+      );
+
+      if (!res || !res.rows || res.rows.length === 0) return {};
+
+      const tenant = res.rows[0];
+      if (tenant.status !== 'suspended') return {};
+
+      const gracePeriodDays = Number(tenant.grace_period_days || 14);
+      const suspendedAt = tenant.suspended_at ? new Date(tenant.suspended_at) : new Date();
+      const elapsedDays = Math.floor((Date.now() - suspendedAt.getTime()) / (24 * 3600 * 1000));
+      const remainingDays = Math.max(0, gracePeriodDays - elapsedDays);
+
+      if (elapsedDays >= gracePeriodDays) {
+        throw new ForbiddenException(
+          `Supermarket subscription grace period expired (${gracePeriodDays} days exceeded). POS sales are disabled until reactivated by HQ.`,
+        );
+      }
+
+      return {
+        notice: `Supermarket subscription suspended. Offline grace period active: ${remainingDays} day(s) remaining. Please contact HQ billing.`,
+      };
+    } catch (err) {
+      if (err instanceof ForbiddenException) throw err;
+      return {};
+    }
+  }
+
+  /**
    * Opens a new cashier shift on a terminal.
    */
   async openShift(
@@ -44,6 +92,7 @@ export class PosService {
     cashierId: string,
     dto: OpenShiftDto,
   ): Promise<Shift> {
+    await this.verifyTenantLicense();
     return this.db.withTransaction(async (client) => {
       // 1. Check for existing open shift on this terminal
       const activeCheck = await client.query<{ id: string }>(
@@ -313,7 +362,117 @@ export class PosService {
     thermalReceipt: string;
     electronicJournal: any;
   }> {
+    await this.verifyTenantLicense();
     return this.db.withTransaction(async (client) => {
+      // 0. Check idempotency: if sale with idempotencyKey already completed, replay it safely
+      if (dto.idempotencyKey) {
+        const dupRes = await client.query<any>(
+          `SELECT * FROM sales WHERE branch_id = $1 AND idempotency_key = $2`,
+          [branchId, dto.idempotencyKey],
+        );
+        if (dupRes.rows.length > 0) {
+          const s = dupRes.rows[0];
+          const itemsRes = await client.query<any>(
+            `SELECT * FROM sale_items WHERE sale_id = $1`,
+            [s.id],
+          );
+          const paymentsRes = await client.query<any>(
+            `SELECT * FROM sale_payments WHERE sale_id = $1`,
+            [s.id],
+          );
+          const saleRecord: SaleRecord = {
+            id: s.id,
+            branchId: s.branch_id,
+            terminalId: s.terminal_id,
+            shiftId: s.shift_id,
+            receiptNumber: s.receipt_number,
+            cashierId: s.cashier_id,
+            subtotal: parseFloat(s.subtotal),
+            discountTotal: parseFloat(s.discount_total),
+            taxableSubtotal: parseFloat(s.taxable_subtotal),
+            taxExemptSubtotal: parseFloat(s.tax_exempt_subtotal),
+            taxTotal: parseFloat(s.tax_total),
+            grandTotal: parseFloat(s.grand_total),
+            totalPaid: parseFloat(s.total_paid),
+            changeGiven: parseFloat(s.change_given),
+            paymentStatus: s.payment_status,
+            fiscalStatus: s.fiscal_status,
+            fiscalReceiptNo: s.fiscal_receipt_no,
+            fiscalMrc: s.fiscal_mrc,
+            fiscalSignature: s.fiscal_signature,
+            reprintCount: s.reprint_count,
+            idempotencyKey: s.idempotency_key,
+            clientTimestamp: s.client_timestamp.toISOString(),
+            serverTimestamp: s.server_timestamp.toISOString(),
+            createdAt: s.created_at.toISOString(),
+            items: itemsRes.rows.map((r: any) => ({
+              id: r.id,
+              saleId: r.sale_id,
+              productId: r.product_id,
+              batchId: r.batch_id,
+              barcode: r.barcode,
+              itemNameSnapshot: r.item_name_snapshot,
+              quantity: parseFloat(r.quantity),
+              unitPrice: parseFloat(r.unit_price),
+              unitCost: parseFloat(r.unit_cost),
+              discountAmount: parseFloat(r.discount_amount),
+              discountReason: r.discount_reason,
+              isVatApplicable: r.is_vat_applicable,
+              taxRate: parseFloat(r.tax_rate),
+              taxAmount: parseFloat(r.tax_amount),
+              lineTotal: parseFloat(r.line_total),
+              createdAt: r.created_at.toISOString(),
+            })),
+            payments: paymentsRes.rows.map((pr: any) => ({
+              id: pr.id,
+              saleId: pr.sale_id,
+              paymentMethod: pr.payment_method,
+              amount: parseFloat(pr.amount),
+              providerReference: pr.provider_reference,
+              isOfflineVerified: pr.is_offline_verified,
+              metadata: pr.metadata,
+              createdAt: pr.created_at.toISOString(),
+            })),
+          };
+          return {
+            sale: saleRecord,
+            thermalReceipt: formatEscPosThermalReceipt({
+              storeName: 'GEBEYA SUPERMARKET',
+              storeTin: '0012345678',
+              storeVatNumber: 'ETH-VAT-001',
+              branchName: 'Branch',
+              terminalCode: 'POS01',
+              cashierName: cashierId,
+              receiptNumber: s.receipt_number,
+              saleDate: s.created_at.toISOString().replace('T', ' ').substring(0, 19),
+              items: itemsRes.rows.map((i: any) => ({
+                name: i.item_name_snapshot,
+                quantity: parseFloat(i.quantity),
+                unitPrice: parseFloat(i.unit_price),
+                discount: parseFloat(i.discount_amount),
+                lineTotal: parseFloat(i.line_total),
+                isVat: i.is_vat_applicable,
+              })),
+              subtotal: parseFloat(s.subtotal),
+              discountTotal: parseFloat(s.discount_total),
+              taxableSubtotal: parseFloat(s.taxable_subtotal),
+              vatAmount: parseFloat(s.tax_total),
+              exemptSubtotal: parseFloat(s.tax_exempt_subtotal),
+              grandTotal: parseFloat(s.grand_total),
+              payments: paymentsRes.rows.map((p: any) => ({
+                method: p.payment_method,
+                amount: parseFloat(p.amount),
+                reference: p.provider_reference,
+              })),
+              changeGiven: parseFloat(s.change_given),
+              fiscalMrc: s.fiscal_mrc,
+              fiscalReceiptNo: s.fiscal_receipt_no,
+            }),
+            electronicJournal: { receiptNumber: s.receipt_number, replayed: true },
+          };
+        }
+      }
+
       // 1. Verify shift is open
       const shiftRes = await client.query<any>(
         `SELECT * FROM shifts WHERE id = $1 AND branch_id = $2 AND status = 'OPEN'`,
@@ -326,10 +485,11 @@ export class PosService {
 
       // 2. Fetch branch and terminal codes
       const branchRes = await client.query<any>(
-        `SELECT code, name_en, tin_number, vat_number, phone, address FROM branches WHERE id = $1`,
+        `SELECT code, name_en, tin_number, vat_number, phone, address, settings FROM branches WHERE id = $1`,
         [branchId],
       );
       const branch = branchRes.rows[0];
+      const allowNegativeStock = branch?.settings?.allow_negative_stock === true;
 
       const termRes = await client.query<any>(
         `SELECT code FROM terminals WHERE id = $1`,
@@ -393,30 +553,37 @@ export class PosService {
         const prod = prodRes.rows[0];
 
         const unitPrice = item.unitPrice ?? parseFloat(prod.effective_price);
+
         const unitCost = parseFloat(prod.cost_price);
-        const discountAmount = item.discountAmount ?? 0;
-        const rawLineTotal = item.quantity * unitPrice;
-        const netLineTotal = Math.max(0, rawLineTotal - discountAmount);
+        const rawLineGross = round2(item.quantity * unitPrice);
+        const discountAmount = round2(item.discountAmount ?? 0);
+        const netLineTotal = Math.max(0, round2(rawLineGross - discountAmount));
 
-        const pricing = calculatePricing(
-          netLineTotal,
-          prod.is_vat_applicable,
-          parseFloat(prod.vat_rate),
-        );
+        // Tax-inclusive VAT rule: VAT = gross * 15 / 115 for taxable items, 0 for exempt
+        let lineVat = 0;
+        let lineTaxable = 0;
+        let lineExempt = 0;
 
-        subtotal += rawLineTotal;
-        discountTotal += discountAmount;
-        taxableSubtotal += pricing.taxableSubtotal;
-        taxExemptSubtotal += pricing.taxExemptSubtotal;
-        taxTotal += pricing.taxAmount;
-        grandTotal += pricing.total;
+        if (prod.is_vat_applicable) {
+          lineVat = calculateTaxInclusiveLineVat(netLineTotal, true);
+          lineTaxable = round2(netLineTotal - lineVat);
+          taxableSubtotal = round2(taxableSubtotal + lineTaxable);
+          taxTotal = round2(taxTotal + lineVat);
+        } else {
+          lineExempt = netLineTotal;
+          taxExemptSubtotal = round2(taxExemptSubtotal + lineExempt);
+        }
+
+        subtotal = round2(subtotal + rawLineGross);
+        discountTotal = round2(discountTotal + discountAmount);
+        grandTotal = round2(grandTotal + netLineTotal);
 
         // FEFO batch allocation & stock ledger deduction
         const alloc = await this.inventoryService.allocateBatchesForSale(
           branchId,
           item.productId,
           item.quantity,
-          true, // Allow negative allocation if branch allows
+          allowNegativeStock,
           client,
         );
 
@@ -433,7 +600,7 @@ export class PosService {
           referenceId: saleId,
           notes: `POS sale receipt ${receiptNumber}`,
           createdBy: cashierId,
-          allowNegativeStock: true,
+          allowNegativeStock,
         });
 
         preparedItems.push({
@@ -449,8 +616,8 @@ export class PosService {
           discountReason: item.discountReason || null,
           isVatApplicable: prod.is_vat_applicable,
           taxRate: parseFloat(prod.vat_rate),
-          taxAmount: pricing.taxAmount,
-          lineTotal: pricing.total,
+          taxAmount: lineVat,
+          lineTotal: netLineTotal,
         });
 
         receiptItems.push({
@@ -458,19 +625,18 @@ export class PosService {
           quantity: item.quantity,
           unitPrice,
           discount: discountAmount,
-          lineTotal: pricing.total,
+          lineTotal: netLineTotal,
           isVat: prod.is_vat_applicable,
         });
       }
 
       // Round totals to 2 decimal places
-      const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-      subtotal = r2(subtotal);
-      discountTotal = r2(discountTotal);
-      taxableSubtotal = r2(taxableSubtotal);
-      taxExemptSubtotal = r2(taxExemptSubtotal);
-      taxTotal = r2(taxTotal);
-      grandTotal = r2(grandTotal);
+      subtotal = round2(subtotal);
+      discountTotal = round2(discountTotal);
+      taxableSubtotal = round2(taxableSubtotal);
+      taxExemptSubtotal = round2(taxExemptSubtotal);
+      taxTotal = round2(taxTotal);
+      grandTotal = round2(grandTotal);
 
       // 6. Validate payments
       let totalPaid = 0;
@@ -481,7 +647,7 @@ export class PosService {
           cashPaid += p.amount;
         }
       }
-      totalPaid = r2(totalPaid);
+      totalPaid = round2(totalPaid);
 
       if (totalPaid < grandTotal) {
         throw new BadRequestException(
@@ -489,7 +655,7 @@ export class PosService {
         );
       }
 
-      const changeGiven = r2(totalPaid - grandTotal);
+      const changeGiven = round2(totalPaid - grandTotal);
       if (changeGiven > 0 && cashPaid < changeGiven) {
         throw new BadRequestException(
           `INVALID_PAYMENT: Change given (${changeGiven} ETB) cannot exceed cash tendered (${cashPaid} ETB)`,
@@ -511,10 +677,11 @@ export class PosService {
            id, branch_id, terminal_id, shift_id, receipt_number, cashier_id,
            subtotal, discount_total, taxable_subtotal, tax_exempt_subtotal,
            tax_total, grand_total, total_paid, change_given, payment_status,
-           fiscal_status, fiscal_receipt_no, fiscal_mrc, client_timestamp
+           fiscal_status, fiscal_receipt_no, fiscal_mrc, client_timestamp,
+           idempotency_key
          ) VALUES (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-           'PAID', $15, $16, $17, $18
+           'PAID', $15, $16, $17, $18, $19
          ) RETURNING *`,
         [
           saleId,
@@ -535,6 +702,7 @@ export class PosService {
           fiscalReceiptNo,
           fiscalMrc,
           clientTimestamp,
+          dto.idempotencyKey || null,
         ],
       );
       const saleRow = saleRes.rows[0];
@@ -638,6 +806,7 @@ export class PosService {
         fiscalMrc: saleRow.fiscal_mrc,
         fiscalSignature: saleRow.fiscal_signature,
         reprintCount: saleRow.reprint_count,
+        idempotencyKey: saleRow.idempotency_key,
         clientTimestamp: saleRow.client_timestamp.toISOString(),
         serverTimestamp: saleRow.server_timestamp.toISOString(),
         createdAt: saleRow.created_at.toISOString(),
@@ -695,6 +864,14 @@ export class PosService {
         ],
       );
 
+      // 13. Enqueue event into sync_outbox
+      await client.query(
+        `INSERT INTO sync_outbox (
+           branch_id, entity_type, entity_id, operation, idempotency_key, payload, status
+         ) VALUES ($1, 'SALE', $2, 'INSERT', $3, $4, 'PENDING')`,
+        [branchId, saleId, `sync_sale_${saleId}`, JSON.stringify(saleRecord)],
+      );
+
       return {
         sale: saleRecord,
         thermalReceipt,
@@ -702,6 +879,7 @@ export class PosService {
       };
     });
   }
+
 
   /**
    * Processes a return/refund against an original sale and restocks inventory.
@@ -902,4 +1080,392 @@ export class PosService {
       })),
     };
   }
+
+  /**
+   * Retrieves active open shift for a terminal.
+   */
+  async getCurrentShift(branchId: string, terminalId: string): Promise<{ open: boolean; shift: Shift | null }> {
+    const res = await this.db.query<any>(
+      `SELECT * FROM shifts 
+       WHERE branch_id = $1 AND terminal_id = $2 AND status = 'OPEN' 
+       ORDER BY opened_at DESC LIMIT 1`,
+      [branchId, terminalId],
+    );
+    if (res.rows.length === 0) {
+      return { open: false, shift: null };
+    }
+    const s = res.rows[0];
+    return {
+      open: true,
+      shift: {
+        id: s.id,
+        branchId: s.branch_id,
+        terminalId: s.terminal_id,
+        cashierId: s.cashier_id,
+        shiftNumber: s.shift_number,
+        openingCashFloat: parseFloat(s.opening_cash_float),
+        expectedCashSystem: parseFloat(s.expected_cash_system),
+        status: s.status,
+        notes: s.notes,
+        openedAt: s.opened_at.toISOString(),
+        createdAt: s.created_at.toISOString(),
+      },
+    };
+  }
+
+  /**
+   * Retrieves product catalog for POS with branch overrides and current stock.
+   */
+  async getCatalog(branchId: string): Promise<any[]> {
+    const query = `
+      SELECT 
+        p.id,
+        p.sku,
+        p.name_en,
+        p.name_am,
+        p.category_id,
+        c.name_en as category_name_en,
+        c.name_am as category_name_am,
+        p.uom_code,
+        p.base_price,
+        p.cost_price,
+        p.is_vat_applicable,
+        p.vat_rate,
+        p.is_weighed,
+        p.scale_plu,
+        p.min_stock_level,
+        p.allow_discount,
+        COALESCE(bpo.selling_price, p.base_price) as effective_price,
+        bpo.selling_price IS NOT NULL as is_price_overridden,
+        pb.barcode,
+        COALESCE(sl.current_stock, 0) as stock_on_hand
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN branch_product_overrides bpo ON p.id = bpo.product_id AND bpo.branch_id = $1 AND bpo.is_active = TRUE
+      LEFT JOIN LATERAL (
+        SELECT barcode FROM product_barcodes WHERE product_id = p.id AND is_primary = TRUE LIMIT 1
+      ) pb ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(quantity_change), 0) as current_stock
+        FROM stock_ledger
+        WHERE branch_id = $1 AND product_id = p.id
+      ) sl ON TRUE
+      WHERE p.is_active = TRUE
+      ORDER BY p.name_en ASC
+    `;
+    const res = await this.db.query<any>(query, [branchId]);
+    return res.rows.map((r) => ({
+      id: r.id,
+      sku: r.sku,
+      nameEn: r.name_en,
+      nameAm: r.name_am,
+      categoryId: r.category_id,
+      categoryNameEn: r.category_name_en,
+      categoryNameAm: r.category_name_am,
+      uomCode: r.uom_code,
+      basePrice: parseFloat(r.base_price),
+      effectivePrice: parseFloat(r.effective_price),
+      isPriceOverridden: r.is_price_overridden,
+      costPrice: parseFloat(r.cost_price),
+      isVatApplicable: r.is_vat_applicable,
+      vatRate: parseFloat(r.vat_rate),
+      isWeighed: r.is_weighed,
+      scalePlu: r.scale_plu,
+      minStockLevel: parseFloat(r.min_stock_level || '0'),
+      allowDiscount: r.allow_discount,
+      barcode: r.barcode || r.sku,
+      stockOnHand: parseFloat(r.stock_on_hand),
+    }));
+  }
+
+  /**
+   * Persists a held basket to the database.
+   */
+  async holdBasket(branchId: string, cashierId: string, dto: HoldBasketDto): Promise<HeldBasketRecord> {
+    const idRes = await this.db.query<{ id: string }>('SELECT uuid_generate_v7() as id');
+    const id = idRes.rows[0].id;
+
+    const res = await this.db.query<any>(
+      `INSERT INTO held_baskets (
+         id, branch_id, terminal_id, cashier_id, customer_identifier,
+         cart_items, subtotal, tax_total, grand_total
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [
+        id,
+        branchId,
+        dto.terminalId,
+        cashierId,
+        dto.customerIdentifier || null,
+        JSON.stringify(dto.items),
+        dto.subtotal,
+        dto.taxTotal,
+        dto.grandTotal,
+      ],
+    );
+    const r = res.rows[0];
+    return {
+      id: r.id,
+      branchId: r.branch_id,
+      terminalId: r.terminal_id,
+      cashierId: r.cashier_id,
+      customerIdentifier: r.customer_identifier,
+      items: typeof r.cart_items === 'string' ? JSON.parse(r.cart_items) : r.cart_items,
+      subtotal: parseFloat(r.subtotal),
+      taxTotal: parseFloat(r.tax_total),
+      grandTotal: parseFloat(r.grand_total),
+      heldAt: r.held_at.toISOString(),
+      resumedAt: r.resumed_at ? r.resumed_at.toISOString() : null,
+    };
+  }
+
+  /**
+   * Retrieves all active held baskets for a terminal.
+   */
+  async getHeldBaskets(branchId: string, terminalId: string): Promise<HeldBasketRecord[]> {
+    const res = await this.db.query<any>(
+      `SELECT * FROM held_baskets
+       WHERE branch_id = $1 AND terminal_id = $2 AND resumed_at IS NULL
+       ORDER BY held_at DESC`,
+      [branchId, terminalId],
+    );
+    return res.rows.map((r) => ({
+      id: r.id,
+      branchId: r.branch_id,
+      terminalId: r.terminal_id,
+      cashierId: r.cashier_id,
+      customerIdentifier: r.customer_identifier,
+      items: typeof r.cart_items === 'string' ? JSON.parse(r.cart_items) : r.cart_items,
+      subtotal: parseFloat(r.subtotal),
+      taxTotal: parseFloat(r.tax_total),
+      grandTotal: parseFloat(r.grand_total),
+      heldAt: r.held_at.toISOString(),
+      resumedAt: r.resumed_at ? r.resumed_at.toISOString() : null,
+    }));
+  }
+
+  /**
+   * Resumes and closes a held basket.
+   */
+  async resumeHeldBasket(branchId: string, basketId: string): Promise<HeldBasketRecord> {
+    const res = await this.db.query<any>(
+      `UPDATE held_baskets
+       SET resumed_at = clock_timestamp()
+       WHERE id = $1 AND branch_id = $2
+       RETURNING *`,
+      [basketId, branchId],
+    );
+    if (res.rows.length === 0) {
+      throw new NotFoundException(`Held basket ${basketId} not found`);
+    }
+    const r = res.rows[0];
+    return {
+      id: r.id,
+      branchId: r.branch_id,
+      terminalId: r.terminal_id,
+      cashierId: r.cashier_id,
+      customerIdentifier: r.customer_identifier,
+      items: typeof r.cart_items === 'string' ? JSON.parse(r.cart_items) : r.cart_items,
+      subtotal: parseFloat(r.subtotal),
+      taxTotal: parseFloat(r.tax_total),
+      grandTotal: parseFloat(r.grand_total),
+      heldAt: r.held_at.toISOString(),
+      resumedAt: r.resumed_at ? r.resumed_at.toISOString() : null,
+    };
+  }
+
+  /**
+   * Deletes a held basket.
+   */
+  async deleteHeldBasket(branchId: string, basketId: string): Promise<void> {
+    await this.db.query(
+      `DELETE FROM held_baskets WHERE id = $1 AND branch_id = $2`,
+      [basketId, branchId],
+    );
+  }
+
+  /**
+   * Verifies manager PIN for supervisor discount or refund override.
+   */
+  async verifyManagerPin(branchId: string, dto: ManagerPinVerifyDto): Promise<{
+    authorized: boolean;
+    authorizedBy?: string;
+    role?: string;
+    maxDiscountPercentage?: number;
+    message?: string;
+  }> {
+    const query = `
+      SELECT u.id, u.username, u.full_name, u.pin_hash, u.pin_salt, r.name as role_name, r.max_discount_percentage
+      FROM users u
+      JOIN roles r ON u.role_id = r.id
+      LEFT JOIN user_branch_assignments uba ON u.id = uba.user_id
+      WHERE (uba.branch_id = $1 OR r.name IN ('OWNER', 'SUPER_ADMIN'))
+        AND r.name IN ('OWNER', 'BRANCH_MANAGER', 'SUPER_ADMIN')
+        AND u.is_active = TRUE
+    `;
+    const res = await this.db.query<any>(query, [branchId]);
+
+    for (const user of res.rows) {
+      let match = false;
+      const targetHash = user.pin_hash;
+      if (targetHash) {
+        if (user.pin_salt) {
+          const pepper = process.env.PIN_PEPPER || 'gebeyaos-secure-cashier-pin-pepper-2026';
+          const salted = `${dto.pin}:${user.pin_salt}:${pepper}`;
+          match = await argon2.verify(targetHash, salted);
+        } else if (targetHash.startsWith('$argon2')) {
+          match = await argon2.verify(targetHash, dto.pin);
+        } else {
+          match = bcrypt.compareSync(dto.pin, targetHash);
+        }
+        if (match) {
+          try {
+            await this.db.query(
+              `INSERT INTO audit_logs (id, tenant_id, branch_id, user_id, action, entity_name, details, result)
+               VALUES (gen_random_uuid(), (SELECT tenant_id FROM branches WHERE id = $1), $1, $2, 'MANAGER_PIN_VERIFIED', 'pos_override', $3, 'SUCCESS')`,
+              [branchId, user.id, JSON.stringify({ role: user.role_name, actionRequired: dto.actionRequired })],
+            );
+          } catch {}
+          return {
+            authorized: true,
+            authorizedBy: user.id,
+            role: user.role_name,
+            maxDiscountPercentage: parseFloat(user.max_discount_percentage || '25.00'),
+            message: `Authorized by ${user.full_name || user.username} (${user.role_name})`,
+          };
+        }
+      }
+    }
+
+    return {
+      authorized: false,
+      message: 'Invalid Manager PIN or insufficient permissions',
+    };
+  }
+
+  /**
+   * Reprints a customer receipt with audit logging.
+   */
+  async reprintReceipt(branchId: string, saleId: string, cashierId: string, dto: ReprintReceiptDto): Promise<{
+    sale: SaleRecord;
+    thermalReceipt: string;
+    reprintCount: number;
+  }> {
+    return this.db.withTransaction(async (client) => {
+      // 1. Fetch and update sale
+      const updateRes = await client.query<any>(
+        `UPDATE sales
+         SET reprint_count = reprint_count + 1
+         WHERE id = $1 AND branch_id = $2
+         RETURNING *`,
+        [saleId, branchId],
+      );
+
+      if (updateRes.rows.length === 0) {
+        throw new NotFoundException(`Sale ${saleId} not found`);
+      }
+      const sale = updateRes.rows[0];
+
+      // 2. Insert audit log
+      await client.query(
+        `INSERT INTO audit_logs (
+           branch_id, user_id, action, entity_type, entity_id, details
+         ) VALUES ($1, $2, 'pos:receipt:reprint', 'SALE', $3, $4)`,
+        [
+          branchId,
+          cashierId,
+          saleId,
+          JSON.stringify({
+            receiptNumber: sale.receipt_number,
+            reprintCount: sale.reprint_count,
+            reason: dto.reason,
+          }),
+        ],
+      );
+
+      // 3. Fetch items and payments
+      const itemsRes = await client.query<any>(
+        `SELECT * FROM sale_items WHERE sale_id = $1`,
+        [saleId],
+      );
+      const paymentsRes = await client.query<any>(
+        `SELECT * FROM sale_payments WHERE sale_id = $1`,
+        [saleId],
+      );
+      const branchRes = await client.query<any>(
+        `SELECT code, name_en, tin_number, vat_number, phone, address FROM branches WHERE id = $1`,
+        [branchId],
+      );
+      const branch = branchRes.rows[0] || {};
+
+      const thermalReceipt = formatEscPosThermalReceipt({
+        storeName: 'GEBEYA SUPERMARKET',
+        storeTin: branch.tin_number || '0012345678',
+        storeVatNumber: branch.vat_number || 'ETH-VAT-001',
+        branchName: branch.name_en,
+        branchAddress: branch.address || undefined,
+        branchPhone: branch.phone || undefined,
+        terminalCode: sale.terminal_id || 'POS01',
+        cashierName: cashierId,
+        receiptNumber: `${sale.receipt_number} [COPY #${sale.reprint_count}]`,
+        saleDate: sale.created_at.toISOString().replace('T', ' ').substring(0, 19),
+        items: itemsRes.rows.map((i: any) => ({
+          name: i.item_name_snapshot,
+          quantity: parseFloat(i.quantity),
+          unitPrice: parseFloat(i.unit_price),
+          discount: parseFloat(i.discount_amount),
+          lineTotal: parseFloat(i.line_total),
+          isVat: i.is_vat_applicable,
+        })),
+        subtotal: parseFloat(sale.subtotal),
+        discountTotal: parseFloat(sale.discount_total),
+        taxableSubtotal: parseFloat(sale.taxable_subtotal),
+        vatAmount: parseFloat(sale.tax_total),
+        exemptSubtotal: parseFloat(sale.tax_exempt_subtotal),
+        grandTotal: parseFloat(sale.grand_total),
+        payments: paymentsRes.rows.map((p: any) => ({
+          method: p.payment_method,
+          amount: parseFloat(p.amount),
+          reference: p.provider_reference,
+        })),
+        changeGiven: parseFloat(sale.change_given),
+        fiscalMrc: sale.fiscal_mrc,
+        fiscalReceiptNo: sale.fiscal_receipt_no,
+      });
+
+      const saleRecord: SaleRecord = {
+        id: sale.id,
+        branchId: sale.branch_id,
+        terminalId: sale.terminal_id,
+        shiftId: sale.shift_id,
+        receiptNumber: sale.receipt_number,
+        cashierId: sale.cashier_id,
+        subtotal: parseFloat(sale.subtotal),
+        discountTotal: parseFloat(sale.discount_total),
+        taxableSubtotal: parseFloat(sale.taxable_subtotal),
+        taxExemptSubtotal: parseFloat(sale.tax_exempt_subtotal),
+        taxTotal: parseFloat(sale.tax_total),
+        grandTotal: parseFloat(sale.grand_total),
+        totalPaid: parseFloat(sale.total_paid),
+        changeGiven: parseFloat(sale.change_given),
+        paymentStatus: sale.payment_status,
+        fiscalStatus: sale.fiscal_status,
+        fiscalReceiptNo: sale.fiscal_receipt_no,
+        fiscalMrc: sale.fiscal_mrc,
+        fiscalSignature: sale.fiscal_signature,
+        reprintCount: sale.reprint_count,
+        idempotencyKey: sale.idempotency_key,
+        clientTimestamp: sale.client_timestamp.toISOString(),
+        serverTimestamp: sale.server_timestamp.toISOString(),
+        createdAt: sale.created_at.toISOString(),
+      };
+
+      return {
+        sale: saleRecord,
+        thermalReceipt,
+        reprintCount: sale.reprint_count,
+      };
+    });
+  }
 }
+

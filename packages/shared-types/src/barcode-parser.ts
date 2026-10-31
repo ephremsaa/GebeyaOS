@@ -46,8 +46,21 @@ export class BarcodeParser {
     const isEan13Length = trimmed.length === 13 && /^\d+$/.test(trimmed);
     const checksumValid = isEan13Length ? this.isValidEan13Checksum(trimmed) : true;
 
-    if (isEan13Length && trimmed.startsWith(config.prefix)) {
-      const prefixLen = config.prefix.length;
+    // Check for standard retail scale barcode prefixes (20 = weight, 21 = price, 02 = weight/price)
+    const isScalePrefix =
+      (isEan13Length && (trimmed.startsWith('20') || trimmed.startsWith('02') || trimmed.startsWith('21'))) ||
+      (isEan13Length && trimmed.startsWith(config.prefix));
+
+    if (isScalePrefix) {
+      const activePrefix = trimmed.startsWith(config.prefix)
+        ? config.prefix
+        : trimmed.startsWith('20')
+        ? '20'
+        : trimmed.startsWith('02')
+        ? '02'
+        : '21';
+
+      const prefixLen = activePrefix.length;
       const pluStart = prefixLen;
       const pluEnd = pluStart + config.pluLength;
       const valueStart = pluEnd;
@@ -56,7 +69,9 @@ export class BarcodeParser {
       const plu = trimmed.substring(pluStart, pluEnd);
       const rawValue = parseInt(trimmed.substring(valueStart, valueEnd), 10);
 
-      if (config.mode === 'WEIGHT') {
+      const isPriceMode = customConfig?.mode === 'PRICE' || activePrefix === '21';
+
+      if (!isPriceMode) {
         const quantity = config.weightUnit === 'G' ? rawValue / 1000 : rawValue;
         return {
           rawBarcode: trimmed,
@@ -84,3 +99,4 @@ export class BarcodeParser {
     };
   }
 }
+

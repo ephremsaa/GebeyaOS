@@ -11,11 +11,11 @@ export const SetupWizard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Form State
-  const [companyName, setCompanyName] = useState('Gebeya Supermarket');
-  const [tradeName, setTradeName] = useState('Gebeya Retail PLC');
-  const [branchCode, setBranchCode] = useState('BOLE-01');
-  const [branchName, setBranchName] = useState('Bole Medhanialem Branch');
-  const [tinNumber, setTinNumber] = useState('0012345678');
+  const [companyName, setCompanyName] = useState('');
+  const [tradeName, setTradeName] = useState('');
+  const [branchCode, setBranchCode] = useState('');
+  const [branchName, setBranchName] = useState('');
+  const [tinNumber, setTinNumber] = useState('');
   const [currency] = useState('ETB');
   const [defaultVatRate] = useState(0.15);
   const [receiptHeader, setReceiptHeader] = useState('Gebeya Supermarket - Bole Medhanialem');
@@ -23,8 +23,8 @@ export const SetupWizard: React.FC = () => {
 
   // Owner state
   const [ownerFullName, setOwnerFullName] = useState('');
-  const [ownerUsername, setOwnerUsername] = useState('admin');
-  const [ownerPhone, setOwnerPhone] = useState('+251 91 123 4567');
+  const [ownerUsername, setOwnerUsername] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
   const [ownerPin, setOwnerPin] = useState('');
 

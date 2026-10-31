@@ -23,8 +23,29 @@ export class ConflictResolver {
   /**
    * Resolves whether an event pushed from a branch should be accepted by HQ.
    */
-  public static evaluateBranchEvent(event: SyncEvent): EvaluationResult {
-    const { aggregateType, sourceBranchId, payload } = event;
+  public static evaluateBranchEvent(
+    event: SyncEvent,
+    expectedTenantId?: string,
+  ): EvaluationResult {
+    const { aggregateType, sourceBranchId, payload, tenantId } = event;
+
+    // Defense-in-depth: Reject any cross-tenant event attempt
+    if (expectedTenantId) {
+      if (tenantId && tenantId !== expectedTenantId) {
+        return {
+          accepted: false,
+          policy: 'APPLIED_HQ',
+          reason: `Cross-tenant event rejected: event tenantId (${tenantId}) does not match authenticated branch tenant (${expectedTenantId}).`,
+        };
+      }
+      if (payload?.tenant_id && payload.tenant_id !== expectedTenantId) {
+        return {
+          accepted: false,
+          policy: 'APPLIED_HQ',
+          reason: `Cross-tenant event rejected: event payload tenant_id (${payload.tenant_id}) does not match authenticated branch tenant (${expectedTenantId}).`,
+        };
+      }
+    }
 
     switch (aggregateType) {
       // 1. Branch Authoritative: Sales & POS Transactions
@@ -75,14 +96,31 @@ export class ConflictResolver {
           reason: 'Inter-branch transfer events follow the state machine handshake.',
         };
 
-      // 6. HQ Authoritative: Master Catalog & Suppliers
+      // 6. HQ Authoritative: Master Catalog, Roles & Suppliers
       case 'PRODUCT':
       case 'CATEGORY':
       case 'SUPPLIER':
+      case 'ROLE':
         return {
           accepted: false,
           policy: 'APPLIED_HQ',
           reason: `HQ is solely authoritative for master ${aggregateType.toLowerCase()} catalog. Branch modifications are superseded by HQ.`,
+        };
+
+      // 7. Security & Audit Trail (Branch Authoritative, Accepted by HQ)
+      case 'AUDIT_LOG':
+        return {
+          accepted: true,
+          policy: 'APPLIED_BRANCH',
+          reason: 'Branch is authoritative for its local security, authentication, and audit event logs.',
+        };
+
+      // 8. User Management (Branch -> HQ for local administrative deactivations & status changes)
+      case 'USER':
+        return {
+          accepted: true,
+          policy: 'APPLIED_BRANCH',
+          reason: 'Branch local user administrative actions sync to HQ.',
         };
 
       default:

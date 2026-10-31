@@ -48,6 +48,15 @@ export class InventoryController {
     );
   }
 
+  @Get('batches/:productId')
+  async getBatches(
+    @Param('productId') productId: string,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    return this.inventoryService.getBatches(branchId, productId);
+  }
+
   @Post('batches')
   @HttpCode(HttpStatus.CREATED)
   async createBatch(
@@ -136,5 +145,10 @@ export class InventoryController {
   @Get('stock-takes/:id')
   async getStockTakeById(@Param('id') stockTakeId: string) {
     return this.inventoryService.getStockTakeById(stockTakeId);
+  }
+
+  @Get('stock-takes/:id/report')
+  async getStockTakeReport(@Param('id') stockTakeId: string) {
+    return this.inventoryService.getStockTakeReport(stockTakeId);
   }
 }

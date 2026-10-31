@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
 import {
   SyncBatchPushRequest,
@@ -16,17 +16,31 @@ export class HqSyncService {
   constructor(private readonly db: DatabaseService) {}
 
   /**
-   * Ingests a push batch from a branch into sync_inbox with idempotency and Authority Matrix evaluation.
+   * Ingests a push batch from a branch into sync_inbox with idempotency,
+   * Authority Matrix evaluation, and multi-tenant isolation.
    */
-  async processBranchPush(req: SyncBatchPushRequest): Promise<SyncBatchPushResponse> {
+  async processBranchPush(
+    req: SyncBatchPushRequest,
+    authenticatedTenantId?: string,
+    authenticatedBranchId?: string,
+  ): Promise<SyncBatchPushResponse> {
     const acknowledgedEventIds: string[] = [];
     const failedEventIds: string[] = [];
     const conflicts: ConflictRecord[] = [];
 
+    // Verify pushing branch matches authenticated credentials
+    if (authenticatedBranchId && req.sourceBranchId && req.sourceBranchId !== authenticatedBranchId) {
+      throw new ForbiddenException(
+        `Branch mismatch: credentials are for branch ${authenticatedBranchId} but batch payload specifies ${req.sourceBranchId}`,
+      );
+    }
+
+    const tenantId = authenticatedTenantId || req.tenantId;
+
     await this.db.withTransaction(async (client) => {
       for (const event of req.events) {
-        // Evaluate event against Authority Matrix
-        const evalResult = ConflictResolver.evaluateBranchEvent(event);
+        // Evaluate event against Authority Matrix and Tenant Boundary
+        const evalResult = ConflictResolver.evaluateBranchEvent(event, tenantId);
 
         if (!evalResult.accepted) {
           const conflict = ConflictResolver.createConflictRecord(event, evalResult);
@@ -36,27 +50,63 @@ export class HqSyncService {
         }
 
         // Idempotently ingest event into sync_inbox
-        await client.query(
-          `INSERT INTO sync_inbox (
-             source_branch_id, event_id, idempotency_key,
-             aggregate_type, event_type, payload, status, conflict_resolution
-           ) VALUES ($1, $2, $3, $4, $5, $6, 'APPLIED', $7)
-           ON CONFLICT (idempotency_key) DO UPDATE
-           SET processed_at = clock_timestamp()`,
-          [
-            req.sourceBranchId,
-            event.id,
-            event.idempotencyKey,
-            event.aggregateType,
-            event.eventType,
-            JSON.stringify(event.payload),
-            evalResult.policy,
-          ],
-        );
+        if (tenantId) {
+          await client.query(
+            `INSERT INTO sync_inbox (
+               tenant_id, source_branch_id, event_id, idempotency_key,
+               aggregate_type, event_type, payload, status, conflict_resolution
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'APPLIED', $8)
+             ON CONFLICT (idempotency_key) DO UPDATE
+             SET processed_at = clock_timestamp()`,
+            [
+              tenantId,
+              req.sourceBranchId,
+              event.id,
+              event.idempotencyKey,
+              event.aggregateType,
+              event.eventType,
+              JSON.stringify(event.payload),
+              evalResult.policy,
+            ],
+          );
+        } else {
+          await client.query(
+            `INSERT INTO sync_inbox (
+               source_branch_id, event_id, idempotency_key,
+               aggregate_type, event_type, payload, status, conflict_resolution
+             ) VALUES ($1, $2, $3, $4, $5, $6, 'APPLIED', $7)
+             ON CONFLICT (idempotency_key) DO UPDATE
+             SET processed_at = clock_timestamp()`,
+            [
+              req.sourceBranchId,
+              event.id,
+              event.idempotencyKey,
+              event.aggregateType,
+              event.eventType,
+              JSON.stringify(event.payload),
+              evalResult.policy,
+            ],
+          );
+        }
+
+        if (event.aggregateType === 'USER' && event.payload) {
+          try {
+            await client.query(
+              `UPDATE users SET
+                 is_active = COALESCE($1, is_active),
+                 token_version = token_version + 1,
+                 updated_at = clock_timestamp()
+               WHERE id = $2`,
+              [event.payload.isActive !== undefined ? event.payload.isActive : null, event.aggregateId],
+            );
+          } catch {
+            // ignore if user schema differs
+          }
+        }
 
         acknowledgedEventIds.push(event.id);
       }
-    });
+    }, tenantId);
 
     return {
       success: true,
@@ -70,25 +120,31 @@ export class HqSyncService {
   }
 
   /**
-   * Provides catalog deltas for branches to pull.
+   * Provides catalog deltas for branches to pull, scoped to the branch's tenant.
    */
   async getCatalogDeltas(
     branchId: string,
     lastSyncedAt?: string | null,
     limit = 100,
+    tenantId?: string,
   ): Promise<SyncPullResponse> {
     const sinceDate = lastSyncedAt ? new Date(lastSyncedAt) : new Date(0);
     const deltas: CatalogDeltaItem[] = [];
 
     // 1. Categories
-    const catRes = await this.db.query<any>(
-      `SELECT id, code, name_en, name_am, is_active, updated_at
-       FROM categories
-       WHERE updated_at > $1
-       ORDER BY updated_at ASC
-       LIMIT $2`,
-      [sinceDate, limit],
-    );
+    const catQuery = tenantId
+      ? `SELECT id, code, name_en, name_am, is_active, updated_at
+         FROM categories
+         WHERE tenant_id = $1 AND updated_at > $2
+         ORDER BY updated_at ASC
+         LIMIT $3`
+      : `SELECT id, code, name_en, name_am, is_active, updated_at
+         FROM categories
+         WHERE updated_at > $1
+         ORDER BY updated_at ASC
+         LIMIT $2`;
+    const catParams = tenantId ? [tenantId, sinceDate, limit] : [sinceDate, limit];
+    const catRes = await this.db.query<any>(catQuery, catParams, tenantId);
 
     for (const c of catRes.rows) {
       deltas.push({
@@ -107,16 +163,23 @@ export class HqSyncService {
     }
 
     // 2. Products
-    const prodRes = await this.db.query<any>(
-      `SELECT id, sku, name_en, name_am, category_id, uom_code,
-              base_price, cost_price, is_vat_applicable, vat_rate,
-              is_weighed, scale_plu, min_stock_level, is_active, updated_at
-       FROM products
-       WHERE updated_at > $1
-       ORDER BY updated_at ASC
-       LIMIT $2`,
-      [sinceDate, limit],
-    );
+    const prodQuery = tenantId
+      ? `SELECT id, sku, name_en, name_am, category_id, uom_code,
+                base_price, cost_price, is_vat_applicable, vat_rate,
+                is_weighed, scale_plu, min_stock_level, is_active, updated_at
+         FROM products
+         WHERE tenant_id = $1 AND updated_at > $2
+         ORDER BY updated_at ASC
+         LIMIT $3`
+      : `SELECT id, sku, name_en, name_am, category_id, uom_code,
+                base_price, cost_price, is_vat_applicable, vat_rate,
+                is_weighed, scale_plu, min_stock_level, is_active, updated_at
+         FROM products
+         WHERE updated_at > $1
+         ORDER BY updated_at ASC
+         LIMIT $2`;
+    const prodParams = tenantId ? [tenantId, sinceDate, limit] : [sinceDate, limit];
+    const prodRes = await this.db.query<any>(prodQuery, prodParams, tenantId);
 
     for (const p of prodRes.rows) {
       deltas.push({
@@ -144,15 +207,21 @@ export class HqSyncService {
     }
 
     // 3. Suppliers
-    const supRes = await this.db.query<any>(
-      `SELECT id, code, name, tin_number, vat_number, contact_person,
-              phone, email, address, payment_terms_days, is_active, updated_at
-       FROM suppliers
-       WHERE updated_at > $1
-       ORDER BY updated_at ASC
-       LIMIT $2`,
-      [sinceDate, limit],
-    );
+    const supQuery = tenantId
+      ? `SELECT id, code, name, tin_number, vat_number, contact_person,
+                phone, email, address, payment_terms_days, is_active, updated_at
+         FROM suppliers
+         WHERE tenant_id = $1 AND updated_at > $2
+         ORDER BY updated_at ASC
+         LIMIT $3`
+      : `SELECT id, code, name, tin_number, vat_number, contact_person,
+                phone, email, address, payment_terms_days, is_active, updated_at
+         FROM suppliers
+         WHERE updated_at > $1
+         ORDER BY updated_at ASC
+         LIMIT $2`;
+    const supParams = tenantId ? [tenantId, sinceDate, limit] : [sinceDate, limit];
+    const supRes = await this.db.query<any>(supQuery, supParams, tenantId);
 
     for (const s of supRes.rows) {
       deltas.push({
@@ -174,6 +243,87 @@ export class HqSyncService {
         },
         updatedAt: s.updated_at.toISOString(),
       });
+    }
+
+    // 4. Users (Hashes and permissions only, scoped to tenant)
+    try {
+      const userQuery = tenantId
+        ? `SELECT u.id, u.tenant_id, u.username, u.full_name, u.email, u.phone,
+                  u.role_id, r.name as role_name, u.default_branch_id, u.is_active,
+                  u.password_hash, u.pin_hash, u.pin_salt, u.token_version,
+                  u.requires_totp, u.totp_secret_encrypted, u.updated_at
+           FROM users u
+           JOIN roles r ON r.id = u.role_id
+           WHERE u.tenant_id = $1 AND u.updated_at > $2
+           ORDER BY u.updated_at ASC
+           LIMIT $3`
+        : `SELECT u.id, u.tenant_id, u.username, u.full_name, u.email, u.phone,
+                  u.role_id, r.name as role_name, u.default_branch_id, u.is_active,
+                  u.password_hash, u.pin_hash, u.pin_salt, u.token_version,
+                  u.requires_totp, u.totp_secret_encrypted, u.updated_at
+           FROM users u
+           JOIN roles r ON r.id = u.role_id
+           WHERE u.updated_at > $1
+           ORDER BY u.updated_at ASC
+           LIMIT $2`;
+      const userParams = tenantId ? [tenantId, sinceDate, limit] : [sinceDate, limit];
+      const userRes = await this.db.query<any>(userQuery, userParams, tenantId);
+
+      for (const u of userRes.rows) {
+        deltas.push({
+          aggregateType: 'USER',
+          aggregateId: u.id,
+          eventType: 'UPDATED',
+          data: {
+            id: u.id,
+            tenantId: u.tenant_id,
+            username: u.username,
+            fullName: u.full_name,
+            email: u.email,
+            phone: u.phone,
+            roleId: u.role_id,
+            roleName: u.role_name,
+            defaultBranchId: u.default_branch_id,
+            isActive: u.is_active,
+            passwordHash: u.password_hash,
+            pinHash: u.pin_hash,
+            pinSalt: u.pin_salt,
+            tokenVersion: u.token_version || 1,
+            requiresTotp: u.requires_totp ?? false,
+            totpSecretEncrypted: u.totp_secret_encrypted,
+          },
+          updatedAt: u.updated_at.toISOString(),
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not pull user deltas: ${err.message}`);
+    }
+
+    // 5. Roles
+    try {
+      const roleQuery = `SELECT id, name, description, is_system, max_discount_percentage, updated_at
+                         FROM roles
+                         WHERE updated_at > $1
+                         ORDER BY updated_at ASC
+                         LIMIT $2`;
+      const roleRes = await this.db.query<any>(roleQuery, [sinceDate, limit]);
+      for (const r of roleRes.rows) {
+        deltas.push({
+          aggregateType: 'ROLE',
+          aggregateId: r.id,
+          eventType: 'UPDATED',
+          data: {
+            id: r.id,
+            name: r.name,
+            description: r.description,
+            isSystem: r.is_system,
+            maxDiscountPercentage: parseFloat(r.max_discount_percentage || '0'),
+          },
+          updatedAt: r.updated_at.toISOString(),
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not pull role deltas: ${err.message}`);
     }
 
     return {

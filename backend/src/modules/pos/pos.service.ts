@@ -35,11 +35,38 @@ export class PosService {
   /**
    * Opens a new POS lane register shift with initial float.
    */
+  /**
+   * Retrieves active open shift for a terminal.
+   */
+  async getCurrentShift(terminalId: string, branchId?: string) {
+    const params: any[] = [terminalId];
+    let query = `SELECT * FROM shifts WHERE terminal_id = $1 AND status = 'OPEN'`;
+    if (branchId) {
+      params.push(branchId);
+      query += ` AND branch_id = $2`;
+    }
+    query += ` ORDER BY opened_at DESC LIMIT 1`;
+
+    const res = await this.db.query(query, params);
+    if (res.rowCount === 0) {
+      return { open: false, shift: null };
+    }
+    return { open: true, shift: res.rows[0] };
+  }
+
+  /**
+   * Opens a new POS lane register shift with initial float.
+   * Enforces one open shift per terminal and emits SHIFT_OPENED outbox event.
+   */
   async openShift(cashierId: string, dto: OpenShiftDto) {
+    const terminalId = dto.terminal_id || (dto as any).terminalId;
+    const openingFloat = dto.opening_cash_float !== undefined ? dto.opening_cash_float : ((dto as any).openingCashFloat ?? 0);
+    const notes = dto.notes || (dto as any).notes || null;
+
     // 1. Check if terminal already has an active open shift
     const existing = await this.db.query(
       `SELECT id FROM shifts WHERE terminal_id = $1 AND status = 'OPEN'`,
-      [dto.terminal_id],
+      [terminalId],
     );
     if (existing.rowCount && existing.rowCount > 0) {
       throw new BadRequestException('Terminal already has an active OPEN shift. Close it first.');
@@ -48,27 +75,49 @@ export class PosService {
     // 2. Fetch terminal branch_id
     const termRes = await this.db.query(
       `SELECT branch_id FROM terminals WHERE id = $1 AND is_active = TRUE`,
-      [dto.terminal_id],
+      [terminalId],
     );
     if (termRes.rowCount === 0) {
-      throw new NotFoundException(`Terminal '${dto.terminal_id}' not found or inactive.`);
+      throw new NotFoundException(`Terminal '${terminalId}' not found or inactive.`);
     }
     const branchId = termRes.rows[0].branch_id;
 
     // 3. Monotonic shift number for this terminal
     const countRes = await this.db.query<{ max_shift: string }>(
       `SELECT COALESCE(MAX(shift_number), 0) as max_shift FROM shifts WHERE terminal_id = $1`,
-      [dto.terminal_id],
+      [terminalId],
     );
     const nextShiftNum = parseInt(countRes.rows[0].max_shift, 10) + 1;
 
     const shiftId = generateUuidV7();
     const result = await this.db.query(
       `INSERT INTO shifts (
-        id, branch_id, terminal_id, cashier_id, shift_number, opening_cash_float, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, 'OPEN')
+        id, branch_id, terminal_id, cashier_id, shift_number, opening_cash_float, status, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, 'OPEN', $7)
       RETURNING *`,
-      [shiftId, branchId, dto.terminal_id, cashierId, nextShiftNum, dto.opening_cash_float],
+      [shiftId, branchId, terminalId, cashierId, nextShiftNum, openingFloat, notes],
+    );
+
+    // 4. Record initial float movement
+    await this.db.query(
+      `INSERT INTO cash_movements (
+        id, shift_id, branch_id, movement_type, amount, reason, authorized_by
+      ) VALUES ($1, $2, $3, 'FLOAT_IN', $4, 'Opening cash float', $5)`,
+      [generateUuidV7(), shiftId, branchId, openingFloat, cashierId],
+    );
+
+    // 5. Emit outbox event
+    await this.db.query(
+      `INSERT INTO sync_outbox (
+        id, branch_id, entity_type, entity_id, operation, idempotency_key, payload, status
+      ) VALUES ($1, $2, 'SHIFT', $3, 'INSERT', $4, $5, 'PENDING')`,
+      [
+        generateUuidV7(),
+        branchId,
+        shiftId,
+        `shift_open_${shiftId}`,
+        JSON.stringify({ event: 'SHIFT_OPENED', ...result.rows[0] }),
+      ],
     );
 
     return result.rows[0];
@@ -76,6 +125,7 @@ export class PosService {
 
   /**
    * Records cash movement (Safe Drop, Petty Cash Out, Additional Float).
+   * Safe drop requires manager authorization for large amounts (>= 2,000 ETB).
    */
   async recordCashMovement(shiftId: string, cashierId: string, dto: CashMovementDto) {
     const shift = await this.db.query(
@@ -89,6 +139,18 @@ export class PosService {
       throw new BadRequestException('Cannot record cash movement on a closed shift.');
     }
 
+    const movementType = dto.movement_type || (dto as any).movementType;
+    const amount = Number(dto.amount);
+    const reason = dto.reason;
+    const authorizedBy = dto.authorized_by || (dto as any).authorizedBy;
+
+    // Safe drop large amount check: >= 2,000 ETB requires manager authorizer
+    if (movementType === 'SAFE_DROP' && amount >= 2000.0) {
+      if (!authorizedBy || authorizedBy === cashierId) {
+        throw new BadRequestException('Safe drops of 2,000 ETB or more require manager authorization.');
+      }
+    }
+
     const movementId = generateUuidV7();
     const result = await this.db.query(
       `INSERT INTO cash_movements (
@@ -99,10 +161,28 @@ export class PosService {
         movementId,
         shiftId,
         shift.rows[0].branch_id,
-        dto.movement_type,
-        dto.amount,
-        dto.reason,
-        dto.authorized_by || cashierId,
+        movementType,
+        amount,
+        reason,
+        authorizedBy || cashierId,
+      ],
+    );
+
+    // Emit outbox event for cash movement
+    await this.db.query(
+      `INSERT INTO sync_outbox (
+        id, branch_id, entity_type, entity_id, operation, idempotency_key, payload, status
+      ) VALUES ($1, $2, 'SHIFT', $3, 'UPDATE', $4, $5, 'PENDING')`,
+      [
+        generateUuidV7(),
+        shift.rows[0].branch_id,
+        shiftId,
+        `cash_mov_${movementId}`,
+        JSON.stringify({
+          event: 'CASH_MOVEMENT',
+          shift_id: shiftId,
+          ...result.rows[0],
+        }),
       ],
     );
 
@@ -110,7 +190,120 @@ export class PosService {
   }
 
   /**
-   * Closes cashier shift, calculates expected cash, and reconciles cash variance.
+   * Retrieves cash movements (drops, floats, petty cash) for a shift.
+   */
+  async getShiftMovements(shiftId: string) {
+    const res = await this.db.query(
+      `SELECT cm.*, u.full_name as authorizer_name
+       FROM cash_movements cm
+       LEFT JOIN users u ON u.id = cm.authorized_by
+       WHERE cm.shift_id = $1
+       ORDER BY cm.created_at DESC`,
+      [shiftId],
+    );
+    return res.rows;
+  }
+
+  /**
+   * Computes live X-Report readings for an active shift.
+   * Blind close logic: Expected cash is hidden from the CASHIER role.
+   */
+  async getXReport(shiftId: string, userRole?: string) {
+    const shiftRes = await this.db.query('SELECT * FROM shifts WHERE id = $1', [shiftId]);
+    if (shiftRes.rowCount === 0) throw new NotFoundException(`Shift '${shiftId}' not found.`);
+    const shift = shiftRes.rows[0];
+
+    // Payments by method
+    const payRes = await this.db.query<{ payment_method: string; method_total: string }>(
+      `SELECT p.payment_method, COALESCE(SUM(p.amount), 0) as method_total
+       FROM sale_payments p
+       JOIN sales s ON s.id = p.sale_id
+       WHERE s.shift_id = $1
+       GROUP BY p.payment_method`,
+      [shiftId],
+    );
+    let cashSales = 0;
+    let telebirrSales = 0;
+    let cbeBirrSales = 0;
+    let cardSales = 0;
+    for (const r of payRes.rows) {
+      const amt = parseFloat(r.method_total);
+      if (r.payment_method === 'CASH') cashSales = amt;
+      else if (r.payment_method === 'TELEBIRR') telebirrSales = amt;
+      else if (r.payment_method === 'CBE_BIRR') cbeBirrSales = amt;
+      else if (r.payment_method === 'CARD_POS' || r.payment_method === 'CARD') cardSales = amt;
+    }
+
+    // Gross sales and change given
+    const salesCountRes = await this.db.query<{ count: string; gross_sales: string; change_given: string }>(
+      `SELECT COUNT(*) as count, COALESCE(SUM(grand_total), 0) as gross_sales, COALESCE(SUM(change_given), 0) as change_given
+       FROM sales WHERE shift_id = $1`,
+      [shiftId],
+    );
+    const totalSalesCount = parseInt(salesCountRes.rows[0]?.count || '0', 10);
+    const grossSalesAmount = parseFloat(salesCountRes.rows[0]?.gross_sales || '0');
+    const totalChangeGiven = parseFloat(salesCountRes.rows[0]?.change_given || '0');
+    const netCashSales = Math.max(0, cashSales - totalChangeGiven);
+
+    // Cash movements
+    const movRes = await this.db.query<{ movement_type: string; total_amount: string }>(
+      `SELECT movement_type, COALESCE(SUM(amount), 0) as total_amount
+       FROM cash_movements WHERE shift_id = $1 GROUP BY movement_type`,
+      [shiftId],
+    );
+    let safeDrops = 0;
+    let pettyCashOut = 0;
+    let additionalFloat = 0;
+    for (const r of movRes.rows) {
+      const amt = parseFloat(r.total_amount);
+      if (r.movement_type === 'SAFE_DROP') safeDrops = amt;
+      else if (r.movement_type === 'PETTY_CASH_OUT') pettyCashOut = amt;
+      else if (r.movement_type === 'ADDITIONAL_FLOAT') additionalFloat = amt;
+    }
+
+    // Customer refunds in this shift
+    const refundsRes = await this.db.query<{ total_refunds: string }>(
+      `SELECT COALESCE(SUM(r.total_refund_amount), 0) as total_refunds
+       FROM sale_refunds r
+       JOIN sales s ON s.id = r.original_sale_id
+       WHERE s.shift_id = $1`,
+      [shiftId],
+    );
+    const totalRefunds = parseFloat(refundsRes.rows[0]?.total_refunds || '0');
+
+    const openingFloat = parseFloat(shift.opening_cash_float);
+    const expectedCash = Number(
+      (openingFloat + additionalFloat + netCashSales - safeDrops - pettyCashOut - totalRefunds).toFixed(4),
+    );
+
+    // Blind close role check: Expected cash hidden from CASHIER role
+    const isCashierRole = userRole?.toUpperCase() === 'CASHIER';
+
+    return {
+      shift_id: shift.id,
+      terminal_id: shift.terminal_id,
+      cashier_id: shift.cashier_id,
+      shift_number: shift.shift_number,
+      status: shift.status,
+      opened_at: shift.opened_at,
+      opening_float: openingFloat,
+      total_sales_count: totalSalesCount,
+      gross_sales_amount: grossSalesAmount,
+      cash_sales_amount: netCashSales,
+      telebirr_sales_amount: telebirrSales,
+      cbe_birr_sales_amount: cbeBirrSales,
+      card_sales_amount: cardSales,
+      total_refunds: totalRefunds,
+      total_cash_drops: safeDrops,
+      total_petty_cash_out: pettyCashOut,
+      expected_cash: isCashierRole ? null : expectedCash,
+      is_blind_close: isCashierRole,
+    };
+  }
+
+  /**
+   * Closes cashier shift, calculates expected cash, reconciles cash variance,
+   * blocks close if held baskets are active, and requires manager approval for excessive variance.
    */
   async closeShift(shiftId: string, cashierId: string, dto: CloseShiftDto) {
     return this.db.withTransaction(async (client) => {
@@ -126,17 +319,33 @@ export class PosService {
         throw new BadRequestException('Shift is already closed.');
       }
 
-      // Calculate cash sales in this shift
-      const salesCashRes = await client.query<{ total_cash: string }>(
-        `SELECT COALESCE(SUM(p.amount), 0) as total_cash
+      // 1. Cannot close shift with active held baskets
+      const heldBaskets = await client.query<{ count: string }>(
+        `SELECT COUNT(*) as count FROM held_baskets WHERE terminal_id = $1 AND resumed_at IS NULL`,
+        [shift.terminal_id],
+      );
+      const activeHeldCount = parseInt(heldBaskets.rows[0]?.count || '0', 10);
+      if (activeHeldCount > 0) {
+        throw new BadRequestException(
+          `Cannot close shift with ${activeHeldCount} active held basket(s). Please resolve or void all held baskets first.`,
+        );
+      }
+
+      // 2. Calculate cash sales and change given in this shift
+      const salesCashRes = await client.query<{ total_cash: string; change_given: string }>(
+        `SELECT 
+           COALESCE(SUM(p.amount), 0) as total_cash,
+           COALESCE(SUM(s.change_given), 0) as change_given
          FROM sale_payments p
          JOIN sales s ON s.id = p.sale_id
          WHERE s.shift_id = $1 AND p.payment_method = 'CASH'`,
         [shiftId],
       );
-      const totalCashSales = parseFloat(salesCashRes.rows[0].total_cash);
+      const rawCashTendered = parseFloat(salesCashRes.rows[0]?.total_cash || '0');
+      const changeGiven = parseFloat(salesCashRes.rows[0]?.change_given || '0');
+      const totalCashSales = Math.max(0, rawCashTendered - changeGiven);
 
-      // Calculate cash movements
+      // 3. Calculate cash movements
       const movRes = await client.query<{
         cash_in: string;
         cash_out: string;
@@ -145,18 +354,51 @@ export class PosService {
            COALESCE(SUM(CASE WHEN movement_type IN ('FLOAT_IN', 'ADDITIONAL_FLOAT') THEN amount ELSE 0 END), 0) as cash_in,
            COALESCE(SUM(CASE WHEN movement_type IN ('PETTY_CASH_OUT', 'SAFE_DROP') THEN amount ELSE 0 END), 0) as cash_out
          FROM cash_movements
-         WHERE shift_id = $1`,
+         WHERE shift_id = $1 AND movement_type != 'FLOAT_IN'`,
         [shiftId],
       );
-      const cashIn = parseFloat(movRes.rows[0].cash_in);
-      const cashOut = parseFloat(movRes.rows[0].cash_out);
+      const cashIn = parseFloat(movRes.rows[0]?.cash_in || '0');
+      const cashOut = parseFloat(movRes.rows[0]?.cash_out || '0');
 
-      // Expected Cash = Opening Float + Cash Sales + Cash In - Cash Out
+      // 4. Calculate refunds in this shift
+      const refundsRes = await client.query<{ total_refunds: string }>(
+        `SELECT COALESCE(SUM(r.total_refund_amount), 0) as total_refunds
+         FROM sale_refunds r
+         JOIN sales s ON s.id = r.original_sale_id
+         WHERE s.shift_id = $1`,
+        [shiftId],
+      );
+      const totalRefunds = parseFloat(refundsRes.rows[0]?.total_refunds || '0');
+
+      // Expected Cash = Opening Float + Additional Float + Cash Sales - Cash Out - Refunds
       const openingFloat = parseFloat(shift.opening_cash_float);
-      const expectedCash = Number((openingFloat + totalCashSales + cashIn - cashOut).toFixed(4));
+      const expectedCash = Number((openingFloat + cashIn + totalCashSales - cashOut - totalRefunds).toFixed(4));
       const countedCash = Number(dto.closing_cash_counted.toFixed(4));
       const cashVariance = Number((countedCash - expectedCash).toFixed(4));
 
+      // 5. Configurable variance threshold approval check
+      const branchRes = await client.query('SELECT settings FROM branches WHERE id = $1', [shift.branch_id]);
+      const varianceThreshold = parseFloat(branchRes.rows[0]?.settings?.variance_approval_threshold || '50.00');
+
+      if (Math.abs(cashVariance) > varianceThreshold) {
+        if (!dto.authorized_by && !dto.manager_pin) {
+          throw new BadRequestException(
+            `Cash variance of ${Math.abs(cashVariance)} ETB exceeds threshold of ${varianceThreshold} ETB. Manager approval is required.`,
+          );
+        }
+
+        if (dto.authorized_by) {
+          const authUser = await client.query(
+            `SELECT u.id, r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1`,
+            [dto.authorized_by],
+          );
+          if (authUser.rowCount === 0) {
+            throw new ForbiddenException('Invalid manager authorization for shift variance.');
+          }
+        }
+      }
+
+      // 6. Update shift record
       const updateRes = await client.query(
         `UPDATE shifts
          SET closing_cash_counted = $1,
@@ -169,12 +411,55 @@ export class PosService {
         [countedCash, expectedCash, dto.notes || null, shiftId],
       );
 
+      // 7. Audit Log
+      await client.query(
+        `INSERT INTO audit_logs (id, branch_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, 'SHIFT_CLOSE', 'shifts', $4, $5)`,
+        [
+          generateUuidV7(),
+          shift.branch_id,
+          cashierId,
+          shiftId,
+          JSON.stringify({
+            opening_cash_float: openingFloat,
+            expected_cash: expectedCash,
+            counted_cash: countedCash,
+            cash_variance: cashVariance,
+            authorized_by: dto.authorized_by || null,
+          }),
+        ],
+      );
+
+      // 8. Emit SHIFT_CLOSED outbox event
+      await client.query(
+        `INSERT INTO sync_outbox (
+          id, branch_id, entity_type, entity_id, operation, idempotency_key, payload, status
+        ) VALUES ($1, $2, 'SHIFT', $3, 'UPDATE', $4, $5, 'PENDING')`,
+        [
+          generateUuidV7(),
+          shift.branch_id,
+          shiftId,
+          `shift_close_${shiftId}`,
+          JSON.stringify({
+            event: 'SHIFT_CLOSED',
+            shift_id: shiftId,
+            terminal_id: shift.terminal_id,
+            cashier_id: cashierId,
+            closed_at: new Date().toISOString(),
+            expected_cash: expectedCash,
+            counted_cash: countedCash,
+            cash_variance: cashVariance,
+          }),
+        ],
+      );
+
       return {
         ...updateRes.rows[0],
         opening_cash_float: openingFloat,
         total_cash_sales: totalCashSales,
         cash_in_adjustments: cashIn,
         cash_out_adjustments: cashOut,
+        total_refunds: totalRefunds,
         expected_cash: expectedCash,
         counted_cash: countedCash,
         cash_variance: cashVariance,
@@ -188,6 +473,31 @@ export class PosService {
    */
   async processSale(cashierId: string, dto: CreateSaleDto) {
     return this.db.withTransaction(async (client) => {
+      // 0. Idempotency Check: double-tap protection returns previous sale
+      if (dto.idempotency_key) {
+        const existingSale = await client.query(
+          `SELECT * FROM sales WHERE branch_id = $1 AND idempotency_key = $2`,
+          [dto.branch_id, dto.idempotency_key],
+        );
+        if (existingSale.rowCount && existingSale.rowCount > 0) {
+          const s = existingSale.rows[0];
+          const itemsRes = await client.query(
+            `SELECT * FROM sale_items WHERE sale_id = $1`,
+            [s.id],
+          );
+          return {
+            sale_id: s.id,
+            receipt_number: s.receipt_number,
+            grand_total: parseFloat(s.grand_total),
+            total_paid: parseFloat(s.total_paid),
+            change_given: parseFloat(s.change_given),
+            items_count: itemsRes.rowCount || 0,
+            receipt_text: `REPLAY RECEIPT: ${s.receipt_number}`,
+            is_replay: true,
+          };
+        }
+      }
+
       // 1. Verify shift is OPEN
       const shiftRes = await client.query(
         `SELECT * FROM shifts WHERE id = $1 AND status = 'OPEN'`,
@@ -286,13 +596,23 @@ export class PosService {
         });
 
         // FEFO Inventory Allocation
-        const fefo = await this.inventoryService.allocateFefo(
-          client,
-          dto.branch_id,
-          prod.id,
-          calc.quantity,
-          allowNegativeStock,
-        );
+        let fefo;
+        try {
+          fefo = await this.inventoryService.allocateFefo(
+            client,
+            dto.branch_id,
+            prod.id,
+            calc.quantity,
+            allowNegativeStock,
+          );
+        } catch (err: any) {
+          if (err.name === 'InsufficientStockException' || err.message?.includes('Insufficient stock')) {
+            throw new BadRequestException(
+              `Insufficient stock for product '${prod.name_en}'. Negative stock is disabled.`,
+            );
+          }
+          throw err;
+        }
 
         // Deduct inventory in append-only stock ledger
         const primaryBatchId = fefo.allocations.length > 0 ? fefo.allocations[0].batchId : null;
@@ -391,12 +711,12 @@ export class PosService {
 
       const changeGiven = Number((totalPaid - grandTotal).toFixed(4));
 
-      // 5. Generate Offline-Safe Monotonic Receipt Number
+      // 5. Generate Offline-Safe Monotonic Receipt Number unique per branch + terminal + day sequence
       const seqRes = await client.query<{ count: string }>(
-        `SELECT COUNT(*) as count FROM sales WHERE terminal_id = $1 AND shift_id = $2`,
-        [dto.terminal_id, dto.shift_id],
+        `SELECT COUNT(*) as count FROM sales WHERE terminal_id = $1 AND branch_id = $2 AND created_at >= CURRENT_DATE`,
+        [dto.terminal_id, dto.branch_id],
       );
-      const nextReceiptSeq = parseInt(seqRes.rows[0].count, 10) + 1;
+      const nextReceiptSeq = parseInt(seqRes.rows[0]?.count || '0', 10) + 1;
       const now = new Date();
       const receiptNumber = ReceiptNumberGenerator.generate(
         branch.code,
@@ -408,14 +728,15 @@ export class PosService {
 
       const saleId = generateUuidV7();
 
-      // 6. Insert Sale Record
+      // 6. Insert Sale Record with idempotency_key
       await client.query(
         `INSERT INTO sales (
           id, branch_id, terminal_id, shift_id, receipt_number, cashier_id,
           subtotal, discount_total, taxable_subtotal, tax_exempt_subtotal,
           tax_total, grand_total, total_paid, change_given,
-          payment_status, fiscal_status, client_timestamp, server_timestamp
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'PAID', 'FISCALIZED', $15, clock_timestamp())`,
+          payment_status, fiscal_status, client_timestamp, server_timestamp,
+          idempotency_key
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'PAID', 'FISCALIZED', $15, clock_timestamp(), $16)`,
         [
           saleId,
           dto.branch_id,
@@ -432,6 +753,7 @@ export class PosService {
           totalPaid,
           changeGiven,
           dto.client_timestamp ? new Date(dto.client_timestamp) : now,
+          dto.idempotency_key || null,
         ],
       );
 
@@ -526,6 +848,28 @@ export class PosService {
           JSON.stringify(fiscalPayload),
           receiptNumber,
           shift.shift_number,
+        ],
+      );
+
+      // 10. Atomic outbox event enqueue in same transaction
+      await client.query(
+        `INSERT INTO sync_outbox (
+          id, branch_id, entity_type, entity_id, operation, idempotency_key, payload, status
+        ) VALUES ($1, $2, 'SALE', $3, 'INSERT', $4, $5, 'PENDING')`,
+        [
+          generateUuidV7(),
+          dto.branch_id,
+          saleId,
+          dto.idempotency_key || `sale_sync_${saleId}`,
+          JSON.stringify({
+            sale_id: saleId,
+            receipt_number: receiptNumber,
+            grand_total: grandTotal,
+            total_paid: totalPaid,
+            change_given: changeGiven,
+            items: processedItems,
+            payments: processedPayments,
+          }),
         ],
       );
 
@@ -628,6 +972,28 @@ export class PosService {
       await client.query(
         `UPDATE sales SET payment_status = 'FULLY_REFUNDED' WHERE id = $1`,
         [dto.original_sale_id],
+      );
+
+      // Enqueue refund outbox event in same transaction
+      await client.query(
+        `INSERT INTO sync_outbox (
+          id, branch_id, entity_type, entity_id, operation, idempotency_key, payload, status
+        ) VALUES ($1, $2, 'SALE', $3, 'UPDATE', $4, $5, 'PENDING')`,
+        [
+          generateUuidV7(),
+          sale.branch_id,
+          dto.original_sale_id,
+          `refund_sync_${refundId}`,
+          JSON.stringify({
+            refund_id: refundId,
+            original_sale_id: dto.original_sale_id,
+            refund_number: refundNumber,
+            total_refund_amount: totalRefundAmount,
+            tax_refund_amount: totalTaxRefund,
+            reason: dto.reason,
+            authorized_by: dto.authorized_by,
+          }),
+        ],
       );
 
       return {

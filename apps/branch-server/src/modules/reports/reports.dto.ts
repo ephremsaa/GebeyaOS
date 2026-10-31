@@ -9,6 +9,14 @@ export class DateRangeQueryDto {
   @IsString()
   @IsOptional()
   endDate?: string;
+
+  @IsString()
+  @IsOptional()
+  period?: 'today' | 'yesterday' | 'week' | 'month' | 'custom';
+
+  @IsString()
+  @IsOptional()
+  branchId?: string;
 }
 
 export class ExpiringStockQueryDto {
@@ -17,4 +25,8 @@ export class ExpiringStockQueryDto {
   @IsOptional()
   @Type(() => Number)
   days?: number = 30;
+
+  @IsString()
+  @IsOptional()
+  branchId?: string;
 }

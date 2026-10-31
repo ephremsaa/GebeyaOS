@@ -2,6 +2,7 @@ export type StockMovementType =
   | 'SALE'
   | 'SALE_REFUND'
   | 'PURCHASE_RECEIVE'
+  | 'PURCHASE_RETURN'
   | 'TRANSFER_OUT'
   | 'TRANSFER_IN'
   | 'ADJUSTMENT'
@@ -12,6 +13,7 @@ export type StockMovementType =
 export type StockReferenceType =
   | 'SALE'
   | 'GRN'
+  | 'RETURN'
   | 'TRANSFER'
   | 'ADJUSTMENT'
   | 'STOCK_TAKE';
@@ -23,7 +25,7 @@ export type StockAdjustmentReasonCode =
   | 'CORRECTION'
   | 'THEFT';
 
-export type StockTakeScope = 'FULL' | 'CATEGORY' | 'RANDOM_SAMPLE';
+export type StockTakeScope = 'FULL' | 'CATEGORY' | 'LOCATION' | 'RANDOM_SAMPLE';
 
 export type StockTakeStatus = 'IN_PROGRESS' | 'RECONCILED' | 'CANCELLED';
 
@@ -85,11 +87,46 @@ export interface StockTakeItem {
   stockTakeId: string;
   productId: string;
   batchId?: string | null;
-  systemQuantity: number;
+  sku?: string;
+  nameEn?: string;
+  nameAm?: string;
+  uomCode?: string;
+  categoryName?: string;
+  systemQuantity: number; // snapshot at started_at
+  laterMovements?: number; // sales & receipts during count
+  expectedQuantity?: number; // systemQuantity + laterMovements
   countedQuantity: number;
-  variance: number; // countedQuantity - systemQuantity
+  variance: number; // countedQuantity - expectedQuantity
   unitCost: number;
+  varianceValue?: number; // variance * unitCost
+  needsRecount?: boolean; // outside tolerance
+  barcodes?: string[];
   createdAt: string;
+}
+
+export interface StockTakeCategoryReport {
+  categoryId?: string | null;
+  categoryName: string;
+  itemCount: number;
+  expectedValue: number;
+  countedValue: number;
+  varianceValue: number;
+  shrinkagePercent: number;
+}
+
+export interface StockTakeReport {
+  stockTakeId: string;
+  countNumber: string;
+  startedAt: string;
+  completedAt?: string | null;
+  totalItems: number;
+  totalCountedItems: number;
+  totalSnapshotValue: number;
+  totalCountedValue: number;
+  netVarianceValue: number;
+  totalShrinkageValue: number;
+  shrinkagePercent: number;
+  categories: StockTakeCategoryReport[];
 }
 
 export interface StockTake {
@@ -98,6 +135,7 @@ export interface StockTake {
   countNumber: string;
   scope: StockTakeScope;
   categoryId?: string | null;
+  location?: string | null;
   status: StockTakeStatus;
   notes?: string | null;
   conductedBy: string;

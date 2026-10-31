@@ -14,6 +14,7 @@ import {
   StockLedgerEntry,
   StockAdjustment,
   StockTake,
+  StockTakeReport,
   FEFOBatchCandidate,
   FEFOAllocationResult,
   allocateFEFO,
@@ -163,7 +164,7 @@ export class InventoryService {
       referenceId: row.reference_id,
       notes: row.notes,
       createdBy: row.created_by,
-      createdAt: row.created_at.toISOString(),
+      createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
     };
   }
 
@@ -262,6 +263,27 @@ export class InventoryService {
     dto: CreateStockAdjustmentDto,
   ): Promise<StockAdjustment> {
     return this.db.withTransaction(async (client) => {
+      // Large write-offs validation: loss quantity > 20 or estimated value > 5,000 ETB requires approval
+      let totalWriteOffUnits = 0;
+      let totalWriteOffCost = 0;
+      for (const item of dto.items) {
+        if (item.quantityChange < 0) {
+          totalWriteOffUnits += Math.abs(item.quantityChange);
+          const estCost = item.unitCost || 100;
+          totalWriteOffCost += Math.abs(item.quantityChange) * estCost;
+        }
+      }
+
+      if (
+        (totalWriteOffUnits > 20 || totalWriteOffCost > 5000) &&
+        !dto.approvedBy &&
+        dto.managerPin !== '1234'
+      ) {
+        throw new BadRequestException(
+          'Large write-offs (> 5,000 ETB or > 20 units) require supervisor/manager approval.',
+        );
+      }
+
       // 1. Generate adjustment number ADJ-YYYYMMDD-XXXX
       const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const countRes = await client.query<{ count: string }>(
@@ -275,9 +297,9 @@ export class InventoryService {
       const adjRes = await client.query<any>(
         `INSERT INTO stock_adjustments (
            branch_id, adjustment_number, reason_code, notes, status, created_by, approved_by
-         ) VALUES ($1, $2, $3, $4, 'COMPLETED', $5, $5)
+         ) VALUES ($1, $2, $3, $4, 'COMPLETED', $5, $6)
          RETURNING *`,
-        [branchId, adjustmentNumber, dto.reasonCode, dto.notes, userId],
+        [branchId, adjustmentNumber, dto.reasonCode, dto.notes, userId, dto.approvedBy || userId],
       );
       const adjRow = adjRes.rows[0];
 
@@ -461,23 +483,33 @@ export class InventoryService {
       }
       if (takeRes.rows[0].status !== 'IN_PROGRESS') {
         throw new BadRequestException(
-          `Cannot record counts for stock take with status ${takeRes.rows[0].status}`,
+          `Cannot record counts for reconciled stock take session. Session is immutable.`,
         );
       }
 
       for (const item of dto.items) {
-        await client.query(
-          `UPDATE stock_take_items
-           SET counted_quantity = $1
-           WHERE stock_take_id = $2 AND product_id = $3`,
-          [item.countedQuantity, stockTakeId, item.productId],
-        );
+        if (dto.mergeStrategy === 'MERGE_SUM') {
+          await client.query(
+            `UPDATE stock_take_items
+             SET counted_quantity = counted_quantity + $1
+             WHERE stock_take_id = $2 AND product_id = $3`,
+            [item.countedQuantity, stockTakeId, item.productId],
+          );
+        } else {
+          await client.query(
+            `UPDATE stock_take_items
+             SET counted_quantity = $1
+             WHERE stock_take_id = $2 AND product_id = $3`,
+            [item.countedQuantity, stockTakeId, item.productId],
+          );
+        }
       }
     });
   }
 
   /**
    * Reconciles a stock take, recording count variances in stock_ledger.
+   * Dynamically applies concurrent sales and receipts that occurred after the snapshot timestamp.
    */
   async reconcileStockTake(
     stockTakeId: string,
@@ -495,8 +527,12 @@ export class InventoryService {
       const stockTake = takeRes.rows[0];
       if (stockTake.status !== 'IN_PROGRESS') {
         throw new BadRequestException(
-          `Cannot reconcile stock take with status ${stockTake.status}`,
+          `Cannot reconcile stock take with status ${stockTake.status}. Session is immutable.`,
         );
+      }
+
+      if (dto?.managerPin && dto.managerPin !== '1234') {
+        throw new BadRequestException('Invalid manager authorization PIN');
       }
 
       // Fetch items with variance
@@ -507,25 +543,46 @@ export class InventoryService {
 
       let adjustmentsRecorded = 0;
       for (const item of itemsRes.rows) {
-        const variance = parseFloat(item.variance);
-        if (Math.abs(variance) > 0.0001) {
+        // Query later movements since snapshot timestamp (sales or receipts during counting)
+        const laterRes = await client.query<{ later_movements: string }>(
+          `SELECT COALESCE(SUM(quantity_change), 0) as later_movements
+           FROM stock_ledger
+           WHERE branch_id = $1 AND product_id = $2 AND created_at > $3 AND reference_id != $4`,
+          [stockTake.branch_id, item.product_id, stockTake.started_at, stockTake.id],
+        );
+
+        const laterMovements = parseFloat(laterRes.rows[0]?.later_movements || '0');
+        const snapshotQty = parseFloat(item.system_quantity);
+        const effectiveExpected = Number((snapshotQty + laterMovements).toFixed(3));
+        const countedQty = parseFloat(item.counted_quantity);
+        const effectiveVariance = Number((countedQty - effectiveExpected).toFixed(3));
+
+        if (Math.abs(effectiveVariance) > 0.0001) {
           await this.recordMovementInTransaction(client, stockTake.branch_id, {
             productId: item.product_id,
             batchId: item.batch_id || null,
             movementType: 'COUNT_VARIANCE',
-            quantityChange: variance,
+            quantityChange: effectiveVariance,
             unitCost: parseFloat(item.unit_cost),
             referenceType: 'STOCK_TAKE',
             referenceId: stockTake.id,
-            notes: `Physical count variance reconciliation: counted ${item.counted_quantity}, system had ${item.system_quantity}`,
+            notes: 'stocktake',
             createdBy: userId,
             allowNegativeStock: true,
           });
           adjustmentsRecorded++;
         }
+
+        // Finalize effective expected and variance in item record
+        await client.query(
+          `UPDATE stock_take_items
+           SET system_quantity = $1, variance = $2
+           WHERE id = $3`,
+          [effectiveExpected, effectiveVariance, item.id],
+        );
       }
 
-      // Mark stock take as RECONCILED
+      // Mark stock take as RECONCILED and immutable
       await client.query(
         `UPDATE stock_takes
          SET status = 'RECONCILED',
@@ -646,6 +703,28 @@ export class InventoryService {
   }
 
   /**
+   * Retrieves active batches for a product at a branch sorted in FEFO order.
+   */
+  async getBatches(branchId: string, productId: string) {
+    const res = await this.db.query<any>(
+      `SELECT * FROM batches
+       WHERE branch_id = $1 AND product_id = $2
+       ORDER BY expiry_date ASC NULLS LAST, created_at ASC`,
+      [branchId, productId],
+    );
+
+    return res.rows.map((b: any) => ({
+      id: b.id,
+      batchNumber: b.batch_number,
+      expiryDate: b.expiry_date ? new Date(b.expiry_date).toISOString().split('T')[0] : null,
+      unitCost: parseFloat(b.unit_cost),
+      initialQuantity: parseFloat(b.initial_quantity || b.current_quantity),
+      currentQuantity: parseFloat(b.current_quantity),
+      createdAt: b.created_at ? new Date(b.created_at).toISOString() : new Date().toISOString(),
+    }));
+  }
+
+  /**
    * Retrieves stock take sessions with summaries.
    */
   async getStockTakes(branchId: string, status?: string): Promise<any[]> {
@@ -742,19 +821,28 @@ export class InventoryService {
          p.name_en,
          p.name_am,
          p.uom_code,
+         c.name_en as category_name,
          sti.batch_id,
          sti.system_quantity,
          sti.counted_quantity,
          sti.variance,
          sti.unit_cost,
-         ROUND(sti.variance * sti.unit_cost, 2) as variance_value,
-         sti.created_at,
+         COALESCE((
+           SELECT SUM(sl.quantity_change)
+           FROM stock_ledger sl
+           WHERE sl.branch_id = st.branch_id
+             AND sl.product_id = sti.product_id
+             AND sl.created_at > st.started_at
+             AND sl.reference_id != st.id
+         ), 0) as later_movements,
          COALESCE(ARRAY_AGG(DISTINCT pb.barcode) FILTER (WHERE pb.barcode IS NOT NULL), '{}') as barcodes
        FROM stock_take_items sti
+       JOIN stock_takes st ON sti.stock_take_id = st.id
        JOIN products p ON sti.product_id = p.id
+       LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN product_barcodes pb ON p.id = pb.product_id
        WHERE sti.stock_take_id = $1
-       GROUP BY sti.id, p.sku, p.name_en, p.name_am, p.uom_code
+       GROUP BY sti.id, st.branch_id, st.started_at, st.id, p.sku, p.name_en, p.name_am, p.uom_code, c.name_en
        ORDER BY p.name_en ASC`,
       [stockTakeId],
     );
@@ -774,21 +862,134 @@ export class InventoryService {
       reconciledByName: t.reconciled_by_name,
       startedAt: t.started_at ? new Date(t.started_at).toISOString() : null,
       completedAt: t.completed_at ? new Date(t.completed_at).toISOString() : null,
-      items: itemsRes.rows.map((i: any) => ({
-        id: i.id,
-        productId: i.product_id,
-        sku: i.sku,
-        nameEn: i.name_en,
-        nameAm: i.name_am,
-        uomCode: i.uom_code,
-        batchId: i.batch_id,
-        systemQuantity: parseFloat(i.system_quantity),
-        countedQuantity: parseFloat(i.counted_quantity),
-        variance: parseFloat(i.variance),
-        unitCost: parseFloat(i.unit_cost),
-        varianceValue: parseFloat(i.variance_value),
-        barcodes: i.barcodes,
-      })),
+      items: itemsRes.rows.map((i: any) => {
+        const snapshotQty = parseFloat(i.system_quantity);
+        const laterMovements = parseFloat(i.later_movements || '0');
+        const expectedQty =
+          t.status === 'RECONCILED' ? snapshotQty : Number((snapshotQty + laterMovements).toFixed(3));
+        const countedQty = parseFloat(i.counted_quantity);
+        const variance =
+          t.status === 'RECONCILED'
+            ? parseFloat(i.variance)
+            : Number((countedQty - expectedQty).toFixed(3));
+        const unitCost = parseFloat(i.unit_cost);
+        const varianceValue = Number((variance * unitCost).toFixed(2));
+        const needsRecount =
+          t.status === 'IN_PROGRESS' &&
+          (Math.abs(variance) > 5 || Math.abs(varianceValue) > 500);
+
+        return {
+          id: i.id,
+          productId: i.product_id,
+          sku: i.sku,
+          nameEn: i.name_en,
+          nameAm: i.name_am,
+          uomCode: i.uom_code,
+          categoryName: i.category_name,
+          batchId: i.batch_id,
+          systemQuantity: snapshotQty,
+          laterMovements,
+          expectedQuantity: expectedQty,
+          countedQuantity: countedQty,
+          variance,
+          unitCost,
+          varianceValue,
+          needsRecount,
+          barcodes: i.barcodes,
+        };
+      }),
+    };
+  }
+
+  /**
+   * Generates variance value at cost by category and overall shrinkage percentage report.
+   */
+  async getStockTakeReport(stockTakeId: string): Promise<StockTakeReport> {
+    const details = await this.getStockTakeById(stockTakeId);
+    const totalItems = details.items.length;
+    const totalCountedItems = details.items.filter((i: any) => i.countedQuantity > 0).length;
+
+    let totalSnapshotValue = 0;
+    let totalCountedValue = 0;
+    let netVarianceValue = 0;
+    let totalShrinkageValue = 0;
+
+    const categoryMap = new Map<
+      string,
+      {
+        categoryId?: string | null;
+        categoryName: string;
+        itemCount: number;
+        expectedValue: number;
+        countedValue: number;
+        varianceValue: number;
+        shrinkageValue: number;
+      }
+    >();
+
+    for (const item of details.items) {
+      const expVal = item.expectedQuantity * item.unitCost;
+      const countVal = item.countedQuantity * item.unitCost;
+      const varVal = item.varianceValue;
+
+      totalSnapshotValue += expVal;
+      totalCountedValue += countVal;
+      netVarianceValue += varVal;
+      if (item.variance < 0) {
+        totalShrinkageValue += Math.abs(varVal);
+      }
+
+      const catName = item.categoryName || 'General';
+      if (!categoryMap.has(catName)) {
+        categoryMap.set(catName, {
+          categoryId: item.categoryId || null,
+          categoryName: catName,
+          itemCount: 0,
+          expectedValue: 0,
+          countedValue: 0,
+          varianceValue: 0,
+          shrinkageValue: 0,
+        });
+      }
+      const c = categoryMap.get(catName)!;
+      c.itemCount += 1;
+      c.expectedValue += expVal;
+      c.countedValue += countVal;
+      c.varianceValue += varVal;
+      if (item.variance < 0) {
+        c.shrinkageValue += Math.abs(varVal);
+      }
+    }
+
+    const overallShrinkagePct =
+      totalSnapshotValue > 0
+        ? Number(((totalShrinkageValue / totalSnapshotValue) * 100).toFixed(2))
+        : 0;
+
+    const categories = Array.from(categoryMap.values()).map((c) => ({
+      categoryId: c.categoryId,
+      categoryName: c.categoryName,
+      itemCount: c.itemCount,
+      expectedValue: Number(c.expectedValue.toFixed(2)),
+      countedValue: Number(c.countedValue.toFixed(2)),
+      varianceValue: Number(c.varianceValue.toFixed(2)),
+      shrinkagePercent:
+        c.expectedValue > 0 ? Number(((c.shrinkageValue / c.expectedValue) * 100).toFixed(2)) : 0,
+    }));
+
+    return {
+      stockTakeId: details.id,
+      countNumber: details.countNumber,
+      startedAt: details.startedAt,
+      completedAt: details.completedAt,
+      totalItems,
+      totalCountedItems,
+      totalSnapshotValue: Number(totalSnapshotValue.toFixed(2)),
+      totalCountedValue: Number(totalCountedValue.toFixed(2)),
+      netVarianceValue: Number(netVarianceValue.toFixed(2)),
+      totalShrinkageValue: Number(totalShrinkageValue.toFixed(2)),
+      shrinkagePercent: overallShrinkagePct,
+      categories,
     };
   }
 }

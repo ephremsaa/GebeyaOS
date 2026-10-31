@@ -1,0 +1,782 @@
+-- ============================================================================
+-- GebeyaOS - Database Schema Migration
+-- Migration: 006_multi_tenant.sql
+-- Phase: Multi-Tenant Foundation (Step 1 of 6)
+-- ============================================================================
+-- EXECUTION ORDER (safe for a live DB with existing data):
+--   1. Create new tables
+--   2. Seed default tenant ("Kerod Supermarket")
+--   3. Add tenant_id as NULLABLE to every existing table
+--   4. Backfill all rows with the default tenant UUID
+--   5. Add NOT NULL constraint
+--   6. Drop old global unique constraints / indexes
+--   7. Add composite (tenant_id, ...) unique constraints and new indexes
+--   8. Enable Postgres Row-Level Security on all tenant-scoped tables
+--   9. Create RLS policies
+--  10. Set DB role grants
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- SECTION 1: NEW TABLES
+-- ---------------------------------------------------------------------------
+
+-- 1a. tenants — top of the hierarchy
+CREATE TABLE IF NOT EXISTS tenants (
+    id               UUID         PRIMARY KEY DEFAULT uuid_generate_v7(),
+    name             VARCHAR(128) NOT NULL,
+    slug             VARCHAR(64)  NOT NULL,   -- URL-safe, e.g. "kerod-supermarket"
+    status           VARCHAR(32)  NOT NULL DEFAULT 'trial'
+                     CHECK (status IN ('trial','active','suspended')),
+    plan             VARCHAR(32)  NOT NULL DEFAULT 'starter'
+                     CHECK (plan IN ('starter','growth','enterprise')),
+    country          VARCHAR(4)   NOT NULL DEFAULT 'ET',
+    default_language VARCHAR(8)   NOT NULL DEFAULT 'en',
+    -- VAT defaults (can be overridden per branch via branches.settings)
+    vat_settings     JSONB        NOT NULL DEFAULT '{"rate":0.15,"inclusive":false}'::jsonb,
+    -- Plan limits (enforced by app layer; stored here for runtime checks)
+    max_branches     INT          NOT NULL DEFAULT 3,
+    max_terminals    INT          NOT NULL DEFAULT 5,
+    max_users        INT          NOT NULL DEFAULT 20,
+    -- Offline grace period for suspended tenants (days)
+    grace_period_days INT         NOT NULL DEFAULT 14,
+    suspended_at     TIMESTAMPTZ,
+    -- Branding
+    logo_url         TEXT,
+    receipt_header   TEXT,
+    receipt_footer   TEXT,
+    -- Contact & registration
+    owner_email      VARCHAR(128),
+    owner_phone      VARCHAR(32),
+    tin_number       VARCHAR(16),
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT uq_tenants_slug UNIQUE (slug)
+);
+
+CREATE TRIGGER trg_tenants_updated_at
+  BEFORE UPDATE ON tenants
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- 1b. platform_admins — separate from tenant users, no tenant_id ever
+CREATE TABLE IF NOT EXISTS platform_admins (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v7(),
+    username      VARCHAR(64)  NOT NULL,
+    full_name     VARCHAR(128) NOT NULL,
+    email         VARCHAR(128) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,    -- Argon2id
+    is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    last_login_at TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT uq_platform_admins_username UNIQUE (username),
+    CONSTRAINT uq_platform_admins_email    UNIQUE (email)
+);
+
+-- 1c. platform_audit_logs — immutable log of all platform admin actions
+CREATE TABLE IF NOT EXISTS platform_audit_logs (
+    id         UUID        PRIMARY KEY DEFAULT uuid_generate_v7(),
+    admin_id   UUID        NOT NULL REFERENCES platform_admins(id) ON DELETE RESTRICT,
+    action     VARCHAR(64) NOT NULL,  -- 'TENANT_CREATE','TENANT_SUSPEND','SUPPORT_ACCESS_GRANT','OWNER_RESET'
+    tenant_id  UUID        REFERENCES tenants(id) ON DELETE SET NULL,
+    details    JSONB,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_audit_logs_admin  ON platform_audit_logs(admin_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_platform_audit_logs_tenant ON platform_audit_logs(tenant_id, created_at DESC);
+
+-- 1d. tenant_support_access — audited break-glass access for platform admins
+CREATE TABLE IF NOT EXISTS tenant_support_access (
+    id         UUID        PRIMARY KEY DEFAULT uuid_generate_v7(),
+    tenant_id  UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    admin_id   UUID        NOT NULL REFERENCES platform_admins(id) ON DELETE RESTRICT,
+    reason     TEXT        NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tenant_support_access_tenant ON tenant_support_access(tenant_id, expires_at DESC);
+
+-- 1e. branch_activation_codes — single-use codes generated by owner to onboard new branches
+CREATE TABLE IF NOT EXISTS branch_activation_codes (
+    id          UUID         PRIMARY KEY DEFAULT uuid_generate_v7(),
+    tenant_id   UUID         NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    code        VARCHAR(32)  NOT NULL,   -- 8-char alphanumeric, e.g. 'K7X2P9QA'
+    branch_name VARCHAR(128) NOT NULL,   -- intended branch name (pre-filled in UI)
+    used_at     TIMESTAMPTZ,
+    expires_at  TIMESTAMPTZ NOT NULL,    -- default 72 hours from creation
+    created_by  UUID        NOT NULL,    -- user_id; FK added after users gets tenant_id
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT uq_branch_activation_codes_code UNIQUE (code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_branch_activation_codes_tenant ON branch_activation_codes(tenant_id, created_at DESC);
+
+-- 1f. tenant_invite_links — one-time owner onboarding invitations
+CREATE TABLE IF NOT EXISTS tenant_invite_links (
+    id             UUID         PRIMARY KEY DEFAULT uuid_generate_v7(),
+    tenant_id      UUID         NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    token          VARCHAR(64)  NOT NULL,
+    invitee_email  VARCHAR(128),
+    invitee_phone  VARCHAR(32),
+    role_name      VARCHAR(64)  NOT NULL DEFAULT 'OWNER',
+    used_at        TIMESTAMPTZ,
+    expires_at     TIMESTAMPTZ  NOT NULL,
+    wizard_state   JSONB,                -- partial onboarding wizard state (resumable)
+    created_by_admin UUID       REFERENCES platform_admins(id) ON DELETE SET NULL,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT uq_tenant_invite_links_token UNIQUE (token)
+);
+
+-- ---------------------------------------------------------------------------
+-- SECTION 2: SEED DEFAULT TENANT (Kerod Supermarket)
+-- ---------------------------------------------------------------------------
+-- Using a fixed UUIDv7-compatible value so existing data can be backfilled
+-- deterministically. All 001–005 migration data belongs to this tenant.
+
+INSERT INTO tenants (
+    id, name, slug, status, plan,
+    max_branches, max_terminals, max_users,
+    receipt_header, receipt_footer
+) VALUES (
+    '01900000-0000-7000-8000-000000000001',
+    'Kerod Supermarket',
+    'kerod',
+    'active',
+    'enterprise',
+    999, 999, 999,
+    'Kerod Supermarket',
+    'Thank you for shopping with us! / እናመሰግናለን!'
+) ON CONFLICT (id) DO NOTHING;
+
+-- Seed Default Platform Operator (platform_admin / PlatformAdmin2026!)
+INSERT INTO platform_admins (
+    id, username, full_name, email, password_hash, is_active
+) VALUES (
+    '01900000-0000-7000-8000-000000000000',
+    'platform_admin',
+    'GebeyaOS Platform Operator',
+    'admin@gebeyaos.et',
+    '$argon2id$v=19$m=65536,p=4,t=3$cS8NfQ2GOkY7pqs5uAAGtg$r9G2BwJZrfJxf+1hFst+7HQEtNnHS4WSsvFZpsYlLAU',
+    TRUE
+) ON CONFLICT (username) DO NOTHING;
+
+
+-- ---------------------------------------------------------------------------
+-- SECTION 3: ADD tenant_id AS NULLABLE TO EXISTING TABLES
+-- (Nullable first → backfill → add NOT NULL, to avoid full-table locking)
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE branches               ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE terminals              ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE users                  ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE roles                  ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE role_permissions       ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE user_branch_assignments ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE audit_logs             ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE refresh_tokens         ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE categories             ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE products               ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE product_barcodes       ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE branch_product_overrides ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE price_change_logs      ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE batches                ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE stock_ledger           ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE stock_adjustments      ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE stock_adjustment_items ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE stock_takes            ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE stock_take_items       ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE suppliers              ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE purchase_orders        ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE purchase_order_items   ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE goods_received_notes   ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE grn_items              ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE transfers              ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE transfer_items         ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE shifts                 ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE cash_movements         ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sales                  ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sale_items             ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sale_payments          ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sale_refunds           ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sale_refund_items      ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE fiscal_receipt_logs    ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE expense_categories     ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE expenses               ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sync_outbox            ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sync_inbox             ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sync_checkpoints       ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE sync_conflict_logs     ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE import_batches         ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE import_batch_rows      ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE system_settings        ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+-- Migration tables (004, 005)
+ALTER TABLE held_baskets           ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE supplier_payables      ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE supplier_payments      ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE supplier_returns       ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE supplier_return_items  ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE RESTRICT;
+
+-- ---------------------------------------------------------------------------
+-- SECTION 4: BACKFILL ALL EXISTING ROWS WITH THE DEFAULT TENANT UUID
+-- ---------------------------------------------------------------------------
+
+DO $$
+DECLARE
+  default_tenant_id UUID := '01900000-0000-7000-8000-000000000001';
+BEGIN
+  UPDATE branches               SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE terminals              SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE users                  SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE roles                  SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE role_permissions       SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE user_branch_assignments SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE audit_logs             SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE refresh_tokens         SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE categories             SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE products               SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE product_barcodes       SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE branch_product_overrides SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE price_change_logs      SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE batches                SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE stock_ledger           SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE stock_adjustments      SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE stock_adjustment_items SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE stock_takes            SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE stock_take_items       SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE suppliers              SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE purchase_orders        SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE purchase_order_items   SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE goods_received_notes   SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE grn_items              SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE transfers              SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE transfer_items         SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE shifts                 SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE cash_movements         SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sales                  SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sale_items             SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sale_payments          SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sale_refunds           SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sale_refund_items      SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE fiscal_receipt_logs    SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE expense_categories     SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE expenses               SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sync_outbox            SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sync_inbox             SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sync_checkpoints       SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE sync_conflict_logs     SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE import_batches         SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE import_batch_rows      SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE system_settings        SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE held_baskets           SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE supplier_payables      SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE supplier_payments      SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE supplier_returns       SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+  UPDATE supplier_return_items  SET tenant_id = default_tenant_id WHERE tenant_id IS NULL;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- SECTION 5: ADD NOT NULL CONSTRAINTS
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE branches               ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE terminals              ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE users                  ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE roles                  ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE role_permissions       ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE user_branch_assignments ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE audit_logs             ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE refresh_tokens         ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE categories             ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE products               ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE product_barcodes       ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE branch_product_overrides ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE price_change_logs      ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE batches                ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE stock_ledger           ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE stock_adjustments      ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE stock_adjustment_items ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE stock_takes            ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE stock_take_items       ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE suppliers              ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE purchase_orders        ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE purchase_order_items   ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE goods_received_notes   ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE grn_items              ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE transfers              ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE transfer_items         ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE shifts                 ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE cash_movements         ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sales                  ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sale_items             ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sale_payments          ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sale_refunds           ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sale_refund_items      ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE fiscal_receipt_logs    ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE expense_categories     ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE expenses               ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sync_outbox            ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sync_inbox             ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sync_checkpoints       ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE sync_conflict_logs     ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE import_batches         ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE import_batch_rows      ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE system_settings        ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE held_baskets           ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE supplier_payables      ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE supplier_payments      ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE supplier_returns       ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE supplier_return_items  ALTER COLUMN tenant_id SET NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- SECTION 6: DROP OLD GLOBAL UNIQUE CONSTRAINTS (now must be per-tenant)
+-- ---------------------------------------------------------------------------
+
+-- branches.code was globally unique; now scoped to (tenant_id, code)
+ALTER TABLE branches           DROP CONSTRAINT IF EXISTS branches_code_key;
+
+-- users.username was globally unique; now per-tenant
+ALTER TABLE users              DROP CONSTRAINT IF EXISTS users_username_key;
+ALTER TABLE users              DROP CONSTRAINT IF EXISTS users_email_key;
+-- (phone is not unique — intentionally kept as non-unique)
+
+-- roles.name was globally unique; each tenant has its own role set
+ALTER TABLE roles              DROP CONSTRAINT IF EXISTS roles_name_key;
+
+-- categories.code
+ALTER TABLE categories         DROP CONSTRAINT IF EXISTS categories_code_key;
+
+-- products.sku
+ALTER TABLE products           DROP CONSTRAINT IF EXISTS products_sku_key;
+
+-- product_barcodes.barcode
+ALTER TABLE product_barcodes   DROP CONSTRAINT IF EXISTS product_barcodes_barcode_key;
+DROP INDEX IF EXISTS idx_product_barcodes_lookup;
+
+-- suppliers.code
+ALTER TABLE suppliers          DROP CONSTRAINT IF EXISTS suppliers_code_key;
+
+-- stock_adjustments.adjustment_number
+ALTER TABLE stock_adjustments  DROP CONSTRAINT IF EXISTS stock_adjustments_adjustment_number_key;
+
+-- stock_takes.count_number
+ALTER TABLE stock_takes        DROP CONSTRAINT IF EXISTS stock_takes_count_number_key;
+
+-- purchase_orders.order_number
+ALTER TABLE purchase_orders    DROP CONSTRAINT IF EXISTS purchase_orders_order_number_key;
+
+-- goods_received_notes.grn_number
+ALTER TABLE goods_received_notes DROP CONSTRAINT IF EXISTS goods_received_notes_grn_number_key;
+
+-- transfers.transfer_number
+ALTER TABLE transfers           DROP CONSTRAINT IF EXISTS transfers_transfer_number_key;
+
+-- sales.receipt_number
+ALTER TABLE sales              DROP CONSTRAINT IF EXISTS sales_receipt_number_key;
+DROP INDEX IF EXISTS idx_sales_receipt;
+DROP INDEX IF EXISTS idx_sales_idempotency_key;
+
+-- sale_refunds.refund_number
+ALTER TABLE sale_refunds       DROP CONSTRAINT IF EXISTS sale_refunds_refund_number_key;
+
+-- supplier_payments.payment_number
+ALTER TABLE supplier_payments  DROP CONSTRAINT IF EXISTS supplier_payments_payment_number_key;
+
+-- supplier_returns.return_number
+ALTER TABLE supplier_returns   DROP CONSTRAINT IF EXISTS supplier_returns_return_number_key;
+
+-- system_settings.key (PK) — needs table restructure for per-tenant key
+-- Change PK from (key) to (tenant_id, key)
+ALTER TABLE system_settings    DROP CONSTRAINT IF EXISTS system_settings_pkey;
+ALTER TABLE system_settings    ADD CONSTRAINT system_settings_pkey PRIMARY KEY (tenant_id, key);
+
+-- ---------------------------------------------------------------------------
+-- SECTION 7: ADD COMPOSITE UNIQUE CONSTRAINTS & REBUILT INDEXES
+-- All critical indexes now lead with tenant_id for RLS + query plan efficiency
+-- ---------------------------------------------------------------------------
+
+-- branches
+ALTER TABLE branches           ADD CONSTRAINT uq_tenant_branch_code  UNIQUE (tenant_id, code);
+CREATE INDEX IF NOT EXISTS idx_branches_tenant ON branches(tenant_id);
+
+-- terminals
+CREATE INDEX IF NOT EXISTS idx_terminals_tenant_branch ON terminals(tenant_id, branch_id);
+
+-- users
+ALTER TABLE users              ADD CONSTRAINT uq_tenant_username     UNIQUE (tenant_id, username);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tenant_email ON users(tenant_id, email) WHERE email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+
+-- roles
+ALTER TABLE roles              ADD CONSTRAINT uq_tenant_role_name    UNIQUE (tenant_id, name);
+CREATE INDEX IF NOT EXISTS idx_roles_tenant ON roles(tenant_id);
+
+-- categories
+ALTER TABLE categories         ADD CONSTRAINT uq_tenant_category_code UNIQUE (tenant_id, code);
+CREATE INDEX IF NOT EXISTS idx_categories_tenant ON categories(tenant_id);
+
+-- products
+ALTER TABLE products           ADD CONSTRAINT uq_tenant_product_sku  UNIQUE (tenant_id, sku);
+CREATE INDEX IF NOT EXISTS idx_products_tenant ON products(tenant_id);
+
+-- product_barcodes — rebuilt barcode lookup scoped to tenant
+ALTER TABLE product_barcodes   ADD CONSTRAINT uq_tenant_barcode      UNIQUE (tenant_id, barcode);
+CREATE INDEX IF NOT EXISTS idx_product_barcodes_tenant_lookup ON product_barcodes(tenant_id, barcode);
+
+-- suppliers
+ALTER TABLE suppliers          ADD CONSTRAINT uq_tenant_supplier_code UNIQUE (tenant_id, code);
+
+-- stock_adjustments
+ALTER TABLE stock_adjustments  ADD CONSTRAINT uq_tenant_adj_number   UNIQUE (tenant_id, adjustment_number);
+
+-- stock_takes
+ALTER TABLE stock_takes        ADD CONSTRAINT uq_tenant_count_number  UNIQUE (tenant_id, count_number);
+
+-- purchase_orders
+ALTER TABLE purchase_orders    ADD CONSTRAINT uq_tenant_po_number     UNIQUE (tenant_id, order_number);
+
+-- goods_received_notes
+ALTER TABLE goods_received_notes ADD CONSTRAINT uq_tenant_grn_number UNIQUE (tenant_id, grn_number);
+
+-- transfers
+ALTER TABLE transfers          ADD CONSTRAINT uq_tenant_transfer_num  UNIQUE (tenant_id, transfer_number);
+
+-- sales
+ALTER TABLE sales              ADD CONSTRAINT uq_tenant_receipt_num   UNIQUE (tenant_id, receipt_number);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_tenant_idempotency_key ON sales(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sales_tenant_branch_date ON sales(tenant_id, branch_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sales_tenant_receipt     ON sales(tenant_id, receipt_number);
+
+-- sale_refunds
+ALTER TABLE sale_refunds       ADD CONSTRAINT uq_tenant_refund_num    UNIQUE (tenant_id, refund_number);
+
+-- supplier_payments
+ALTER TABLE supplier_payments  ADD CONSTRAINT uq_tenant_payment_num   UNIQUE (tenant_id, payment_number);
+
+-- supplier_returns
+ALTER TABLE supplier_returns   ADD CONSTRAINT uq_tenant_return_num    UNIQUE (tenant_id, return_number);
+
+-- audit_logs — rebuild leading index for tenant
+DROP INDEX IF EXISTS idx_audit_logs_branch_date;
+DROP INDEX IF EXISTS idx_audit_logs_user_date;
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_branch_date ON audit_logs(tenant_id, branch_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_user_date   ON audit_logs(tenant_id, user_id, created_at DESC);
+
+-- sync_outbox — tenant-scoped pending drain
+DROP INDEX IF EXISTS idx_sync_outbox_pending;
+CREATE INDEX IF NOT EXISTS idx_sync_outbox_tenant_pending ON sync_outbox(tenant_id, branch_id, status, sequence_no)
+  WHERE status = 'PENDING';
+
+-- sync_inbox — tenant-scoped dedup
+DROP INDEX IF EXISTS idx_sync_inbox_dedup;
+CREATE INDEX IF NOT EXISTS idx_sync_inbox_tenant_dedup ON sync_inbox(tenant_id, idempotency_key);
+
+-- import_batches
+DROP INDEX IF EXISTS idx_import_batches_branch;
+DROP INDEX IF EXISTS idx_import_batches_hash;
+CREATE INDEX IF NOT EXISTS idx_import_batches_tenant_branch ON import_batches(tenant_id, branch_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_import_batches_tenant_hash   ON import_batches(tenant_id, file_hash);
+
+-- stock_ledger
+DROP INDEX IF EXISTS idx_stock_ledger_branch_prod;
+CREATE INDEX IF NOT EXISTS idx_stock_ledger_tenant_branch_prod ON stock_ledger(tenant_id, branch_id, product_id, created_at DESC);
+
+-- batches FEFO
+DROP INDEX IF EXISTS idx_batches_fefo;
+CREATE INDEX IF NOT EXISTS idx_batches_tenant_fefo ON batches(tenant_id, branch_id, product_id, expiry_date ASC, created_at ASC)
+  WHERE current_quantity > 0;
+
+-- shifts
+DROP INDEX IF EXISTS idx_shifts_open;
+CREATE INDEX IF NOT EXISTS idx_shifts_tenant_open ON shifts(tenant_id, branch_id, terminal_id, status)
+  WHERE status = 'OPEN';
+
+-- held_baskets
+DROP INDEX IF EXISTS idx_held_baskets_active;
+CREATE INDEX IF NOT EXISTS idx_held_baskets_tenant_active ON held_baskets(tenant_id, branch_id, terminal_id, held_at DESC)
+  WHERE resumed_at IS NULL;
+
+-- supplier_payables aging
+DROP INDEX IF EXISTS idx_supplier_payables_aging;
+CREATE INDEX IF NOT EXISTS idx_supplier_payables_tenant_aging ON supplier_payables(tenant_id, branch_id, status, due_date);
+
+-- ---------------------------------------------------------------------------
+-- SECTION 8: ROW-LEVEL SECURITY — ENABLE ON ALL TENANT-SCOPED TABLES
+-- ---------------------------------------------------------------------------
+-- Policy: a row is visible/mutable only when its tenant_id equals the
+-- session variable app.current_tenant (set by the app's DB layer per request,
+-- never from user input).
+--
+-- "FORCE ROW LEVEL SECURITY" applies the policy even to the table owner,
+-- ensuring no code path can accidentally bypass isolation.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE branches               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branches               FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE terminals              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE terminals              FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE users                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users                  FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE roles                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE roles                  FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE role_permissions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE role_permissions       FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE branch_activation_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branch_activation_codes FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE user_branch_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_branch_assignments FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE audit_logs             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs             FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE refresh_tokens         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE refresh_tokens         FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE categories             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories             FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE products               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products               FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE product_barcodes       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_barcodes       FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE branch_product_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branch_product_overrides FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE price_change_logs      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE price_change_logs      FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE batches                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE batches                FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE stock_ledger           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_ledger           FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE stock_adjustments      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_adjustments      FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE stock_adjustment_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_adjustment_items FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE stock_takes            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_takes            FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE stock_take_items       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_take_items       FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE suppliers              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE suppliers              FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE purchase_orders        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_orders        FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE purchase_order_items   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_order_items   FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE goods_received_notes   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goods_received_notes   FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE grn_items              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE grn_items              FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE transfers              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transfers              FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE transfer_items         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transfer_items         FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE shifts                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shifts                 FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE cash_movements         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_movements         FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sales                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales                  FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sale_items             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sale_items             FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sale_payments          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sale_payments          FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sale_refunds           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sale_refunds           FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sale_refund_items      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sale_refund_items      FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE fiscal_receipt_logs    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fiscal_receipt_logs    FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE expense_categories     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expense_categories     FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE expenses               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses               FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sync_outbox            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_outbox            FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sync_inbox             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_inbox             FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sync_checkpoints       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_checkpoints       FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE sync_conflict_logs     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_conflict_logs     FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE import_batches         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE import_batches         FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE import_batch_rows      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE import_batch_rows      FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE system_settings        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_settings        FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE held_baskets           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE held_baskets           FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE supplier_payables      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE supplier_payables      FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE supplier_payments      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE supplier_payments      FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE supplier_returns       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE supplier_returns       FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE supplier_return_items  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE supplier_return_items  FORCE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------------
+-- SECTION 9: ROW-LEVEL SECURITY POLICIES
+-- ---------------------------------------------------------------------------
+-- One policy per table. The policy evaluates:
+--   tenant_id = current_setting('app.current_tenant', TRUE)::uuid
+-- The TRUE flag makes current_setting return NULL (not error) when not set,
+-- which causes the cast to fail → no rows returned. This is the fail-safe
+-- behavior we want: unset session variable = zero data leaked.
+-- ---------------------------------------------------------------------------
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tables TEXT[] := ARRAY[
+    'branches','terminals','users','roles','role_permissions','branch_activation_codes',
+    'user_branch_assignments','audit_logs','refresh_tokens',
+    'categories','products','product_barcodes','branch_product_overrides','price_change_logs',
+    'batches','stock_ledger','stock_adjustments','stock_adjustment_items','stock_takes','stock_take_items',
+    'suppliers','purchase_orders','purchase_order_items','goods_received_notes','grn_items',
+    'transfers','transfer_items',
+    'shifts','cash_movements','sales','sale_items','sale_payments',
+    'sale_refunds','sale_refund_items','fiscal_receipt_logs',
+    'expense_categories','expenses',
+    'sync_outbox','sync_inbox','sync_checkpoints','sync_conflict_logs',
+    'import_batches','import_batch_rows','system_settings','held_baskets',
+    'supplier_payables','supplier_payments','supplier_returns','supplier_return_items'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY tables LOOP
+    -- Drop existing policy if this migration is re-run
+    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', tbl);
+    -- Create SELECT+INSERT+UPDATE+DELETE policy
+    EXECUTE format(
+      $policy$
+        CREATE POLICY tenant_isolation ON %I
+          USING (
+            tenant_id = NULLIF(current_setting('app.current_tenant', TRUE), '')::uuid
+          )
+          WITH CHECK (
+            tenant_id = NULLIF(current_setting('app.current_tenant', TRUE), '')::uuid
+          )
+      $policy$,
+      tbl
+    );
+  END LOOP;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- SECTION 10: DATABASE ROLE — restrict the app role so it cannot bypass RLS
+-- ---------------------------------------------------------------------------
+-- Create role if it doesn't exist (idempotent).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'gebeyaos_app') THEN
+    CREATE ROLE gebeyaos_app LOGIN PASSWORD 'CHANGE_IN_PRODUCTION';
+  END IF;
+END;
+$$;
+
+-- Grant access to schema and all existing tables
+GRANT USAGE ON SCHEMA public TO gebeyaos_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO gebeyaos_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO gebeyaos_app;
+
+-- Ensure future tables created in public are also accessible
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gebeyaos_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO gebeyaos_app;
+
+-- gebeyaos_app is explicitly NOT granted BYPASSRLS or SUPERUSER.
+-- The postgres/superuser role that runs migrations MUST NOT be used by the app.
+
+-- ---------------------------------------------------------------------------
+-- SECTION 11: HELPER FUNCTION — safe tenant context setter
+-- ---------------------------------------------------------------------------
+-- Called by the app's DatabaseService at the start of every transaction.
+-- Using SET LOCAL ensures the variable resets automatically on COMMIT/ROLLBACK.
+
+CREATE OR REPLACE FUNCTION set_tenant_context(p_tenant_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  PERFORM set_config('app.current_tenant', p_tenant_id::text, FALSE); -- Session scope
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION set_tenant_context(UUID) TO gebeyaos_app;
+
+-- ---------------------------------------------------------------------------
+-- SECTION 12: CI LINT GUARD — verify all tenant tables have RLS enabled
+-- ---------------------------------------------------------------------------
+-- This view is used by the CI isolation check script to confirm coverage.
+
+CREATE OR REPLACE VIEW v_rls_coverage AS
+SELECT
+    c.relname                                            AS table_name,
+    c.relrowsecurity                                     AS rls_enabled,
+    c.relforcerowsecurity                                AS rls_forced,
+    (SELECT count(*) FROM pg_policies p
+      WHERE p.tablename = c.relname AND p.policyname = 'tenant_isolation')::int AS isolation_policy_count
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND c.relkind = 'r'
+  AND c.relname NOT IN ('platform_audit_logs', 'tenant_support_access', 'tenant_invite_links')
+  AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = c.relname
+      AND column_name = 'tenant_id'
+      AND table_schema = 'public'
+  )
+ORDER BY c.relname;
+
+COMMENT ON VIEW v_rls_coverage IS
+  'CI guard: every row must have rls_enabled=true, rls_forced=true, isolation_policy_count=1';
+
+-- ============================================================================
+-- END OF MIGRATION 006_multi_tenant.sql
+-- ============================================================================

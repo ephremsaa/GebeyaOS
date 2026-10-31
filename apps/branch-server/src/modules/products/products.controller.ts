@@ -18,6 +18,9 @@ import {
   PriceChangeDto,
   UpdateProductDto,
   ProductQueryDto,
+  CreateCategoryDto,
+  BulkCategoryDto,
+  BulkArchiveDto,
 } from './dto/products.dto';
 
 @Controller(['products', 'api/products'])
@@ -38,9 +41,20 @@ export class ProductsController {
     return this.productsService.getCategories();
   }
 
+  @Post('categories')
+  @HttpCode(HttpStatus.CREATED)
+  async createCategory(@Body() dto: CreateCategoryDto) {
+    return this.productsService.createCategory(dto);
+  }
+
   @Get('uoms')
   async getUoms() {
     return this.productsService.getUoms();
+  }
+
+  @Get('check-barcode')
+  async checkBarcode(@Query('barcode') barcode: string) {
+    return this.productsService.checkBarcode(barcode || '');
   }
 
   @Get('reorder-suggestions')
@@ -62,6 +76,28 @@ export class ProductsController {
     @Body() dto: UpdateProductDto,
   ) {
     return this.productsService.updateProduct(productId, dto);
+  }
+
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  async archiveProduct(
+    @Param('id') productId: string,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    return this.productsService.archiveProduct(productId, branchId);
+  }
+
+  @Post('bulk-category')
+  @HttpCode(HttpStatus.OK)
+  async bulkUpdateCategory(@Body() dto: BulkCategoryDto) {
+    return this.productsService.bulkUpdateCategory(dto.product_ids, dto.category_id);
+  }
+
+  @Post('bulk-archive')
+  @HttpCode(HttpStatus.OK)
+  async bulkArchive(@Body() dto: BulkArchiveDto) {
+    return this.productsService.bulkArchive(dto.product_ids, dto.archive);
   }
 
   @Post(':id/barcodes')

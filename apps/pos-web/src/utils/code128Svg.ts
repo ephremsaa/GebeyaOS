@@ -80,3 +80,41 @@ export function generateCode128Svg(text: string, width = 240, height = 70): stri
     </svg>
   `.trim();
 }
+
+/**
+ * Calculates standard GS1 / EAN-13 modulo-10 check digit from first 12 digits.
+ */
+export function calculateEan13Checksum(first12Digits: string): number {
+  if (first12Digits.length !== 12 || !/^\d{12}$/.test(first12Digits)) {
+    throw new Error('Must provide exactly 12 numeric digits to compute EAN-13 checksum');
+  }
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const digit = parseInt(first12Digits[i], 10);
+    sum += digit * (i % 2 === 0 ? 1 : 3);
+  }
+  return (10 - (sum % 10)) % 10;
+}
+
+/**
+ * Generates an internal store EAN-13 barcode (prefix 21 + 10 random digits + modulo-10 checksum).
+ */
+export function generateInternalEan13(): string {
+  // Retail in-store prefix '21'
+  let payload = '21';
+  for (let i = 0; i < 10; i++) {
+    payload += Math.floor(Math.random() * 10).toString();
+  }
+  const checkDigit = calculateEan13Checksum(payload);
+  return `${payload}${checkDigit}`;
+}
+
+/**
+ * Generates a clean internal Code 128 alphanumeric SKU or barcode.
+ */
+export function generateInternalCode128(prefix = 'GEB'): string {
+  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const timestampPart = Date.now().toString().slice(-4);
+  return `${prefix}-${timestampPart}${randomPart}`;
+}
+

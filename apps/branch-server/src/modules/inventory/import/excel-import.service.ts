@@ -310,11 +310,13 @@ export class ExcelImportService {
           formattedExpiry = rawExpiry.slice(0, 10);
         }
 
-        const expDate = new Date(formattedExpiry);
-        if (isNaN(expDate.getTime())) {
-          issues.push('Invalid Expiry Date format (use YYYY-MM-DD)');
-        } else if (expDate < new Date()) {
-          issues.push('Expiry date is in the past');
+        if (formattedExpiry) {
+          const expDate = new Date(formattedExpiry);
+          if (isNaN(expDate.getTime())) {
+            issues.push('Invalid Expiry Date format (use YYYY-MM-DD)');
+          } else if (expDate < new Date()) {
+            issues.push('Expiry date is in the past');
+          }
         }
       } else if (isPerishable) {
         issues.push('Expiry Date is required for perishable category');

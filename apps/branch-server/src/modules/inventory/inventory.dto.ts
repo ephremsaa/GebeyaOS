@@ -79,6 +79,14 @@ export class CreateStockAdjustmentDto {
   @IsNotEmpty()
   notes!: string;
 
+  @IsString()
+  @IsOptional()
+  approvedBy?: string;
+
+  @IsString()
+  @IsOptional()
+  managerPin?: string;
+
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateAdjustmentItemDto)
@@ -86,13 +94,17 @@ export class CreateStockAdjustmentDto {
 }
 
 export class CreateStockTakeDto {
-  @IsEnum(['FULL', 'CATEGORY', 'RANDOM_SAMPLE'])
+  @IsEnum(['FULL', 'CATEGORY', 'LOCATION', 'RANDOM_SAMPLE'])
   @IsNotEmpty()
   scope!: StockTakeScope;
 
   @IsUUID()
   @IsOptional()
   categoryId?: string;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
 
   @IsString()
   @IsOptional()
@@ -111,6 +123,14 @@ export class RecordStockTakeCountItemDto {
   @IsNumber()
   @Min(0)
   countedQuantity!: number;
+
+  @IsString()
+  @IsOptional()
+  counterId?: string;
+
+  @IsString()
+  @IsOptional()
+  counterName?: string;
 }
 
 export class RecordStockTakeCountDto {
@@ -118,12 +138,24 @@ export class RecordStockTakeCountDto {
   @ValidateNested({ each: true })
   @Type(() => RecordStockTakeCountItemDto)
   items!: RecordStockTakeCountItemDto[];
+
+  @IsEnum(['OVERWRITE', 'MERGE_SUM'])
+  @IsOptional()
+  mergeStrategy?: 'OVERWRITE' | 'MERGE_SUM';
 }
 
 export class ReconcileStockTakeDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsString()
+  @IsOptional()
+  managerPin?: string;
+
+  @IsString()
+  @IsOptional()
+  approvedBy?: string;
 }
 
 export class CreateBatchDto {

@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -15,6 +16,7 @@ import { UsersService } from './users.service';
 import {
   CreateStaffUserDto,
   UpdateStaffUserDto,
+  CreateRoleDto,
   AdminResetPasswordDto,
   AdminResetPinDto,
   UpdateRolePermissionsDto,
@@ -55,6 +57,15 @@ export class UsersController {
     return this.usersService.updateUser(adminId, userId, dto);
   }
 
+  @Delete(':id')
+  @RequirePermissions('admin:users:manage')
+  async deleteUser(
+    @CurrentUser('id') adminId: string,
+    @Param('id') userId: string,
+  ) {
+    return this.usersService.deleteUser(adminId, userId);
+  }
+
   @Patch(':id/status')
   @RequirePermissions('admin:users:manage')
   async setUserActiveStatus(
@@ -91,6 +102,25 @@ export class UsersController {
   @RequirePermissions('admin:users:manage')
   async listRoles() {
     return this.usersService.listRoles();
+  }
+
+  @Post('roles')
+  @RequirePermissions('admin:roles:manage')
+  @HttpCode(HttpStatus.CREATED)
+  async createRole(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: CreateRoleDto,
+  ) {
+    return this.usersService.createRole(adminId, dto);
+  }
+
+  @Delete('roles/:id')
+  @RequirePermissions('admin:roles:manage')
+  async deleteRole(
+    @CurrentUser('id') adminId: string,
+    @Param('id') roleId: string,
+  ) {
+    return this.usersService.deleteRole(adminId, roleId);
   }
 
   @Put('roles/:id/permissions')

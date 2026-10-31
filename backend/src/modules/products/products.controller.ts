@@ -2,29 +2,98 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Param,
   Query,
-  Patch,
+  Headers,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { ProductsService, ScannedProductLookupResult } from './products.service';
 import {
   CreateProductDto,
+  UpdateProductDto,
   CreateBarcodeDto,
   SetBranchOverrideDto,
   PriceChangeDto,
+  ProductQueryDto,
+  CreateCategoryDto,
+  BulkCategoryDto,
+  BulkArchiveDto,
 } from './dto/products.dto';
 
 @Controller('api/products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
+  @Get()
+  async getProducts(
+    @Query() query: ProductQueryDto,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || '018e0000-0000-7000-8000-000000000020';
+    return this.productsService.getProducts(branchId, query);
+  }
+
+  @Get('categories')
+  async getCategories() {
+    return this.productsService.getCategories();
+  }
+
+  @Post('categories')
+  @HttpCode(HttpStatus.CREATED)
+  async createCategory(@Body() dto: CreateCategoryDto) {
+    return this.productsService.createCategory(dto);
+  }
+
+  @Get('uoms')
+  async getUoms() {
+    return this.productsService.getUoms();
+  }
+
+  @Get('check-barcode')
+  async checkBarcode(@Query('barcode') barcode: string) {
+    return this.productsService.checkBarcode(barcode || '');
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createProduct(@Body() dto: CreateProductDto) {
     return this.productsService.createProduct(dto);
+  }
+
+  @Put(':id')
+  @HttpCode(HttpStatus.OK)
+  async updateProduct(
+    @Param('id') productId: string,
+    @Body() dto: UpdateProductDto,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || '018e0000-0000-7000-8000-000000000020';
+    return this.productsService.updateProduct(productId, dto, branchId);
+  }
+
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  async archiveProduct(
+    @Param('id') productId: string,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || '018e0000-0000-7000-8000-000000000020';
+    return this.productsService.archiveProduct(productId, branchId);
+  }
+
+  @Post('bulk-category')
+  @HttpCode(HttpStatus.OK)
+  async bulkUpdateCategory(@Body() dto: BulkCategoryDto) {
+    return this.productsService.bulkUpdateCategory(dto.product_ids, dto.category_id);
+  }
+
+  @Post('bulk-archive')
+  @HttpCode(HttpStatus.OK)
+  async bulkArchive(@Body() dto: BulkArchiveDto) {
+    return this.productsService.bulkArchive(dto.product_ids, dto.archive);
   }
 
   @Post(':id/barcodes')

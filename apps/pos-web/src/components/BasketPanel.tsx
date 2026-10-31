@@ -7,10 +7,13 @@ import {
   PlayCircle,
   Scale,
   AlertTriangle,
+  Tag,
+  RotateCcw,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { EmptyState, Button, Modal, KeyboardHint } from './ui';
 import { CartItem } from './PosCheckout';
+import { round2, calculateTaxInclusiveLineVat } from '@gebeyaos/shared-types';
 
 export interface BasketPanelProps {
   cart: CartItem[];
@@ -20,7 +23,18 @@ export interface BasketPanelProps {
   onHoldBasket: () => void;
   onResumeBasket: () => void;
   hasHeldBasket: boolean;
+  heldBasketsCount?: number;
+  onOpenHeldBaskets?: () => void;
   onOpenPayment: () => void;
+  onOpenLineDiscount?: (index: number) => void;
+  onOpenBasketDiscount?: () => void;
+  onOpenRefund?: () => void;
+  basketDiscount?: {
+    type: 'PERCENT' | 'FIXED';
+    value: number;
+    amount: number;
+    authorizedBy?: string;
+  } | null;
 }
 
 export const BasketPanel: React.FC<BasketPanelProps> = ({
@@ -31,18 +45,36 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
   onHoldBasket,
   onResumeBasket,
   hasHeldBasket,
+  heldBasketsCount = 0,
+  onOpenHeldBaskets,
   onOpenPayment,
+  onOpenLineDiscount,
+  onOpenBasketDiscount,
+  onOpenRefund,
+  basketDiscount,
 }) => {
   const { language, t, formatCurrency } = useI18n();
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
   // Calculations
-  const subtotal = cart.reduce((sum, item) => sum + item.lineTotal, 0);
-  // Ethiopian 15% VAT for VAT-inclusive retail calculation: tax = price * 15 / 115
-  const vatTotal = cart.reduce((sum, item) => {
-    return item.isVat ? sum + item.lineTotal * (15 / 115) : sum;
-  }, 0);
-  const total = subtotal;
+  const grossSubtotal = round2(cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0));
+  const lineDiscountsTotal = round2(cart.reduce((sum, item) => sum + (item.discount || 0), 0));
+  const subtotalAfterLineDiscounts = round2(grossSubtotal - lineDiscountsTotal);
+  const basketDiscountAmt = round2(basketDiscount ? basketDiscount.amount : 0);
+  const total = Math.max(0, round2(subtotalAfterLineDiscounts - basketDiscountAmt));
+  const totalDiscounts = round2(lineDiscountsTotal + basketDiscountAmt);
+
+  // Ethiopian 15% VAT for VAT-inclusive retail calculation:
+  // VAT is computed per line using net line amount (accounting for proportional basket discount)
+  const vatTotal = round2(
+    cart.reduce((sum, item) => {
+      if (!item.isVat) return sum;
+      const proportion = subtotalAfterLineDiscounts > 0 ? item.lineTotal / subtotalAfterLineDiscounts : 0;
+      const itemNet = Math.max(0, round2(item.lineTotal - proportion * basketDiscountAmt));
+      return sum + calculateTaxInclusiveLineVat(itemNet, true);
+    }, 0),
+  );
+
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleConfirmClear = () => {
@@ -55,7 +87,7 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
 
   return (
     <aside className="w-[380px] min-w-[380px] bg-surface border-l border-border-subtle flex flex-col h-full flex-shrink-0 select-none">
-      {/* 1. Header: Current basket (n) with Hold and Clear icon buttons */}
+      {/* 1. Header: Current basket (n) with Hold, Clear, Held Baskets, and Refund icon buttons */}
       <div className="h-14 px-5 border-b border-border-subtle flex items-center justify-between flex-shrink-0 bg-surface">
         <h2 className="text-base font-semibold text-text-main leading-none">
           {basketHeaderTitle}
@@ -63,15 +95,34 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
 
         {/* Secondary Actions with Tooltips */}
         <div className="flex items-center gap-1">
-          {hasHeldBasket && (
+          {/* Refund button */}
+          {onOpenRefund && (
             <button
               type="button"
-              onClick={onResumeBasket}
-              className="p-2 rounded-lg text-warning hover:bg-warning-soft transition-colors duration-fast cursor-pointer"
-              title={t('resume')}
-              aria-label={t('resume')}
+              onClick={onOpenRefund}
+              className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
+              title={t('refund')}
+              aria-label={t('refund')}
+            >
+              <RotateCcw size={18} strokeWidth={1.75} />
+            </button>
+          )}
+
+          {/* Held Baskets Drawer / Resume Button with Badge */}
+          {(heldBasketsCount > 0 || hasHeldBasket) && (
+            <button
+              type="button"
+              onClick={onOpenHeldBaskets || onResumeBasket}
+              className="relative p-2 rounded-lg text-warning hover:bg-warning-soft transition-colors duration-fast cursor-pointer"
+              title={`${t('heldBaskets')} (${heldBasketsCount || 1})`}
+              aria-label={t('heldBaskets')}
             >
               <PlayCircle size={18} strokeWidth={1.75} />
+              {heldBasketsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-warning text-white text-[10px] font-bold flex items-center justify-center px-1 shadow-xs">
+                  {heldBasketsCount}
+                </span>
+              )}
             </button>
           )}
 
@@ -134,19 +185,24 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
                       <span>{formatCurrency(item.unitPrice)}</span>
                     )}
                   </div>
+                  {item.discount > 0 && (
+                    <span className="text-[11px] font-semibold text-primary block mt-0.5">
+                      -{formatCurrency(item.discount)} {t('discount')}
+                    </span>
+                  )}
                 </div>
 
-                {/* 44px Stepper with Editable Quantity */}
-                <div className="flex items-center gap-2">
+                {/* Stepper with Editable Quantity */}
+                <div className="flex items-center gap-1.5">
                   {!isScale ? (
                     <div className="flex items-center bg-surface-2 rounded-xl p-0.5 border border-border-subtle">
                       <button
                         type="button"
                         onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface active:scale-95 transition-all duration-fast cursor-pointer"
+                        className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface active:scale-95 transition-all duration-fast cursor-pointer"
                         aria-label="Decrease quantity"
                       >
-                        <Minus size={16} strokeWidth={1.75} />
+                        <Minus size={15} strokeWidth={1.75} />
                       </button>
                       <input
                         type="number"
@@ -158,30 +214,47 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
                             onUpdateQuantity(index, val);
                           }
                         }}
-                        className="w-11 h-11 text-center font-semibold text-[14px] tabular-nums bg-transparent text-text-main focus:outline-none focus:bg-surface rounded-md"
+                        className="w-10 h-10 text-center font-semibold text-[14px] tabular-nums bg-transparent text-text-main focus:outline-none focus:bg-surface rounded-md"
                         aria-label="Item quantity"
                       />
                       <button
                         type="button"
                         onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface active:scale-95 transition-all duration-fast cursor-pointer"
+                        className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface active:scale-95 transition-all duration-fast cursor-pointer"
                         aria-label="Increase quantity"
                       >
-                        <Plus size={16} strokeWidth={1.75} />
+                        <Plus size={15} strokeWidth={1.75} />
                       </button>
                     </div>
                   ) : (
-                    <span className="text-[13px] font-semibold px-2.5 py-1.5 rounded-lg bg-surface-2 text-text-main border border-border-subtle tabular-nums">
+                    <span className="text-[13px] font-semibold px-2 py-1.5 rounded-lg bg-surface-2 text-text-main border border-border-subtle tabular-nums">
                       {(item.scaleWeightGrams! / 1000).toFixed(3)} kg
                     </span>
                   )}
 
-                  {/* Line Total (Right-aligned) */}
-                  <div className="w-20 text-right">
-                    <span className="text-[15px] font-semibold text-text-main tabular-nums font-mono block">
+                  {/* Line Total */}
+                  <div className="w-18 text-right">
+                    <span className="text-[14px] font-semibold text-text-main tabular-nums font-mono block">
                       {formatCurrency(item.lineTotal)}
                     </span>
                   </div>
+
+                  {/* Line Discount Icon */}
+                  {onOpenLineDiscount && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenLineDiscount(index)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-fast cursor-pointer ${
+                        item.discount > 0
+                          ? 'text-primary bg-primary-soft hover:bg-primary-soft/80'
+                          : 'text-text-dim hover:text-text-main hover:bg-surface-2'
+                      }`}
+                      aria-label={t('discount')}
+                      title={item.discount > 0 ? `Discount: -${formatCurrency(item.discount)}` : t('discount')}
+                    >
+                      <Tag size={15} strokeWidth={1.75} />
+                    </button>
+                  )}
 
                   {/* Remove Icon */}
                   <button
@@ -200,18 +273,40 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
         )}
       </div>
 
-      {/* 3. Pinned Footer: Subtotal, VAT 15% (included) in muted 14px, divider, Total 32px/700, Pay button 56px */}
+      {/* 3. Pinned Footer: Subtotal, Discounts, VAT 15% (included) in muted 14px, divider, Total 32px/700, Pay button 56px */}
       <div className="p-5 border-t border-border-subtle bg-surface flex flex-col gap-3">
-        {/* Subtotal and VAT in muted 14px */}
+        {/* Subtotal, Discounts, and VAT in muted 14px */}
         <div className="flex flex-col gap-1.5 text-[14px]">
           <div className="flex justify-between items-center text-text-muted">
             <span>{t('subtotal')}</span>
             <span className="tabular-nums font-mono font-medium text-text-main text-right">
-              {formatCurrency(subtotal)}
+              {formatCurrency(grossSubtotal)}
             </span>
           </div>
 
-          {/* Hide VAT row when zero */}
+          {/* Discounts Row */}
+          {(totalDiscounts > 0 || onOpenBasketDiscount) && (
+            <div className="flex justify-between items-center text-[13px]">
+              <div className="flex items-center gap-1.5">
+                <span className="text-text-muted">{t('discount')}</span>
+                {onOpenBasketDiscount && !isCartEmpty && (
+                  <button
+                    type="button"
+                    onClick={onOpenBasketDiscount}
+                    className="text-xs text-primary font-semibold hover:underline cursor-pointer flex items-center gap-0.5"
+                  >
+                    <Tag size={12} strokeWidth={1.75} />
+                    <span>{basketDiscount ? t('edit') : `+ ${t('basketDiscount')}`}</span>
+                  </button>
+                )}
+              </div>
+              <span className="tabular-nums font-mono font-medium text-primary text-right">
+                {totalDiscounts > 0 ? `-${formatCurrency(totalDiscounts)}` : '0.00 ETB'}
+              </span>
+            </div>
+          )}
+
+          {/* VAT Row */}
           {vatTotal > 0 && (
             <div className="flex justify-between items-center text-text-muted text-[14px]">
               <span>{t('vatIncludedNotice')}</span>

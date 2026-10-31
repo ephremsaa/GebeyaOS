@@ -75,12 +75,73 @@ export class SetupWizardDto {
 
 export class LoginDto {
   @IsString()
+  @IsOptional()
+  companyCode?: string;
+
+  @IsString()
   @IsNotEmpty()
   usernameOrPhone!: string;
 
   @IsString()
   @IsNotEmpty()
   password!: string;
+
+  @IsString()
+  @IsOptional()
+  totpCode?: string;
+}
+
+export class ForgotPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  companyCode!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  usernameOrPhone!: string;
+
+  @IsString()
+  @IsIn(['EMAIL', 'SMS'])
+  @IsOptional()
+  channel: 'EMAIL' | 'SMS' = 'SMS';
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  companyCode!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  usernameOrPhone!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(4)
+  @MaxLength(8)
+  code!: string;
+
+  @IsString()
+  @MinLength(10)
+  newPassword!: string;
+}
+
+export class UpdateProfileDto {
+  @IsString()
+  @IsOptional()
+  fullName?: string;
+
+  @IsString()
+  @IsOptional()
+  email?: string;
+
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @IsString()
+  @IsOptional()
+  defaultBranchId?: string;
 }
 
 export class PinLoginDto {
@@ -91,7 +152,68 @@ export class PinLoginDto {
 
   @IsString()
   @IsOptional()
+  userId?: string;
+
+  @IsString()
+  @IsOptional()
   terminalCode?: string;
+
+  @IsString()
+  @IsOptional()
+  deviceToken?: string;
+}
+
+export class TerminalPairDto {
+  @IsString()
+  @IsNotEmpty()
+  terminalCode!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  terminalName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  branchId!: string;
+
+  @IsString()
+  @IsOptional()
+  deviceToken?: string;
+
+  @IsNumber()
+  @IsOptional()
+  autoLockMinutes?: number;
+}
+
+export class ManagerOverrideDto {
+  @IsString()
+  @MinLength(4)
+  @MaxLength(6)
+  managerPin!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  action!: string;
+
+  @IsString()
+  @IsOptional()
+  requiredPermission?: string;
+
+  @IsNumber()
+  @IsOptional()
+  amount?: number;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @IsString()
+  @IsOptional()
+  branchId?: string;
+
+  @IsString()
+  @IsOptional()
+  cashierId?: string;
 }
 
 export class RefreshTokenDto {

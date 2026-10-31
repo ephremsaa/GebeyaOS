@@ -37,7 +37,7 @@ export class CreateStaffUserDto {
   pin!: string;
 
   @IsString()
-  @IsIn(['OWNER', 'HQ_ADMIN', 'BRANCH_MANAGER', 'CASHIER', 'STOREKEEPER', 'ACCOUNTANT'])
+  @IsNotEmpty()
   role!: RoleName;
 
   @IsUUID()
@@ -46,7 +46,7 @@ export class CreateStaffUserDto {
 
   @IsBoolean()
   @IsOptional()
-  forcePasswordChange: boolean = true;
+  forcePasswordChange?: boolean = true;
 }
 
 export class UpdateStaffUserDto {
@@ -63,7 +63,6 @@ export class UpdateStaffUserDto {
   email?: string;
 
   @IsString()
-  @IsIn(['OWNER', 'HQ_ADMIN', 'BRANCH_MANAGER', 'CASHIER', 'STOREKEEPER', 'ACCOUNTANT'])
   @IsOptional()
   role?: RoleName;
 
@@ -76,6 +75,23 @@ export class UpdateStaffUserDto {
   isActive?: boolean;
 }
 
+export class CreateRoleDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString({ each: true })
+  @IsOptional()
+  permissions?: string[];
+
+  @IsOptional()
+  maxDiscountPercentage?: number;
+}
+
 export class AdminResetPasswordDto {
   @IsString()
   @MinLength(8)
@@ -83,7 +99,7 @@ export class AdminResetPasswordDto {
 
   @IsBoolean()
   @IsOptional()
-  forcePasswordChange: boolean = true;
+  forcePasswordChange?: boolean = true;
 }
 
 export class AdminResetPinDto {
@@ -96,4 +112,7 @@ export class AdminResetPinDto {
 export class UpdateRolePermissionsDto {
   @IsString({ each: true })
   permissionIds!: string[];
+
+  @IsOptional()
+  maxDiscountPercentage?: number;
 }

@@ -14,7 +14,10 @@ export class SyncClientService {
   private readonly logger = new Logger(SyncClientService.name);
   private consecutiveFailures = 0;
   private lastSyncAttempt: string | null = null;
+  private lastHqContact: string | null = new Date().toISOString();
   private isSyncing = false;
+  private catalogVersion = 'v18.4';
+  private clockSkewSeconds = 0;
 
   constructor(
     private readonly db: DatabaseService,
@@ -55,6 +58,19 @@ export class SyncClientService {
       if (response.success) {
         await this.outbox.acknowledgeBatch(response.acknowledgedEventIds);
         this.consecutiveFailures = 0;
+
+        // Also mark matching audit_logs as SYNCED
+        try {
+          await this.db.query(
+            `UPDATE audit_logs SET sync_status = 'SYNCED', synced_at = clock_timestamp()
+             WHERE id = ANY(
+               SELECT aggregate_id::uuid FROM sync_outbox WHERE id = ANY($1) AND aggregate_type = 'AUDIT_LOG'
+             )`,
+            [response.acknowledgedEventIds],
+          );
+        } catch {
+          // non-fatal
+        }
 
         if (response.failedEventIds && response.failedEventIds.length > 0) {
           await this.outbox.recordBatchFailures(
@@ -202,6 +218,71 @@ export class SyncClientService {
           data.isActive ?? true,
         ],
       );
+    } else if (aggregateType === 'ROLE') {
+      await client.query(
+        `INSERT INTO roles (id, name, description, is_system, max_discount_percentage)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name,
+           description = EXCLUDED.description,
+           is_system = EXCLUDED.is_system,
+           max_discount_percentage = EXCLUDED.max_discount_percentage,
+           updated_at = clock_timestamp()`,
+        [
+          data.id,
+          data.name,
+          data.description || null,
+          data.isSystem ?? false,
+          data.maxDiscountPercentage || 0,
+        ],
+      );
+    } else if (aggregateType === 'USER') {
+      await client.query(
+        `INSERT INTO users (
+           id, tenant_id, username, full_name, email, phone,
+           role_id, default_branch_id, is_active, password_hash,
+           pin_hash, pin_salt, token_version, requires_totp, totp_secret_encrypted
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10, 'UNSET'), $11, $12, $13, $14, $15)
+         ON CONFLICT (id) DO UPDATE SET
+           full_name = COALESCE(EXCLUDED.full_name, users.full_name),
+           email = COALESCE(EXCLUDED.email, users.email),
+           phone = COALESCE(EXCLUDED.phone, users.phone),
+           role_id = COALESCE(EXCLUDED.role_id, users.role_id),
+           default_branch_id = COALESCE(EXCLUDED.default_branch_id, users.default_branch_id),
+           is_active = COALESCE(EXCLUDED.is_active, users.is_active),
+           password_hash = CASE WHEN EXCLUDED.password_hash = 'UNSET' THEN users.password_hash ELSE EXCLUDED.password_hash END,
+           pin_hash = COALESCE(EXCLUDED.pin_hash, users.pin_hash),
+           pin_salt = COALESCE(EXCLUDED.pin_salt, users.pin_salt),
+           token_version = COALESCE(EXCLUDED.token_version, users.token_version),
+           requires_totp = COALESCE(EXCLUDED.requires_totp, users.requires_totp),
+           totp_secret_encrypted = COALESCE(EXCLUDED.totp_secret_encrypted, users.totp_secret_encrypted),
+           updated_at = clock_timestamp()`,
+        [
+          data.id,
+          data.tenantId,
+          data.username,
+          data.fullName,
+          data.email || null,
+          data.phone || null,
+          data.roleId,
+          data.defaultBranchId || null,
+          data.isActive ?? true,
+          data.passwordHash || null,
+          data.pinHash || null,
+          data.pinSalt || null,
+          data.tokenVersion || 1,
+          data.requiresTotp ?? false,
+          data.totpSecretEncrypted || null,
+        ],
+      );
+
+      // If user was deactivated or token invalidated at HQ, immediately revoke active sessions
+      if (data.isActive === false) {
+        await client.query(
+          `UPDATE refresh_tokens SET revoked_at = clock_timestamp() WHERE user_id = $1 AND revoked_at IS NULL`,
+          [data.id],
+        );
+      }
     }
   }
 
@@ -232,16 +313,59 @@ export class SyncClientService {
   }
 
   /**
-   * Returns client sync status and backoff information.
+   * Evaluates clock skew between branch clock and HQ server-assigned sequence timestamp.
+   * If clock drift > 300 seconds (5 min), flags alert while preserving sequence-based ordering.
+   */
+  detectClockSkew(serverTimestamp?: string): { skewSeconds: number; isSkewed: boolean } {
+    if (!serverTimestamp) {
+      return { skewSeconds: this.clockSkewSeconds, isSkewed: Math.abs(this.clockSkewSeconds) > 300 };
+    }
+    const localMs = Date.now();
+    const serverMs = new Date(serverTimestamp).getTime();
+    this.clockSkewSeconds = Math.round((localMs - serverMs) / 1000);
+    this.lastHqContact = new Date().toISOString();
+    return {
+      skewSeconds: this.clockSkewSeconds,
+      isSkewed: Math.abs(this.clockSkewSeconds) > 300,
+    };
+  }
+
+  /**
+   * Forces an initial pull of the full master catalog for a newly provisioned branch.
+   */
+  async forceInitialCatalogPull(branchId: string): Promise<{ appliedCount: number; catalogVersion: string }> {
+    const res = await this.pullCatalogDeltas(branchId);
+    this.catalogVersion = `v${(parseFloat(this.catalogVersion.replace('v', '')) + 0.1).toFixed(1)}`;
+    this.lastHqContact = new Date().toISOString();
+    return {
+      appliedCount: res.appliedCount,
+      catalogVersion: this.catalogVersion,
+    };
+  }
+
+  /**
+   * Returns client sync status, clock skew, catalog version, and backoff information.
    */
   getSyncStatus() {
     // Exponential backoff delay calculation
     const backoffMs = Math.min(60000, 1000 * Math.pow(2, this.consecutiveFailures));
+
+    // Health alert after N failed attempts
+    let healthAlert: string | null = null;
+    if (this.consecutiveFailures >= 5) {
+      healthAlert = `Warning: HQ sync has encountered ${this.consecutiveFailures} consecutive network failures. Sales are safely saved locally and will sync when connectivity resumes.`;
+    }
+
     return {
       isOnline: this.consecutiveFailures === 0,
       consecutiveFailures: this.consecutiveFailures,
       backoffDelayMs: backoffMs,
       lastSyncAttempt: this.lastSyncAttempt,
+      lastHqContact: this.lastHqContact,
+      catalogVersion: this.catalogVersion,
+      clockSkewSeconds: this.clockSkewSeconds,
+      isClockSkewed: Math.abs(this.clockSkewSeconds) > 300,
+      healthAlert,
     };
   }
 }

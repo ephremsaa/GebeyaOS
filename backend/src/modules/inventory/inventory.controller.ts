@@ -29,6 +29,29 @@ export class InventoryController {
     return this.inventoryService.getStockBalance(branchId, productId);
   }
 
+  @Get('ledger/:branchId/:productId')
+  async getLedger(
+    @Param('branchId') branchId: string,
+    @Param('productId') productId: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.inventoryService.getLedgerHistory(
+      branchId,
+      productId,
+      limit ? Number(limit) : 50,
+      offset ? Number(offset) : 0,
+    );
+  }
+
+  @Get('batches/:branchId/:productId')
+  async getBatches(
+    @Param('branchId') branchId: string,
+    @Param('productId') productId: string,
+  ) {
+    return this.inventoryService.getBatches(branchId, productId);
+  }
+
   @Get('expiring/:branchId')
   async getExpiring(
     @Param('branchId') branchId: string,
@@ -82,5 +105,15 @@ export class InventoryController {
   ) {
     const actorId = userId || '018e0000-0000-7000-8000-000000000001';
     return this.inventoryService.reconcileStockTake(stockTakeId, actorId, dto);
+  }
+
+  @Get('stock-takes/:id')
+  async getStockTakeById(@Param('id') stockTakeId: string) {
+    return this.inventoryService.getStockTakeById(stockTakeId);
+  }
+
+  @Get('stock-takes/:id/report')
+  async getStockTakeReport(@Param('id') stockTakeId: string) {
+    return this.inventoryService.getStockTakeReport(stockTakeId);
   }
 }

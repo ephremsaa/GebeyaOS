@@ -22,6 +22,9 @@ import {
   CreatePurchaseOrderDto,
   UpdatePurchaseOrderStatusDto,
   CreateGRNDto,
+  ApprovePurchaseOrderDto,
+  RecordSupplierPaymentDto,
+  CreateSupplierReturnDto,
 } from './purchasing.dto';
 
 @Injectable()
@@ -108,6 +111,7 @@ export class PurchasingService {
 
   /**
    * Creates a formal Purchase Order (PO).
+   * High-value purchase orders (> 50,000 ETB) require manager authorization.
    */
   async createPurchaseOrder(
     branchId: string,
@@ -160,23 +164,28 @@ export class PurchasingService {
       taxTotal = r4(taxTotal);
       grandTotal = r4(grandTotal);
 
-      // 4. Insert purchase_orders header
+      // 4. Approval required if above threshold of 50,000 ETB
+      const requiresApproval = grandTotal > 50000;
+      const initialStatus = requiresApproval ? 'DRAFT' : 'APPROVED';
+
       const poRes = await client.query<any>(
         `INSERT INTO purchase_orders (
            branch_id, order_number, supplier_id, status, expected_delivery_date,
-           subtotal, tax_total, grand_total, notes, created_by
-         ) VALUES ($1, $2, $3, 'DRAFT', $4, $5, $6, $7, $8, $9)
+           subtotal, tax_total, grand_total, notes, created_by, requires_approval
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           branchId,
           orderNumber,
           dto.supplierId,
+          initialStatus,
           dto.expectedDeliveryDate || null,
           subtotal,
           taxTotal,
           grandTotal,
           dto.notes || null,
           userId,
+          requiresApproval,
         ],
       );
       const poRow = poRes.rows[0];
@@ -314,6 +323,8 @@ export class PurchasingService {
       // 3. Apportion landed costs
       const freightCost = dto.landedFreightCost || 0;
       const otherCost = dto.landedOtherCost || 0;
+      const dutyCost = dto.landedDutyCost || 0;
+      const allocationMethod = dto.allocationMethod || 'BY_VALUE';
       const apportionedItems = apportionLandedCost(
         dto.items.map((i) => ({
           productId: i.productId,
@@ -322,15 +333,17 @@ export class PurchasingService {
         })),
         freightCost,
         otherCost,
+        dutyCost,
+        allocationMethod,
       );
 
       const totalPurchase = apportionedItems.reduce((sum, i) => sum + i.purchaseTotal, 0);
-      const totalReceivedCost = totalPurchase + freightCost + otherCost;
+      const totalReceivedCost = totalPurchase + freightCost + otherCost + dutyCost;
 
       // 4. Calculate Ethiopian Withholding Tax (2% if >= 10,000 ETB)
       const withholdingTax = calculateWithholdingTax(
         totalReceivedCost,
-        Boolean(supplier.tin_number),
+        dto.applyWithholdingTax ?? Boolean(supplier.tin_number),
       );
 
       // 5. Insert goods_received_notes header
@@ -349,7 +362,7 @@ export class PurchasingService {
           dto.supplierInvoiceNo || null,
           dto.supplierInvoiceDate || null,
           freightCost,
-          otherCost,
+          otherCost + dutyCost,
           totalReceivedCost,
           withholdingTax,
           userId,
@@ -498,6 +511,39 @@ export class PurchasingService {
         );
       }
 
+      // 8. Create Supplier Payable in ONE transaction
+      const paymentTermsDays = supplier.payment_terms_days
+        ? parseInt(supplier.payment_terms_days, 10) || 0
+        : 0;
+      const invDate = dto.supplierInvoiceDate ? new Date(dto.supplierInvoiceDate) : new Date();
+      const dueDate = new Date(invDate.getTime() + paymentTermsDays * 86400000);
+      const netPayable = Number((totalReceivedCost - withholdingTax).toFixed(4));
+      let payableId: string | null = null;
+
+      try {
+        const payRes = await client.query(
+          `INSERT INTO supplier_payables (
+            branch_id, supplier_id, grn_id, invoice_number, invoice_date, due_date,
+            total_amount, withholding_amount, net_payable, paid_amount, status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 'UNPAID')
+          RETURNING id`,
+          [
+            branchId,
+            dto.supplierId,
+            grnRow.id,
+            dto.supplierInvoiceNo || grnNumber,
+            invDate,
+            dueDate,
+            Number(totalReceivedCost.toFixed(4)),
+            withholdingTax,
+            netPayable,
+          ],
+        );
+        payableId = payRes?.rows?.[0]?.id || null;
+      } catch (err: any) {
+        this.logger.warn(`Could not insert into supplier_payables: ${err.message}`);
+      }
+
       return {
         id: grnRow.id,
         branchId: grnRow.branch_id,
@@ -512,6 +558,9 @@ export class PurchasingService {
         landedOtherCost: parseFloat(grnRow.landed_other_cost),
         totalReceivedCost: parseFloat(grnRow.total_received_cost),
         withholdingTaxAmount: parseFloat(grnRow.withholding_tax_amount),
+        netSupplierPayable: netPayable,
+        payableId,
+        dueDate: dueDate.toISOString().split('T')[0],
         receivedBy: grnRow.received_by,
         createdAt: grnRow.created_at.toISOString(),
         items: savedGRNItems,
@@ -568,4 +617,351 @@ export class PurchasingService {
       })),
     };
   }
+
+  /**
+   * Retrieves all Purchase Orders for a branch.
+   */
+  async getPurchaseOrders(branchId?: string): Promise<any[]> {
+    let query = `
+      SELECT po.*, s.name as supplier_name, s.code as supplier_code, s.phone as supplier_phone,
+             (SELECT COUNT(*) FROM purchase_order_items WHERE purchase_order_id = po.id) as item_count
+      FROM purchase_orders po
+      JOIN suppliers s ON s.id = po.supplier_id
+    `;
+    const params: any[] = [];
+    if (branchId) {
+      query += ' WHERE po.branch_id = $1';
+      params.push(branchId);
+    }
+    query += ' ORDER BY po.created_at DESC';
+
+    const res = await this.db.query<any>(query, params);
+    return res.rows.map((r: any) => ({
+      id: r.id,
+      branchId: r.branch_id,
+      orderNumber: r.order_number,
+      supplierId: r.supplier_id,
+      supplierName: r.supplier_name,
+      supplierCode: r.supplier_code,
+      supplierPhone: r.supplier_phone,
+      itemCount: parseInt(r.item_count || '0', 10),
+      status: r.status,
+      expectedDeliveryDate: r.expected_delivery_date
+        ? r.expected_delivery_date.toISOString().split('T')[0]
+        : null,
+      subtotal: parseFloat(r.subtotal),
+      taxTotal: parseFloat(r.tax_total),
+      grandTotal: parseFloat(r.grand_total),
+      notes: r.notes,
+      createdBy: r.created_by,
+      createdAt: r.created_at.toISOString(),
+      updatedAt: r.updated_at.toISOString(),
+    }));
+  }
+
+  /**
+   * Retrieves single Purchase Order by ID.
+   */
+  async getPurchaseOrder(poId: string): Promise<any> {
+    const res = await this.db.query<any>(
+      `SELECT po.*, s.name as supplier_name, s.code as supplier_code, s.phone as supplier_phone, s.tin_number, s.payment_terms_days
+       FROM purchase_orders po
+       JOIN suppliers s ON s.id = po.supplier_id
+       WHERE po.id = $1`,
+      [poId],
+    );
+
+    if (res.rows.length === 0) {
+      throw new NotFoundException(`Purchase Order ${poId} not found`);
+    }
+
+    const r = res.rows[0];
+    const itemsRes = await this.db.query<any>(
+      `SELECT poi.*, p.name_en, p.name_am, p.sku, p.base_unit
+       FROM purchase_order_items poi
+       JOIN products p ON p.id = poi.product_id
+       WHERE poi.purchase_order_id = $1
+       ORDER BY poi.id ASC`,
+      [poId],
+    );
+
+    return {
+      id: r.id,
+      branchId: r.branch_id,
+      orderNumber: r.order_number,
+      supplierId: r.supplier_id,
+      supplierName: r.supplier_name,
+      supplierCode: r.supplier_code,
+      supplierPhone: r.supplier_phone,
+      tinNumber: r.tin_number,
+      paymentTermsDays: r.payment_terms_days,
+      status: r.status,
+      expectedDeliveryDate: r.expected_delivery_date
+        ? r.expected_delivery_date.toISOString().split('T')[0]
+        : null,
+      subtotal: parseFloat(r.subtotal),
+      taxTotal: parseFloat(r.tax_total),
+      grandTotal: parseFloat(r.grand_total),
+      notes: r.notes,
+      createdBy: r.created_by,
+      createdAt: r.created_at.toISOString(),
+      updatedAt: r.updated_at.toISOString(),
+      items: itemsRes.rows.map((ir: any) => ({
+        id: ir.id,
+        purchaseOrderId: ir.purchase_order_id,
+        productId: ir.product_id,
+        nameEn: ir.name_en,
+        nameAm: ir.name_am,
+        sku: ir.sku,
+        baseUnit: ir.base_unit,
+        orderedQuantity: parseFloat(ir.ordered_quantity),
+        receivedQuantity: parseFloat(ir.received_quantity),
+        unitCost: parseFloat(ir.unit_cost),
+        taxRate: parseFloat(ir.tax_rate),
+        totalCost: parseFloat(ir.total_cost),
+      })),
+    };
+  }
+
+  /**
+   * Lists all GRNs for a branch.
+   */
+  async getGRNList(branchId?: string): Promise<any[]> {
+    let query = `
+      SELECT grn.*, s.name as supplier_name, s.code as supplier_code, po.order_number as po_order_number,
+             (SELECT COUNT(*) FROM grn_items WHERE grn_id = grn.id) as item_count
+      FROM goods_received_notes grn
+      JOIN suppliers s ON s.id = grn.supplier_id
+      LEFT JOIN purchase_orders po ON po.id = grn.purchase_order_id
+    `;
+    const params: any[] = [];
+    if (branchId) {
+      query += ' WHERE grn.branch_id = $1';
+      params.push(branchId);
+    }
+    query += ' ORDER BY grn.created_at DESC';
+
+    const res = await this.db.query<any>(query, params);
+    return res.rows.map((r: any) => ({
+      id: r.id,
+      branchId: r.branch_id,
+      grnNumber: r.grn_number,
+      purchaseOrderId: r.purchase_order_id,
+      poOrderNumber: r.po_order_number,
+      supplierId: r.supplier_id,
+      supplierName: r.supplier_name,
+      supplierCode: r.supplier_code,
+      supplierInvoiceNo: r.supplier_invoice_no,
+      supplierInvoiceDate: r.supplier_invoice_date
+        ? r.supplier_invoice_date.toISOString().split('T')[0]
+        : null,
+      landedFreightCost: parseFloat(r.landed_freight_cost),
+      landedOtherCost: parseFloat(r.landed_other_cost),
+      totalReceivedCost: parseFloat(r.total_received_cost),
+      withholdingTaxAmount: parseFloat(r.withholding_tax_amount),
+      itemCount: parseInt(r.item_count || '0', 10),
+      receivedBy: r.received_by,
+      createdAt: r.created_at.toISOString(),
+    }));
+  }
+
+  /**
+   * Approves a high-value purchase order with manager authorization PIN.
+   */
+  async approvePurchaseOrder(userId: string, poId: string, managerPin: string): Promise<any> {
+    if (managerPin !== '1234') {
+      throw new BadRequestException('Invalid manager authorization PIN');
+    }
+
+    const res = await this.db.query<any>(
+      `UPDATE purchase_orders
+       SET status = 'APPROVED', approved_by = $1, approved_at = clock_timestamp(), updated_at = clock_timestamp()
+       WHERE id = $2
+       RETURNING *`,
+      [userId, poId],
+    );
+
+    if (res.rows.length === 0) {
+      throw new NotFoundException(`Purchase Order ${poId} not found`);
+    }
+    return res.rows[0];
+  }
+
+  /**
+   * Dispatches/sends approved purchase order to supplier.
+   */
+  async sendPurchaseOrder(poId: string): Promise<any> {
+    const res = await this.db.query<any>(
+      `UPDATE purchase_orders
+       SET status = 'SENT', updated_at = clock_timestamp()
+       WHERE id = $1
+       RETURNING *`,
+      [poId],
+    );
+
+    if (res.rows.length === 0) {
+      throw new NotFoundException(`Purchase Order ${poId} not found`);
+    }
+    return res.rows[0];
+  }
+
+  /**
+   * Retrieves payables and aging report for suppliers.
+   */
+  async listPayables(branchId?: string): Promise<any[]> {
+    let query = `
+      SELECT sp.*, s.name as supplier_name, s.code as supplier_code, s.tin_number,
+             (CURRENT_DATE - sp.due_date) as aging_days
+      FROM supplier_payables sp
+      JOIN suppliers s ON s.id = sp.supplier_id
+    `;
+    const params: any[] = [];
+    if (branchId) {
+      query += ' WHERE sp.branch_id = $1';
+      params.push(branchId);
+    }
+    query += ' ORDER BY sp.due_date ASC';
+
+    try {
+      const res = await this.db.query<any>(query, params);
+      return res.rows.map((row: any) => {
+        const agingDays = parseInt(row.aging_days, 10) || 0;
+        let agingBucket = 'CURRENT';
+        if (agingDays > 60) agingBucket = '60+';
+        else if (agingDays > 30) agingBucket = '31-60';
+        else if (agingDays > 0) agingBucket = '1-30';
+
+        return {
+          ...row,
+          aging_days: Math.max(0, agingDays),
+          aging_bucket: agingBucket,
+          remaining_balance: Number((parseFloat(row.net_payable) - parseFloat(row.paid_amount)).toFixed(4)),
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Records a payment to a supplier against a payable.
+   */
+  async recordSupplierPayment(userId: string, dto: RecordSupplierPaymentDto): Promise<any> {
+    return this.db.withTransaction(async (client) => {
+      const paymentNumber = `PAY-${Date.now().toString().slice(-8)}`;
+
+      const payRes = await client.query<any>(
+        `INSERT INTO supplier_payments (
+          branch_id, supplier_id, payable_id, payment_number, amount,
+          payment_method, reference_number, notes, paid_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *`,
+        [
+          dto.branchId,
+          dto.supplierId,
+          dto.payableId || null,
+          paymentNumber,
+          dto.amount,
+          dto.paymentMethod,
+          dto.referenceNumber || null,
+          dto.notes || null,
+          userId,
+        ],
+      );
+
+      if (dto.payableId) {
+        const pRes = await client.query<any>(
+          `SELECT net_payable, paid_amount FROM supplier_payables WHERE id = $1 FOR UPDATE`,
+          [dto.payableId],
+        );
+        if (pRes.rows.length > 0) {
+          const currentPaid = parseFloat(pRes.rows[0].paid_amount);
+          const netPayable = parseFloat(pRes.rows[0].net_payable);
+          const newPaid = Number((currentPaid + dto.amount).toFixed(4));
+          const newStatus = newPaid >= netPayable ? 'PAID' : 'PARTIALLY_PAID';
+
+          await client.query(
+            `UPDATE supplier_payables 
+             SET paid_amount = $1, status = $2, updated_at = clock_timestamp()
+             WHERE id = $3`,
+            [newPaid, newStatus, dto.payableId],
+          );
+        }
+      }
+
+      return payRes.rows[0];
+    });
+  }
+
+  /**
+   * Processes Return to Supplier (Purchase Return) creating reversing stock movements.
+   */
+  async processSupplierReturn(userId: string, dto: CreateSupplierReturnDto): Promise<any> {
+    return this.db.withTransaction(async (client) => {
+      const returnNumber = `RET-${Date.now().toString().slice(-8)}`;
+
+      let totalReturnValue = 0;
+      for (const item of dto.items) {
+        totalReturnValue += item.quantity * item.unitCost;
+      }
+      totalReturnValue = Number(totalReturnValue.toFixed(4));
+
+      const retRes = await client.query<any>(
+        `INSERT INTO supplier_returns (
+          branch_id, supplier_id, grn_id, return_number, status,
+          total_return_value, reason, created_by
+        ) VALUES ($1, $2, $3, $4, 'CONFIRMED', $5, $6, $7)
+        RETURNING *`,
+        [
+          dto.branchId,
+          dto.supplierId,
+          dto.grnId || null,
+          returnNumber,
+          totalReturnValue,
+          dto.reason,
+          userId,
+        ],
+      );
+      const retId = retRes.rows[0].id;
+
+      for (const item of dto.items) {
+        const lineTotal = Number((item.quantity * item.unitCost).toFixed(4));
+
+        await client.query(
+          `INSERT INTO supplier_return_items (
+            return_id, product_id, batch_id, quantity, unit_cost, total_cost, reason
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            retId,
+            item.productId,
+            item.batchId || null,
+            item.quantity,
+            item.unitCost,
+            lineTotal,
+            item.reason,
+          ],
+        );
+
+        // Record reversing stock movement (negative quantityChange)
+        await this.inventoryService.recordMovementInTransaction(client, dto.branchId, {
+          productId: item.productId,
+          batchId: item.batchId,
+          movementType: 'PURCHASE_RETURN',
+          quantityChange: -item.quantity,
+          unitCost: item.unitCost,
+          referenceType: 'RETURN',
+          referenceId: retId,
+          notes: `Purchase Return ${returnNumber}: ${item.reason}`,
+          createdBy: userId,
+          allowNegativeStock: true,
+        });
+      }
+
+      return {
+        ...retRes.rows[0],
+        items: dto.items,
+      };
+    });
+  }
 }
+

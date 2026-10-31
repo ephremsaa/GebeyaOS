@@ -153,6 +153,16 @@ export class CreateGrnDto {
   @Type(() => Number)
   landed_other_cost?: number;
 
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  landed_duty_cost?: number;
+
+  @IsString()
+  @IsOptional()
+  allocation_method?: 'BY_VALUE' | 'BY_QUANTITY';
+
   @IsBoolean()
   @IsOptional()
   apply_withholding_tax?: boolean;
@@ -161,4 +171,92 @@ export class CreateGrnDto {
   @ValidateNested({ each: true })
   @Type(() => GrnItemInputDto)
   items!: GrnItemInputDto[];
+}
+
+export class ApprovePurchaseOrderDto {
+  @IsString()
+  @IsNotEmpty()
+  manager_pin!: string;
+}
+
+export class RecordSupplierPaymentDto {
+  @IsUUID()
+  @IsNotEmpty()
+  branch_id!: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  supplier_id!: string;
+
+  @IsUUID()
+  @IsOptional()
+  payable_id?: string;
+
+  @IsNumber()
+  @Min(0.01)
+  @Type(() => Number)
+  amount!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  payment_method!: string; // 'CASH', 'BANK_TRANSFER', 'TELEBIRR', 'CBE_BIRR', 'CHECK'
+
+  @IsString()
+  @IsOptional()
+  reference_number?: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+export class ReturnItemInputDto {
+  @IsUUID()
+  @IsNotEmpty()
+  product_id!: string;
+
+  @IsUUID()
+  @IsOptional()
+  batch_id?: string;
+
+  @IsString()
+  @IsOptional()
+  batch_number?: string;
+
+  @IsNumber()
+  @Min(0.001)
+  @Type(() => Number)
+  quantity!: number;
+
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  unit_cost!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+}
+
+export class CreateSupplierReturnDto {
+  @IsUUID()
+  @IsNotEmpty()
+  branch_id!: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  supplier_id!: string;
+
+  @IsUUID()
+  @IsOptional()
+  grn_id?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReturnItemInputDto)
+  items!: ReturnItemInputDto[];
 }

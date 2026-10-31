@@ -20,13 +20,12 @@ import {
   ImportValidationSummary,
   ImportCommitResult,
 } from '@gebeyaos/shared-types';
-import { SampleProduct } from '../../sample-data';
 
 interface ExcelImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCommitSuccess: (message: string, updatedProducts: SampleProduct[]) => void;
-  existingProducts: SampleProduct[];
+  onCommitSuccess: (message: string, updatedProducts: any[]) => void;
+  existingProducts: any[];
 }
 
 export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
@@ -91,109 +90,13 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         setStep(2);
       } else {
         const err = await res.json().catch(() => ({}));
-        // Offline demo fallback parsing
-        simulateClientParsing(selected);
+        setErrorMsg(err.message || 'Validation failed. Please verify column headers and file content.');
       }
     } catch {
-      simulateClientParsing(selected);
+      setErrorMsg('Cannot connect to server to validate import file.');
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const simulateClientParsing = (f: File) => {
-    // Generate realistic parsed rows for offline demo
-    const simulatedRows: ParsedImportRow[] = [
-      {
-        rowNumber: 2,
-        sku: 'MILK-ANCHOR-1L',
-        barcode: '6001234567890',
-        nameEn: 'Anchor UHT Whole Milk 1L',
-        category: 'Dairy & Eggs',
-        unit: 'PCS',
-        quantity: 50,
-        costPrice: 85,
-        sellingPrice: 110,
-        batchNumber: 'B-2026-10',
-        expiryDate: '2027-04-15',
-        status: 'OK',
-        issues: [],
-      },
-      {
-        rowNumber: 3,
-        sku: 'FLOUR-TEFF-5K',
-        barcode: '6009876543210',
-        nameEn: 'Magna White Teff Flour 5KG',
-        category: 'Bakery & Grains',
-        unit: 'PCS',
-        quantity: 25,
-        costPrice: 520,
-        sellingPrice: 680,
-        batchNumber: 'TF-998',
-        expiryDate: '2027-08-30',
-        status: 'OK',
-        issues: [],
-      },
-      {
-        rowNumber: 4,
-        sku: 'OIL-SUNFLOWER-3L',
-        barcode: '6005544332211',
-        nameEn: 'Golden Star Sunflower Oil 3L',
-        category: 'Household',
-        unit: 'PCS',
-        quantity: 40,
-        costPrice: 690,
-        sellingPrice: 890,
-        batchNumber: 'OL-2026',
-        expiryDate: '2027-12-31',
-        status: 'OK',
-        issues: [],
-      },
-      {
-        rowNumber: 5,
-        sku: 'PASTA-BIA-500G',
-        barcode: '6003322110099',
-        nameEn: 'Bia Macaroni Pasta 500g',
-        category: 'Bakery & Grains',
-        unit: 'PCS',
-        quantity: 120,
-        costPrice: 42,
-        sellingPrice: 58,
-        batchNumber: 'P-12',
-        expiryDate: '2028-02-15',
-        status: 'OK',
-        issues: [],
-      },
-      {
-        rowNumber: 6,
-        sku: 'BUTTER-SHENKOR-250G',
-        barcode: '6007788990011',
-        nameEn: 'Shenkora Table Butter 250g',
-        category: 'Dairy & Eggs',
-        unit: 'PCS',
-        quantity: 15,
-        costPrice: 180,
-        sellingPrice: 230,
-        batchNumber: 'BT-04',
-        expiryDate: '2024-01-01', // error: past expiry
-        status: 'ERROR',
-        issues: ['Expiry date is in the past (must be in future)'],
-      },
-    ];
-
-    const summary: ImportValidationSummary = {
-      totalRows: simulatedRows.length,
-      okRows: 4,
-      warningRows: 0,
-      errorRows: 1,
-      duplicateFileWarning: false,
-      fileHash: `demo-hash-${Date.now()}`,
-      rows: simulatedRows,
-    };
-
-    setValidationData(summary);
-    setEditableRows(simulatedRows);
-    setStep(2);
   };
 
   // Inline Cell Editing
@@ -255,75 +158,24 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         const result: ImportCommitResult = await res.json();
         setCommitResult(result);
         setStep(3);
+        onCommitSuccess(
+          `Import successfully committed: ${result.totalRows} rows processed (${result.totalQuantityAdded || 0} units logged to ledger)`,
+          existingProducts,
+        );
       } else {
         const err = await res.json().catch(() => ({}));
         if (res.status === 409) {
-          setErrorMsg(err.message);
+          setErrorMsg(err.message || 'Duplicate import detected. Check confirm duplicate to proceed.');
           setConfirmDuplicate(true);
         } else {
-          // offline simulation
-          simulateCommitSuccess();
+          setErrorMsg(err.message || 'Import failed to commit. Check server connection.');
         }
       }
     } catch {
-      simulateCommitSuccess();
+      setErrorMsg('Cannot reach server to commit import.');
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const simulateCommitSuccess = () => {
-    const updated = [...existingProducts];
-    let addedCount = 0;
-    let qtyAdded = 0;
-
-    for (const r of editableRows) {
-      if (r.status === 'ERROR') continue;
-      qtyAdded += r.quantity;
-      const idx = updated.findIndex((p) => p.barcode === r.barcode || p.sku === r.sku);
-      if (idx >= 0) {
-        updated[idx] = {
-          ...updated[idx],
-          stockOnHand: updated[idx].stockOnHand + r.quantity,
-          costPrice: r.costPrice,
-          price: r.sellingPrice,
-        };
-      } else {
-        addedCount++;
-        updated.push({
-          id: `prod-imp-${Date.now()}-${r.rowNumber}`,
-          sku: r.sku,
-          barcode: r.barcode,
-          nameEn: r.nameEn,
-          category: r.category,
-          price: r.sellingPrice,
-          costPrice: r.costPrice,
-          isVat: r.isVat ?? true,
-          stockOnHand: r.quantity,
-          minStock: 10,
-        });
-      }
-    }
-
-    const simResult: ImportCommitResult = {
-      batchId: `batch-${Date.now()}`,
-      fileName,
-      importMode,
-      sourceType,
-      totalRows: editableRows.length,
-      createdCount: addedCount,
-      updatedCount: editableRows.length - addedCount - 1,
-      skippedCount: 0,
-      failedCount: editableRows.filter((r) => r.status === 'ERROR').length,
-      totalQuantityAdded: qtyAdded,
-    };
-
-    setCommitResult(simResult);
-    setStep(3);
-    onCommitSuccess(
-      `Import successfully committed: ${simResult.totalRows} rows processed (${qtyAdded} units logged to ledger)`,
-      updated,
-    );
   };
 
   const handleUndoRecentImport = async () => {
