@@ -46,9 +46,6 @@ const MainApp: React.FC = () => {
       const isRegister = window.location.hash === '#register' || window.location.pathname.startsWith('/register');
       setIsPlatformRoute(isPlatform);
       setIsRegisterRoute(isRegister);
-      if (isPlatform) {
-        setActiveTab('platform');
-      }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -130,8 +127,8 @@ const MainApp: React.FC = () => {
     );
   }
 
-  // 0. Platform Admin Console Route (#platform or activeTab === 'platform')
-  if (isPlatformRoute || activeTab === 'platform') {
+  // 0. Platform Admin Console Route (accessed strictly via dedicated #platform or /platform route)
+  if (isPlatformRoute) {
     return (
       <PlatformAdminConsole
         onExit={() => {
