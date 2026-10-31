@@ -5,6 +5,7 @@ import { DatabaseService } from '../../src/common/database/database.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
 import { UsersService } from '../../src/modules/users/users.service';
 import { PosService } from '../../src/modules/pos/pos.service';
+import { InventoryService } from '../../src/modules/inventory/inventory.service';
 import { SyncClientService } from '../../src/modules/sync/sync-client.service';
 import { SyncOutboxService } from '../../src/modules/sync/sync-outbox.service';
 import { HqSyncService } from '../../../hq-server/src/modules/hq-sync/hq-sync.service';
@@ -75,7 +76,7 @@ describe('Step 5: Offline Verification on Branch Server & Credential Sync Spec',
     pinHasher = new PinHasherService();
     syncOutbox = new SyncOutboxService(db);
     syncClient = new SyncClientService(db, syncOutbox);
-    hqSyncService = new HqSyncService(db);
+    hqSyncService = new HqSyncService(db as any);
     tenantContext = new TenantContextService();
     jwtGuard = new JwtAuthGuard(db, tenantContext);
     platformGuard = new PlatformAdminGuard(db);
@@ -90,7 +91,8 @@ describe('Step 5: Offline Verification on Branch Server & Credential Sync Spec',
       auditSecurity,
     );
     usersService = new UsersService(db, tenantContext);
-    posService = new PosService(db, pinHasher, rateLimiter, auditSecurity);
+    const inventoryService = new InventoryService(db);
+    posService = new PosService(db, inventoryService);
 
     const ownerRes = await rawClient.query(`SELECT id FROM roles WHERE name = 'OWNER' LIMIT 1`);
     ownerRoleId = ownerRes.rows[0].id;
@@ -258,7 +260,7 @@ describe('Step 5: Offline Verification on Branch Server & Credential Sync Spec',
         testBranchId,
         {
           pin: '4321', // manager PIN
-          action: 'HIGH_DISCOUNT_OVERRIDE',
+          actionRequired: 'HIGH_DISCOUNT_OVERRIDE',
         },
       );
 

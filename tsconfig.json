@@ -7,7 +7,28 @@
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
-  }
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@gebeyaos/shared-types": ["packages/shared-types/src"],
+      "@gebeyaos/sync-protocol": ["packages/sync-protocol/src"]
+    }
+  },
+  "include": [
+    "apps/branch-server/src/**/*",
+    "apps/branch-server/test/**/*",
+    "apps/hq-server/src/**/*",
+    "apps/hq-server/test/**/*",
+    "packages/shared-types/src/**/*",
+    "packages/sync-protocol/src/**/*",
+    "scripts/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "backend",
+    "apps/pos-web",
+    "scratch"
+  ]
 }
 
