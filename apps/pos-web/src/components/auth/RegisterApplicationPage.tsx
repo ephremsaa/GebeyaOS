@@ -315,3 +315,4 @@ export const RegisterApplicationPage: React.FC<RegisterApplicationPageProps> = (
     </div>
   );
 };
+
