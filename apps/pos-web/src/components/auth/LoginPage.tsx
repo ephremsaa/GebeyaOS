@@ -608,8 +608,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
           </>
         )}
 
-        {/* Platform Operator Console Link */}
-        <div className="flex items-center justify-center pt-2">
+        {/* Bottom Navigation Links */}
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80">
+          <button
+            type="button"
+            onClick={() => {
+              window.location.hash = '#register';
+            }}
+            className="text-[11px] text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
+          >
+            <Store size={13} className="text-emerald-600 dark:text-emerald-400" />
+            {language === 'am' ? 'ሱፐርማርኬትዎን ያስመዝግቡ' : 'Register your supermarket'}
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -618,7 +629,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             className="text-[11px] text-slate-400 hover:text-emerald-500 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
           >
             <ShieldAlert size={13} className="text-emerald-500" />
-            Platform Operator Console
+            Platform HQ
           </button>
         </div>
       </div>

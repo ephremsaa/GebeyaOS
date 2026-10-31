@@ -26,6 +26,7 @@ import { PinPadModal } from './components/auth/PinPadModal';
 import { SessionExpiredDialog } from './components/auth/SessionExpiredDialog';
 import { PlatformAdminConsole } from './components/platform/PlatformAdminConsole';
 import { TenantOnboardingWizard } from './components/onboarding/TenantOnboardingWizard';
+import { RegisterApplicationPage } from './components/auth/RegisterApplicationPage';
 
 const MainApp: React.FC = () => {
   const { isAuthenticated, isLocked, setupStatus, currentUser, lockSession } = useAuth();
@@ -34,12 +35,17 @@ const MainApp: React.FC = () => {
   const [isPlatformRoute, setIsPlatformRoute] = useState<boolean>(
     () => window.location.hash === '#platform' || window.location.pathname.startsWith('/platform'),
   );
+  const [isRegisterRoute, setIsRegisterRoute] = useState<boolean>(
+    () => window.location.hash === '#register' || window.location.pathname.startsWith('/register'),
+  );
 
   // Sync hash routing
   useEffect(() => {
     const handleHashChange = () => {
       const isPlatform = window.location.hash === '#platform' || window.location.pathname.startsWith('/platform');
+      const isRegister = window.location.hash === '#register' || window.location.pathname.startsWith('/register');
       setIsPlatformRoute(isPlatform);
+      setIsRegisterRoute(isRegister);
       if (isPlatform) {
         setActiveTab('platform');
       }
@@ -107,6 +113,18 @@ const MainApp: React.FC = () => {
         onComplete={() => {
           window.location.hash = '';
           window.location.href = '/';
+        }}
+      />
+    );
+  }
+
+  // 0. Public Supermarket Registration Application (#register or /register)
+  if (isRegisterRoute) {
+    return (
+      <RegisterApplicationPage
+        onBackToLogin={() => {
+          window.location.hash = '';
+          setIsRegisterRoute(false);
         }}
       />
     );

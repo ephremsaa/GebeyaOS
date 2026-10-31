@@ -129,3 +129,33 @@ export interface PlatformAuditLogEntry {
   createdAt: string;
 }
 
+export interface TenantApplicationItem {
+  id: string;
+  supermarketName: string;
+  ownerFullName: string;
+  phone: string;
+  email: string;
+  city: string;
+  address?: string | null;
+  notes?: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectionReason?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  tenantId?: string | null;
+  inviteToken?: string | null;
+  ipAddress?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmitTenantApplicationRequest {
+  supermarketName: string;
+  ownerFullName: string;
+  phone: string;
+  email: string;
+  city: string;
+  address?: string;
+  notes?: string;
+}
+

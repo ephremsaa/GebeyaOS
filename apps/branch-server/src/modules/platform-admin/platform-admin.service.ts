@@ -35,6 +35,7 @@ import {
   TenantStatus,
   TenantPlan,
   PlatformAdminUser,
+  TenantApplicationItem,
 } from '@gebeyaos/shared-types';
 import {
   PlatformLoginDto,
@@ -43,6 +44,8 @@ import {
   Platform2FAVerifyDto,
   PlatformChangePasswordDto,
   PlatformReauthDto,
+  SubmitTenantApplicationDto,
+  RejectApplicationDto,
 } from './dto/platform-admin.dto';
 import { TenantExportService, TenantExportResult } from './tenant-export.service';
 
@@ -1343,6 +1346,170 @@ export class PlatformAdminService {
     return {
       message: `Tenant '${tenant.name}' and all associated data have been permanently deleted.`,
       tenantId: tenant.id,
+    };
+  }
+
+  /**
+   * Submit a new public supermarket registration application
+   */
+  async submitApplication(dto: SubmitTenantApplicationDto, ipAddress?: string): Promise<{ id: string; message: string; status: string }> {
+    const appId = generateUuidV7();
+    await this.db.query(
+      `INSERT INTO tenant_applications (
+        id, supermarket_name, owner_full_name, phone, email, city, address, notes, status, ip_address
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9)`,
+      [
+        appId,
+        dto.supermarketName.trim(),
+        dto.ownerFullName.trim(),
+        dto.phone.trim(),
+        dto.email.trim().toLowerCase(),
+        dto.city.trim(),
+        dto.address ? dto.address.trim() : null,
+        dto.notes ? dto.notes.trim() : null,
+        ipAddress || null,
+      ],
+    );
+    return {
+      id: appId,
+      status: 'PENDING',
+      message: 'Application submitted successfully. Platform administrators will review your application.',
+    };
+  }
+
+  /**
+   * List supermarket registration applications
+   */
+  async listApplications(status?: string): Promise<TenantApplicationItem[]> {
+    let sql = `SELECT * FROM tenant_applications`;
+    const params: any[] = [];
+    if (status && status !== 'all') {
+      sql += ` WHERE status = $1`;
+      params.push(status.toUpperCase());
+    }
+    sql += ` ORDER BY created_at DESC`;
+    const res = await this.db.query(sql, params);
+    return res.rows.map((r: any) => ({
+      id: r.id,
+      supermarketName: r.supermarket_name,
+      ownerFullName: r.owner_full_name,
+      phone: r.phone,
+      email: r.email,
+      city: r.city,
+      address: r.address,
+      notes: r.notes,
+      status: r.status,
+      rejectionReason: r.rejection_reason,
+      approvedBy: r.approved_by,
+      approvedAt: r.approved_at ? r.approved_at.toISOString() : null,
+      tenantId: r.tenant_id,
+      inviteToken: r.invite_token,
+      ipAddress: r.ip_address,
+      createdAt: r.created_at.toISOString(),
+      updatedAt: r.updated_at.toISOString(),
+    }));
+  }
+
+  /**
+   * Approve application: creates tenant, generates 72-hour invite token, updates application, logs audit
+   */
+  async approveApplication(applicationId: string, adminId: string, ipAddress?: string) {
+    const appRes = await this.db.query(`SELECT * FROM tenant_applications WHERE id = $1`, [applicationId]);
+    if (appRes.rows.length === 0) {
+      throw new NotFoundException('Application not found');
+    }
+    const app = appRes.rows[0];
+    if (app.status === 'APPROVED') {
+      throw new BadRequestException('Application has already been approved');
+    }
+
+    // Provision the tenant using existing createTenant logic
+    const created = await this.createTenant(
+      {
+        name: app.supermarket_name,
+        plan: 'starter',
+        ownerName: app.owner_full_name,
+        ownerEmailOrPhone: app.email || app.phone,
+      },
+      adminId,
+      ipAddress,
+    );
+
+    // Update application record
+    await this.db.query(
+      `UPDATE tenant_applications SET
+        status = 'APPROVED',
+        approved_by = $1,
+        approved_at = CURRENT_TIMESTAMP,
+        tenant_id = $2,
+        invite_token = $3,
+        updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [adminId, created.tenant.id, created.inviteToken, applicationId],
+    );
+
+    await this.logPlatformAction({
+      adminId,
+      action: 'APPLICATION_APPROVE',
+      tenantId: created.tenant.id,
+      ipAddress,
+      details: {
+        applicationId,
+        supermarketName: app.supermarket_name,
+        ownerFullName: app.owner_full_name,
+        phone: app.phone,
+        email: app.email,
+      },
+    });
+
+    return {
+      applicationId,
+      status: 'APPROVED',
+      tenant: created.tenant,
+      inviteLink: created.inviteLink,
+      inviteToken: created.inviteToken,
+    };
+  }
+
+  /**
+   * Reject application
+   */
+  async rejectApplication(applicationId: string, adminId: string, reason?: string, ipAddress?: string) {
+    const appRes = await this.db.query(`SELECT * FROM tenant_applications WHERE id = $1`, [applicationId]);
+    if (appRes.rows.length === 0) {
+      throw new NotFoundException('Application not found');
+    }
+    const app = appRes.rows[0];
+    if (app.status === 'APPROVED') {
+      throw new BadRequestException('Cannot reject an already approved application');
+    }
+
+    await this.db.query(
+      `UPDATE tenant_applications SET
+        status = 'REJECTED',
+        rejection_reason = $1,
+        approved_by = $2,
+        approved_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [reason || 'Application requirements not met', adminId, applicationId],
+    );
+
+    await this.logPlatformAction({
+      adminId,
+      action: 'APPLICATION_REJECT',
+      ipAddress,
+      details: {
+        applicationId,
+        supermarketName: app.supermarket_name,
+        reason: reason || 'Application requirements not met',
+      },
+    });
+
+    return {
+      applicationId,
+      status: 'REJECTED',
+      message: 'Application rejected',
     };
   }
 

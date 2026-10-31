@@ -127,3 +127,41 @@ export class PlatformUpdatePlanDto {
   plan!: TenantPlan;
 }
 
+export class SubmitTenantApplicationDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  supermarketName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  ownerFullName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  phone!: string;
+
+  @IsEmail()
+  @IsNotEmpty()
+  email!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  city!: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+export class RejectApplicationDto {
+  @IsString()
+  @IsOptional()
+  reason?: string;
+}
+

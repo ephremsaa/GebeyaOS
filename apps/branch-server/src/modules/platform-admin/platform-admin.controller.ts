@@ -26,6 +26,8 @@ import {
   PlatformChangePasswordDto,
   PlatformReauthDto,
   PlatformUpdatePlanDto,
+  SubmitTenantApplicationDto,
+  RejectApplicationDto,
 } from './dto/platform-admin.dto';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 import {
@@ -276,6 +278,52 @@ export class PlatformAdminController {
       req.platformAdmin.id,
       ip,
       reauthToken,
+    );
+  }
+
+  // Supermarket Public Registration & Approval Flow
+
+  @Post('applications')
+  async submitApplication(
+    @Body() dto: SubmitTenantApplicationDto,
+    @Ip() ip: string,
+  ) {
+    return this.platformAdminService.submitApplication(dto, ip);
+  }
+
+  @Get('applications')
+  @UseGuards(PlatformAdminGuard)
+  async listApplications(@Query('status') status?: string) {
+    return this.platformAdminService.listApplications(status);
+  }
+
+  @Post('applications/:id/approve')
+  @UseGuards(PlatformAdminGuard)
+  async approveApplication(
+    @Param('id') applicationId: string,
+    @Req() req: any,
+    @Ip() ip: string,
+  ) {
+    return this.platformAdminService.approveApplication(
+      applicationId,
+      req.platformAdmin.id,
+      ip,
+    );
+  }
+
+  @Post('applications/:id/reject')
+  @UseGuards(PlatformAdminGuard)
+  async rejectApplication(
+    @Param('id') applicationId: string,
+    @Body() dto: RejectApplicationDto,
+    @Req() req: any,
+    @Ip() ip: string,
+  ) {
+    return this.platformAdminService.rejectApplication(
+      applicationId,
+      req.platformAdmin.id,
+      dto.reason,
+      ip,
     );
   }
 }

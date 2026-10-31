@@ -27,6 +27,9 @@ import {
   CheckCircle2,
   HelpCircle,
   ShieldCheck,
+  FileText,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import {
   TenantUsageSummary,
@@ -36,6 +39,7 @@ import {
   SupportAccessSession,
   PlatformSessionInfo,
   PlatformAdminRole,
+  TenantApplicationItem,
 } from '@gebeyaos/shared-types';
 import { calculatePasswordStrength } from '../../utils/password-meter';
 
@@ -76,8 +80,15 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
   const [twoFaError, setTwoFaError] = useState<string | null>(null);
 
   // View state
-  const [currentTab, setCurrentTab] = useState<'tenants' | 'audit' | 'sessions'>('tenants');
+  const [currentTab, setCurrentTab] = useState<'tenants' | 'applications' | 'audit' | 'sessions'>('tenants');
   const [tenants, setTenants] = useState<TenantUsageSummary[]>([]);
+  const [applications, setApplications] = useState<TenantApplicationItem[]>([]);
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false);
+  const [applicationFilter, setApplicationFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [selectedApplicationForReject, setSelectedApplicationForReject] = useState<TenantApplicationItem | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [approvingAppId, setApprovingAppId] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<PlatformAuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -150,10 +161,88 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
   useEffect(() => {
     if (platformToken) {
       loadTenants();
+      loadApplications();
       loadAuditLogs();
       loadSessions();
     }
   }, [platformToken]);
+
+  const loadApplications = async () => {
+    if (!platformToken) return;
+    setIsLoadingApplications(true);
+    try {
+      const res = await fetch(`${API_BASE}/applications`, {
+        headers: { Authorization: `Bearer ${platformToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setApplications(Array.isArray(data) ? data : []);
+      } else {
+        setApplications([]);
+      }
+    } catch {
+      setApplications([]);
+    } finally {
+      setIsLoadingApplications(false);
+    }
+  };
+
+  const handleApproveApplication = async (app: TenantApplicationItem) => {
+    if (!platformToken) return;
+    setApprovingAppId(app.id);
+    try {
+      const res = await fetch(`${API_BASE}/applications/${app.id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${platformToken}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCreatedTenantResult({
+          tenant: data.tenant,
+          inviteToken: data.inviteToken,
+          inviteLink: data.inviteLink,
+        });
+        await loadApplications();
+        await loadTenants();
+      } else {
+        alert(data.message || 'Failed to approve application');
+      }
+    } catch {
+      alert('Network error approving application');
+    } finally {
+      setApprovingAppId(null);
+    }
+  };
+
+  const handleRejectApplication = async () => {
+    if (!platformToken || !selectedApplicationForReject) return;
+    setIsRejecting(true);
+    try {
+      const res = await fetch(`${API_BASE}/applications/${selectedApplicationForReject.id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${platformToken}`,
+        },
+        body: JSON.stringify({ reason: rejectReason }),
+      });
+      if (res.ok) {
+        setSelectedApplicationForReject(null);
+        setRejectReason('');
+        await loadApplications();
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Failed to reject application');
+      }
+    } catch {
+      alert('Network error rejecting application');
+    } finally {
+      setIsRejecting(false);
+    }
+  };
 
   // Auto-refresh token rotation before expiration (access token = 15m; rotate every 12m)
   useEffect(() => {
@@ -1181,6 +1270,22 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
     return matchesSearch && matchesStatus;
   });
 
+  const filteredApplications = applications.filter((app) => {
+    if (applicationFilter !== 'all' && app.status.toLowerCase() !== applicationFilter) {
+      return false;
+    }
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      app.supermarketName.toLowerCase().includes(q) ||
+      app.ownerFullName.toLowerCase().includes(q) ||
+      app.phone.toLowerCase().includes(q) ||
+      app.email.toLowerCase().includes(q) ||
+      app.city.toLowerCase().includes(q)
+    );
+  });
+
+  const pendingApplicationsCount = applications.filter((a) => a.status === 'PENDING').length;
   const totalBranches = tenants.reduce((acc, t) => acc + t.branchCount, 0);
   const totalTerminals = tenants.reduce((acc, t) => acc + t.terminalCount, 0);
   const activeTenantsCount = tenants.filter((t) => t.status === 'active').length;
@@ -1240,6 +1345,16 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
               }`}
             >
               <Building2 size={14} /> Supermarkets ({tenants.length})
+            </button>
+            <button
+              onClick={() => setCurrentTab('applications')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                currentTab === 'applications'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <FileText size={14} /> Applications ({pendingApplicationsCount})
             </button>
             <button
               onClick={() => setCurrentTab('sessions')}
@@ -1588,6 +1703,163 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
               </div>
             </div>
           </>
+        )}
+
+        {/* Applications Tab */}
+        {currentTab === 'applications' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <FileText size={18} className="text-emerald-400" /> Supermarket Onboarding Applications
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Review incoming supermarket registrations, verify business details, and approve with 72-hour owner setup tokens.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+                  {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setApplicationFilter(f)}
+                      className={`px-3 py-1 rounded-lg capitalize transition-all ${
+                        applicationFilter === f
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={loadApplications}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 flex items-center gap-1.5"
+                >
+                  <RefreshCw size={13} className={isLoadingApplications ? 'animate-spin' : ''} /> Refresh
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto mt-4">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="text-[11px] uppercase font-bold text-slate-400 border-b border-slate-800 bg-slate-900/60">
+                  <tr>
+                    <th className="py-3 px-4">Supermarket & Location</th>
+                    <th className="py-3 px-4">Owner & Contact</th>
+                    <th className="py-3 px-4">Submitted</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Notes</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredApplications.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-500 font-sans text-xs">
+                        No supermarket onboarding applications found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredApplications.map((app) => (
+                      <tr key={app.id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-white text-sm">{app.supermarketName}</div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <span>{app.city}</span>
+                            {app.address && <span>• {app.address}</span>}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-200">{app.ownerFullName}</div>
+                          <div className="text-[11px] font-mono text-emerald-400 mt-0.5">{app.phone}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{app.email}</div>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-400 font-mono text-[11px]">
+                          {new Date(app.createdAt).toLocaleDateString()}
+                          <div className="text-[10px] text-slate-500">{new Date(app.createdAt).toLocaleTimeString()}</div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1 ${
+                              app.status === 'APPROVED'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : app.status === 'REJECTED'
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}
+                          >
+                            {app.status === 'APPROVED' && <CheckCircle2 size={11} />}
+                            {app.status === 'REJECTED' && <X size={11} />}
+                            {app.status === 'PENDING' && <Clock size={11} />}
+                            {app.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-400 text-[11px] max-w-xs truncate">
+                          {app.notes || '—'}
+                          {app.rejectionReason && (
+                            <div className="text-rose-400 text-[10px] mt-0.5 font-medium">
+                              Reason: {app.rejectionReason}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          {app.status === 'PENDING' ? (
+                            <div className="inline-flex items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={approvingAppId === app.id}
+                                onClick={() => handleApproveApplication(app)}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                              >
+                                {approvingAppId === app.id ? (
+                                  <RefreshCw size={12} className="animate-spin" />
+                                ) : (
+                                  <Check size={12} />
+                                )}
+                                Approve & Issue Token
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedApplicationForReject(app);
+                                  setRejectReason('');
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 text-slate-400 font-medium text-xs border border-slate-700 transition-all cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : app.status === 'APPROVED' && app.inviteToken ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const url = `${window.location.origin}/#onboarding?token=${app.inviteToken}`;
+                                navigator.clipboard.writeText(url);
+                                setCopiedToken(app.inviteToken || null);
+                                setTimeout(() => setCopiedToken(null), 2500);
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs border border-slate-700 inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              {copiedToken === app.inviteToken ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                              {copiedToken === app.inviteToken ? 'Link Copied!' : 'Copy Invite Link'}
+                            </button>
+                          ) : (
+                            <span className="text-slate-600 text-xs">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* Sessions Tab */}
@@ -1969,6 +2241,63 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
         </div>
       )}
 
+      {/* MODAL: Reject Supermarket Application */}
+      {selectedApplicationForReject && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <AlertTriangle size={18} className="text-rose-400" />
+                Reject Supermarket Application
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedApplicationForReject(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 mb-4">
+              Are you sure you want to reject the application for{' '}
+              <strong className="text-white">{selectedApplicationForReject.supermarketName}</strong>?
+            </p>
+
+            <div className="mb-5">
+              <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                Rejection Reason (Audit Log)
+              </label>
+              <textarea
+                rows={3}
+                placeholder="e.g. Could not verify business license or contact number was unreachable."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-hidden focus:border-rose-500 transition-colors resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setSelectedApplicationForReject(null)}
+                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-bold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isRejecting}
+                onClick={handleRejectApplication}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50"
+              >
+                {isRejecting ? 'Rejecting...' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 4. Modal: Provision Supermarket Tenant */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs">
@@ -2341,6 +2670,63 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                   Permanently Delete
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Reject Supermarket Application */}
+      {selectedApplicationForReject && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <AlertTriangle size={18} className="text-rose-400" />
+                Reject Supermarket Application
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedApplicationForReject(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 mb-4">
+              Are you sure you want to reject the application for{' '}
+              <strong className="text-white">{selectedApplicationForReject.supermarketName}</strong>?
+            </p>
+
+            <div className="mb-5">
+              <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                Rejection Reason (Audit Log)
+              </label>
+              <textarea
+                rows={3}
+                placeholder="e.g. Could not verify business license or contact number was unreachable."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-hidden focus:border-rose-500 transition-colors resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setSelectedApplicationForReject(null)}
+                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-bold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isRejecting}
+                onClick={handleRejectApplication}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50"
+              >
+                {isRejecting ? 'Rejecting...' : 'Confirm Rejection'}
+              </button>
             </div>
           </div>
         </div>
