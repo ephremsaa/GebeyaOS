@@ -64,7 +64,7 @@ export class SetupWizardDto {
   ownerPhone!: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(10)
   ownerPassword!: string;
 
   @IsString()

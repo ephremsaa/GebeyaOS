@@ -36,8 +36,8 @@ export const SetupWizard: React.FC = () => {
       setError('Please fill in all owner account fields.');
       return;
     }
-    if (ownerPassword.length < 8) {
-      setError('Password must be at least 8 characters long.');
+    if (ownerPassword.length < 10) {
+      setError('Password must be at least 10 characters long.');
       return;
     }
     if (ownerPin.length < 4 || ownerPin.length > 6) {
@@ -331,8 +331,8 @@ export const SetupWizard: React.FC = () => {
                 <input
                   type="password"
                   required
-                  minLength={8}
-                  placeholder="Min 8 characters"
+                  minLength={10}
+                  placeholder="Min 10 characters"
                   className="field-input mt-1"
                   value={ownerPassword}
                   onChange={(e) => setOwnerPassword(e.target.value)}

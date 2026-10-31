@@ -141,21 +141,124 @@ export class AuthService {
     this.passwordPolicy.assertValidPassword(dto.ownerPassword);
     this.pinHasher.assertValidPin(dto.ownerPin);
 
-    return this.db.withTransaction(async (client) => {
+    const setupResult = await this.db.withTransaction(async (client) => {
+      // 1. Ensure tenant exists in `tenants` table
+      let tenantSlug = dto.companyName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'supermarket';
+
+      const tenantCheck = await client.query(
+        `SELECT id, slug, name FROM tenants WHERE id = $1`,
+        [targetTenantId],
+      );
+
+      if (tenantCheck.rows.length === 0) {
+        const slugCheck = await client.query(`SELECT id FROM tenants WHERE slug = $1`, [tenantSlug]);
+        if (slugCheck.rows.length > 0) {
+          tenantSlug = `${tenantSlug}-${Date.now().toString().slice(-4)}`;
+        }
+        await client.query(
+          `INSERT INTO tenants (
+            id, name, slug, status, plan, country, default_language, vat_settings,
+            max_branches, max_terminals, max_users, grace_period_days,
+            receipt_header, receipt_footer, owner_phone, tin_number
+           ) VALUES ($1, $2, $3, 'active', 'starter', 'ET', $4, $5, 3, 5, 20, 14, $6, $7, $8, $9)
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug`,
+          [
+            targetTenantId,
+            dto.companyName.trim(),
+            tenantSlug,
+            dto.language || 'en',
+            JSON.stringify({ rate: dto.defaultVatRate || 0.15, inclusive: false }),
+            dto.receiptHeader || dto.companyName.trim(),
+            dto.receiptFooter || 'Thank you for shopping with us! / እናመሰግናለን!',
+            dto.ownerPhone.trim(),
+            dto.tinNumber?.trim() || null,
+          ],
+        );
+      } else {
+        tenantSlug = tenantCheck.rows[0].slug;
+        await client.query(
+          `UPDATE tenants SET
+             name = COALESCE(NULLIF($2, ''), name),
+             receipt_header = COALESCE(NULLIF($3, ''), receipt_header),
+             receipt_footer = COALESCE(NULLIF($4, ''), receipt_footer),
+             owner_phone = COALESCE(NULLIF($5, ''), owner_phone),
+             tin_number = COALESCE(NULLIF($6, ''), tin_number),
+             updated_at = clock_timestamp()
+           WHERE id = $1`,
+          [
+            targetTenantId,
+            dto.companyName.trim(),
+            dto.receiptHeader || dto.companyName.trim(),
+            dto.receiptFooter || 'Thank you for shopping with us! / እናመሰግናለን!',
+            dto.ownerPhone.trim(),
+            dto.tinNumber?.trim() || null,
+          ],
+        );
+      }
+
+      // 2. Ensure standard system roles exist for this tenant
+      let roleRes = await client.query(
+        `SELECT id FROM roles WHERE tenant_id = $1 AND name = 'OWNER' LIMIT 1`,
+        [targetTenantId],
+      );
+
+      let ownerRoleId: string;
+      if (roleRes.rows.length === 0) {
+        ownerRoleId = generateUuidV7();
+        await client.query(
+          `INSERT INTO roles (id, tenant_id, name, description, is_system, max_discount_percentage)
+           VALUES ($1, $2, 'OWNER', 'Supermarket Company Owner with unrestricted administrative rights', TRUE, 100.00)`,
+          [ownerRoleId, targetTenantId],
+        );
+
+        // Assign all permissions to Owner role
+        const allPerms = await client.query(`SELECT id FROM permissions`);
+        for (const p of allPerms.rows) {
+          await client.query(
+            `INSERT INTO role_permissions (role_id, permission_id, tenant_id)
+             VALUES ($1, $2, $3)
+             ON CONFLICT DO NOTHING`,
+            [ownerRoleId, p.id, targetTenantId],
+          );
+        }
+      } else {
+        ownerRoleId = roleRes.rows[0].id;
+      }
+
+      // Ensure other canonical staff roles exist for this tenant
+      const defaultRoles = [
+        { name: 'BRANCH_MANAGER', desc: 'Branch Store Manager', maxDiscount: 20.0 },
+        { name: 'CASHIER', desc: 'POS Cashier', maxDiscount: 5.0 },
+        { name: 'STOREKEEPER', desc: 'Inventory Storekeeper', maxDiscount: 0.0 },
+      ];
+      for (const dr of defaultRoles) {
+        await client.query(
+          `INSERT INTO roles (id, tenant_id, name, description, is_system, max_discount_percentage)
+           VALUES ($1, $2, $3, $4, TRUE, $5)
+           ON CONFLICT (tenant_id, name) DO NOTHING`,
+          [generateUuidV7(), targetTenantId, dr.name, dr.desc, dr.maxDiscount],
+        );
+      }
+
+      // 3. Create or update First Branch
       const branchId = generateUuidV7();
-      await client.query(
-        `INSERT INTO branches (id, tenant_id, code, name, trade_name, tin_number, phone, is_hq, settings)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8)
+      const branchRes = await client.query(
+        `INSERT INTO branches (id, tenant_id, code, name, trade_name, tin_number, phone, city, is_hq, settings)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'Addis Ababa', TRUE, $8)
          ON CONFLICT (tenant_id, code) DO UPDATE SET
             name = EXCLUDED.name,
             trade_name = EXCLUDED.trade_name,
             tin_number = EXCLUDED.tin_number,
-            settings = EXCLUDED.settings`,
+            settings = EXCLUDED.settings
+         RETURNING id`,
         [
           branchId,
           targetTenantId,
           dto.branchCode.toUpperCase().trim(),
-          dto.companyName.trim(),
+          (dto.branchName || dto.companyName).trim(),
           dto.tradeName || dto.companyName.trim(),
           dto.tinNumber.trim(),
           dto.ownerPhone.trim(),
@@ -168,24 +271,36 @@ export class AuthService {
           }),
         ],
       );
+      const actualBranchId = branchRes.rows?.[0]?.id || branchId;
 
-      const roleRes = await client.query(
-        `SELECT id FROM roles WHERE name = 'OWNER' LIMIT 1`,
+      // 4. Create First POS Terminal (POS-01)
+      const terminalId = generateUuidV7();
+      await client.query(
+        `INSERT INTO terminals (id, tenant_id, branch_id, code, name, device_type, printer_type, is_active)
+         VALUES ($1, $2, $3, 'POS-01', 'Lane 1 Express', 'POS_STATION', 'ESC_POS', TRUE)
+         ON CONFLICT (branch_id, code) DO NOTHING`,
+        [terminalId, targetTenantId, actualBranchId],
       );
-      if (roleRes.rows.length === 0) {
-        throw new NotFoundException('OWNER role is missing in system roles.');
-      }
-      const ownerRoleId = roleRes.rows[0].id;
 
-      // Hash credentials
+      // 5. Hash credentials & create Owner User
       const passwordHash = await this.hashPassword(dto.ownerPassword);
       const pinSalt = this.pinHasher.generateSalt();
       const pinHash = await this.pinHasher.hashPin(dto.ownerPin, pinSalt);
       const ownerId = generateUuidV7();
 
-      await client.query(
+      const userRes = await client.query(
         `INSERT INTO users (id, tenant_id, username, full_name, phone, password_hash, pin_hash, pin_salt, role_id, default_branch_id, is_active, token_version)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, 1)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, 1)
+         ON CONFLICT (tenant_id, username) DO UPDATE SET
+            full_name = EXCLUDED.full_name,
+            phone = EXCLUDED.phone,
+            password_hash = EXCLUDED.password_hash,
+            pin_hash = EXCLUDED.pin_hash,
+            pin_salt = EXCLUDED.pin_salt,
+            role_id = EXCLUDED.role_id,
+            default_branch_id = EXCLUDED.default_branch_id,
+            is_active = TRUE
+         RETURNING id`,
         [
           ownerId,
           targetTenantId,
@@ -196,17 +311,18 @@ export class AuthService {
           pinHash,
           pinSalt,
           ownerRoleId,
-          branchId,
+          actualBranchId,
         ],
       );
+      const actualOwnerId = userRes.rows?.[0]?.id || ownerId;
 
       await client.query(
         `INSERT INTO user_branch_assignments (user_id, branch_id, tenant_id)
          VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-        [ownerId, branchId, targetTenantId],
+        [actualOwnerId, actualBranchId, targetTenantId],
       );
 
-      // Lock setup permanently
+      // 6. Lock setup permanently
       await client.query(
         `INSERT INTO system_settings (tenant_id, key, value)
          VALUES ($1, 'setup_completed', $2)
@@ -224,18 +340,6 @@ export class AuthService {
         ],
       );
 
-      await this.auditSecurity.logAuthEvent({
-        tenantId: targetTenantId,
-        branchId,
-        userId: ownerId,
-        action: 'SETUP_WIZARD_COMPLETED',
-        entityName: 'system_settings',
-        ipAddress,
-        userAgent,
-        result: 'SUCCESS',
-        details: { company: dto.companyName, owner: dto.ownerUsername },
-      });
-
       const permsRes = await client.query(
         `SELECT permission_id FROM role_permissions WHERE role_id = $1`,
         [ownerRoleId],
@@ -243,30 +347,55 @@ export class AuthService {
       const permissions = permsRes.rows.map((r: any) => r.permission_id);
 
       const authUser: AuthenticatedUser = {
-        id: ownerId,
+        id: actualOwnerId,
         tenantId: targetTenantId,
-        tenantSlug: 'kerod',
+        tenantSlug,
         tenantName: dto.companyName.trim(),
         username: dto.ownerUsername.toLowerCase().trim(),
         fullName: dto.ownerFullName.trim(),
         phone: dto.ownerPhone.trim(),
         role: 'OWNER',
         roleId: ownerRoleId,
-        branchId,
+        branchId: actualBranchId,
         branchCode: dto.branchCode.toUpperCase().trim(),
-        branchName: dto.companyName.trim(),
+        branchName: (dto.branchName || dto.companyName).trim(),
         permissions,
         forcePasswordChange: false,
       };
 
-      const tokens = await this.tokenSvc.createTenantSessionTokens(authUser, 'Setup Wizard', ipAddress, userAgent);
       return {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiresIn: tokens.expiresIn,
-        user: authUser,
+        authUser,
+        actualOwnerId,
+        actualBranchId,
       };
+    }, targetTenantId);
+
+    // Record audit event and issue session tokens now that transaction has committed
+    await this.auditSecurity.logAuthEvent({
+      tenantId: targetTenantId,
+      branchId: setupResult.actualBranchId,
+      userId: setupResult.actualOwnerId,
+      action: 'SETUP_WIZARD_COMPLETED',
+      entityName: 'system_settings',
+      ipAddress,
+      userAgent,
+      result: 'SUCCESS',
+      details: { company: dto.companyName, owner: dto.ownerUsername },
     });
+
+    const tokens = await this.tokenSvc.createTenantSessionTokens(
+      setupResult.authUser,
+      'Setup Wizard',
+      ipAddress,
+      userAgent,
+    );
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
+      user: setupResult.authUser,
+    };
   }
 
   /**

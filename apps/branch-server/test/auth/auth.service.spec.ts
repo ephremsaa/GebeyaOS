@@ -44,12 +44,21 @@ describe('AuthService (Phase 1)', () => {
       mockDb.query
         .mockResolvedValueOnce({ rows: [] }) // system_settings check
         .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // users count
-        // insert branch
-        .mockResolvedValueOnce({ rows: [] })
-        // fetch OWNER role
+        // tenant check (exists)
+        .mockResolvedValueOnce({ rows: [{ id: '01900000-0000-7000-8000-000000000001', slug: 'gebeya-market' }] })
+        .mockResolvedValueOnce({ rows: [] }) // update tenants
+        // fetch OWNER role (exists)
         .mockResolvedValueOnce({ rows: [{ id: 'role-owner-123' }] })
-        // insert owner
+        // insert canonical roles
         .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        // insert branch
+        .mockResolvedValueOnce({ rows: [{ id: 'branch-1' }] })
+        // insert terminal
+        .mockResolvedValueOnce({ rows: [] })
+        // insert owner
+        .mockResolvedValueOnce({ rows: [{ id: 'owner-1' }] })
         // insert branch assignment
         .mockResolvedValueOnce({ rows: [] })
         // insert system_settings lock
@@ -81,6 +90,67 @@ describe('AuthService (Phase 1)', () => {
       expect(result.refreshToken).toBeDefined();
       expect(result.user.username).toBe('owner');
       expect(result.user.role).toBe('OWNER');
+    });
+
+    it('auto-provisions tenant, OWNER role with permissions, and terminal on empty fresh install', async () => {
+      mockDb.query
+        .mockResolvedValueOnce({ rows: [] }) // system_settings check
+        .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // users count
+        // 1. tenant check: not found
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] }) // slug check
+        .mockResolvedValueOnce({ rows: [] }) // insert tenant
+        // 2. roles check: OWNER not found
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] }) // insert OWNER role
+        .mockResolvedValueOnce({ rows: [{ id: 'perm-1' }, { id: 'perm-2' }] }) // select permissions
+        .mockResolvedValueOnce({ rows: [] }) // insert role_permissions 1
+        .mockResolvedValueOnce({ rows: [] }) // insert role_permissions 2
+        // insert canonical roles
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        // 3. insert branch
+        .mockResolvedValueOnce({ rows: [{ id: 'branch-fresh-1' }] })
+        // 4. insert terminal
+        .mockResolvedValueOnce({ rows: [] })
+        // 5. insert owner
+        .mockResolvedValueOnce({ rows: [{ id: 'owner-fresh-1' }] })
+        .mockResolvedValueOnce({ rows: [] }) // insert branch assignment
+        // 6. insert system_settings lock
+        .mockResolvedValueOnce({ rows: [] })
+        // get role permissions (inside transaction)
+        .mockResolvedValueOnce({ rows: [{ permission_id: 'perm-1' }, { permission_id: 'perm-2' }] })
+        // audit log & sync outbox (outside transaction)
+        .mockResolvedValueOnce({ rows: [] }) // insert audit_logs
+        .mockResolvedValueOnce({ rows: [] }) // insert sync_outbox
+        // token service user verification
+        .mockResolvedValueOnce({ rows: [{ token_version: 1, is_active: true }] })
+        // insert refresh_tokens
+        .mockResolvedValueOnce({ rows: [] });
+
+      const dto: SetupWizardDto = {
+        companyName: 'Sahle Supermarket',
+        branchCode: 'MAIN-01',
+        branchName: 'Main Store',
+        tinNumber: '0098765432',
+        currency: 'ETB',
+        defaultVatRate: 0.15,
+        language: 'en',
+        ownerUsername: 'recodpos',
+        ownerFullName: 'sahle leka',
+        ownerPhone: '0911359269',
+        ownerPassword: 'SecurePassword123!',
+        ownerPin: '1234',
+      };
+
+      const result = await authService.executeSetup(dto, '127.0.0.1');
+      expect(result.accessToken).toBeDefined();
+      expect(result.user.username).toBe('recodpos');
+      expect(result.user.fullName).toBe('sahle leka');
+      expect(result.user.role).toBe('OWNER');
+      expect(result.user.tenantSlug).toBe('sahle-supermarket');
+      expect(result.user.permissions).toEqual(['perm-1', 'perm-2']);
     });
 
     it('permanently locks setup wizard after initial execution', async () => {
