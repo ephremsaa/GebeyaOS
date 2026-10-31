@@ -8,8 +8,6 @@ interface ImportHistoryModalProps {
   onRevertSuccess?: (batchId: string) => void;
 }
 
-const DEMO_HISTORY: ImportBatchSummary[] = [];
-
 export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
   isOpen,
   onClose,
@@ -29,12 +27,14 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
         });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             setBatches(data);
           }
+        } else {
+          setBatches([]);
         }
       } catch {
-        // use demo history
+        setBatches([]);
       }
     };
     fetchHistory();

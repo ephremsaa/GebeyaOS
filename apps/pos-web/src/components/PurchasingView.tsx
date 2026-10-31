@@ -41,18 +41,7 @@ import { posApi } from '../utils/pos-api';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 
-// Ethiopian Demo Suppliers
 const FALLBACK_SUPPLIERS: any[] = [];
-
-// Demo Products for PO & GRN creation with on-hand & reorder specs
-const SAMPLE_PRODUCTS = [
-  { id: 'p-milk', sku: 'MILK-ANCHOR-1L', barcode: '6001234567890', nameEn: 'Anchor UHT Whole Milk 1L', nameAm: 'አንከር ወተት 1ሊ', baseUnit: 'PCS', costPrice: 85, onHand: 15, minStock: 50, reorderQty: 100, isPerishable: true, supplierId: 's1' },
-  { id: 'p-teff', sku: 'FLOUR-TEFF-MAGNA-5K', barcode: '6002345678901', nameEn: 'Magna White Teff Flour 5KG', nameAm: 'ማኛ የጤፍ ዱቄት 5ኪግ', baseUnit: 'BAG', costPrice: 520, onHand: 8, minStock: 25, reorderQty: 40, isPerishable: false, supplierId: 's2' },
-  { id: 'p-oil', sku: 'OIL-SUNFLOWER-3L', barcode: '6003456789012', nameEn: 'Golden Star Sunflower Oil 3L', nameAm: 'የሱፍ ዘይት 3ሊ', baseUnit: 'BTL', costPrice: 480, onHand: 4, minStock: 30, reorderQty: 50, isPerishable: false, supplierId: 's1' },
-  { id: 'p-water', sku: 'WATER-HIGHLAND-1L', barcode: '6004567890123', nameEn: 'Highland Spring Natural Water 1L', nameAm: 'ሀይላንድ የተፈጥሮ ውሃ 1ሊ', baseUnit: 'PCS', costPrice: 22, onHand: 120, minStock: 80, reorderQty: 200, isPerishable: false, supplierId: 's4' },
-  { id: 'p-coffee', sku: 'COFFEE-YIRGA-500G', barcode: '6005678901234', nameEn: 'Tomoca Yirgacheffe Roast 500G', nameAm: 'ቶሞካ ይርጋጨፌ ቡና 500ግ', baseUnit: 'BAG', costPrice: 380, onHand: 12, minStock: 20, reorderQty: 30, isPerishable: false, supplierId: 's3' },
-  { id: 'p-soap', sku: 'SOAP-BARAKA-4P', barcode: '6006789012345', nameEn: 'Baraka Laundry Soap Pack of 4', nameAm: 'በረካ የልብስ ሳሙና', baseUnit: 'PCK', costPrice: 135, onHand: 45, minStock: 40, reorderQty: 60, isPerishable: false, supplierId: 's1' },
-];
 
 export interface POLineItem {
   id?: string;
@@ -162,6 +151,7 @@ export const PurchasingView: React.FC = () => {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderSummary[]>([]);
   const [grnList, setGrnList] = useState<GRNSummary[]>([]);
   const [payables, setPayables] = useState<SupplierPayableItem[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modals & Drawers
@@ -184,7 +174,7 @@ export const PurchasingView: React.FC = () => {
 
   // Supplier Return Modal
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
-  const [returnSupplierId, setReturnSupplierId] = useState(suppliers[0]?.id || 's1');
+  const [returnSupplierId, setReturnSupplierId] = useState('');
   const [returnReason, setReturnReason] = useState('Defective goods identified at receipt');
   const [returnItems, setReturnItems] = useState<
     Array<{ productId: string; productName: string; sku: string; batchNumber: string; quantity: number; unitCost: number; reason: string }>
@@ -215,229 +205,26 @@ export const PurchasingView: React.FC = () => {
   const loadPurchasingData = async () => {
     setIsLoading(true);
     try {
-      const [supData, poData, grnData, payablesData] = await Promise.all([
+      const [supData, poData, grnData, payablesData, catData] = await Promise.all([
         posApi.getSuppliers(),
-        posApi.getPurchaseOrders(),
-        posApi.getGrnList(),
-        posApi.getPayables(),
+        posApi.getPurchaseOrders(currentUser?.branchId),
+        posApi.getGrnList(currentUser?.branchId),
+        posApi.getPayables(currentUser?.branchId),
+        posApi.getCatalog(currentUser?.branchId),
       ]);
 
-      if (supData && supData.length > 0) setSuppliers(supData);
-      else setSuppliers(FALLBACK_SUPPLIERS);
-
-      if (poData && poData.length > 0) {
-        setPurchaseOrders(poData);
-      } else {
-        // Fallback demo POs
-        setPurchaseOrders([
-          {
-            id: 'po-1',
-            orderNumber: 'PO-20261028-0001',
-            supplierId: 's1',
-            supplierName: 'Almaz Agro Industries S.C.',
-            supplierCode: 'SUP-ALMAZ',
-            supplierPhone: '+251 91 100 2233',
-            supplierTin: '0098765432',
-            status: 'PARTIALLY_RECEIVED',
-            requiresApproval: false,
-            expectedDeliveryDate: '2026-10-31',
-            subtotal: 17000,
-            taxTotal: 2550,
-            grandTotal: 19550,
-            itemCount: 1,
-            notes: 'Weekly fresh dairy supply for Bole Branch',
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            items: [
-              {
-                id: 'poi-1',
-                productId: 'p-milk',
-                productName: 'Anchor UHT Whole Milk 1L',
-                sku: 'MILK-ANCHOR-1L',
-                orderedQuantity: 200,
-                receivedQuantity: 100,
-                unitCost: 85,
-                taxRate: 0.15,
-                totalCost: 17000,
-              },
-            ],
-          },
-          {
-            id: 'po-2',
-            orderNumber: 'PO-20261029-0002',
-            supplierId: 's2',
-            supplierName: 'Adaa Teff Farmers Union',
-            supplierCode: 'SUP-ADAA',
-            supplierPhone: '+251 91 123 4567',
-            supplierTin: '0011223344',
-            status: 'SENT',
-            requiresApproval: false,
-            expectedDeliveryDate: '2026-11-04',
-            subtotal: 26000,
-            taxTotal: 0,
-            grandTotal: 26000,
-            itemCount: 1,
-            notes: 'Direct farm wholesale grains',
-            createdAt: new Date().toISOString(),
-            items: [
-              {
-                id: 'poi-2',
-                productId: 'p-teff',
-                productName: 'Magna White Teff Flour 5KG',
-                sku: 'FLOUR-TEFF-MAGNA-5K',
-                orderedQuantity: 50,
-                receivedQuantity: 0,
-                unitCost: 520,
-                taxRate: 0,
-                totalCost: 26000,
-              },
-            ],
-          },
-          {
-            id: 'po-3',
-            orderNumber: 'PO-20261029-0003',
-            supplierId: 's1',
-            supplierName: 'Almaz Agro Industries S.C.',
-            supplierCode: 'SUP-ALMAZ',
-            supplierPhone: '+251 91 100 2233',
-            supplierTin: '0098765432',
-            status: 'DRAFT',
-            requiresApproval: true,
-            expectedDeliveryDate: '2026-11-08',
-            subtotal: 57600,
-            taxTotal: 8640,
-            grandTotal: 66240,
-            itemCount: 2,
-            notes: 'High-volume wholesale restock exceeding 50,000 ETB approval threshold',
-            createdAt: new Date().toISOString(),
-            items: [
-              {
-                id: 'poi-3',
-                productId: 'p-oil',
-                productName: 'Golden Star Sunflower Oil 3L',
-                sku: 'OIL-SUNFLOWER-3L',
-                orderedQuantity: 120,
-                receivedQuantity: 0,
-                unitCost: 480,
-                taxRate: 0.15,
-                totalCost: 57600,
-              },
-            ],
-          },
-        ]);
-      }
-
-      if (grnData && grnData.length > 0) {
-        setGrnList(grnData);
-      } else {
-        // Fallback demo GRNs
-        setGrnList([
-          {
-            id: 'grn-1',
-            grnNumber: 'GRN-20261028-0001',
-            purchaseOrderId: 'po-1',
-            poOrderNumber: 'PO-20261028-0001',
-            supplierId: 's1',
-            supplierName: 'Almaz Agro Industries S.C.',
-            supplierInvoiceNo: 'INV-ALM-8891',
-            supplierInvoiceDate: '2026-10-28',
-            landedFreightCost: 800,
-            landedDutyCost: 200,
-            landedOtherCost: 200,
-            totalReceivedCost: 9700,
-            withholdingTaxAmount: 0,
-            netSupplierPayable: 9700,
-            itemCount: 1,
-            receivedBy: 'Tigist Alemayehu (Storekeeper)',
-            createdAt: new Date(Date.now() - 43200000).toISOString(),
-            items: [
-              {
-                id: 'gi-1',
-                productId: 'p-milk',
-                productName: 'Anchor UHT Whole Milk 1L',
-                sku: 'MILK-ANCHOR-1L',
-                orderedQuantity: 200,
-                receivedQuantity: 100,
-                acceptedQuantity: 100,
-                rejectedQuantity: 0,
-                rejectReason: '',
-                batchNumber: 'BAT-20261028-MILK',
-                expiryDate: '2027-01-31',
-                purchaseUnitCost: 85,
-                apportionedLandedCost: 12,
-                finalUnitCost: 97,
-              },
-            ],
-          },
-        ]);
-      }
-
-      if (payablesData && payablesData.length > 0) {
-        setPayables(payablesData);
-      } else {
-        // Fallback demo payables
-        setPayables([
-          {
-            id: 'pay-1',
-            branchId: 'b-01',
-            supplierId: 's1',
-            supplierName: 'Almaz Agro Industries S.C.',
-            supplierCode: 'SUP-ALMAZ',
-            tinNumber: '0098765432',
-            grnId: 'grn-1',
-            invoiceNumber: 'INV-ALM-8891',
-            invoiceDate: '2026-10-28',
-            dueDate: '2026-11-27',
-            totalAmount: 9700,
-            withholdingAmount: 0,
-            netPayable: 9700,
-            paidAmount: 0,
-            remainingBalance: 9700,
-            agingDays: 0,
-            agingBucket: 'CURRENT',
-            status: 'UNPAID',
-          },
-          {
-            id: 'pay-2',
-            branchId: 'b-01',
-            supplierId: 's2',
-            supplierName: 'Adaa Teff Farmers Union',
-            supplierCode: 'SUP-ADAA',
-            tinNumber: '0011223344',
-            invoiceNumber: 'INV-ADAA-4402',
-            invoiceDate: '2026-09-20',
-            dueDate: '2026-10-05',
-            totalAmount: 32000,
-            withholdingAmount: 640,
-            netPayable: 31360,
-            paidAmount: 15000,
-            remainingBalance: 16360,
-            agingDays: 24,
-            agingBucket: '1-30',
-            status: 'PARTIALLY_PAID',
-          },
-          {
-            id: 'pay-3',
-            branchId: 'b-01',
-            supplierId: 's4',
-            supplierName: 'Highland Spring Beverage Co.',
-            supplierCode: 'SUP-HIGHLAND',
-            tinNumber: '0044332211',
-            invoiceNumber: 'INV-HLD-1029',
-            invoiceDate: '2026-08-15',
-            dueDate: '2026-08-30',
-            totalAmount: 14500,
-            withholdingAmount: 290,
-            netPayable: 14210,
-            paidAmount: 0,
-            remainingBalance: 14210,
-            agingDays: 60,
-            agingBucket: '31-60',
-            status: 'UNPAID',
-          },
-        ]);
-      }
+      setSuppliers(Array.isArray(supData) ? supData : []);
+      setPurchaseOrders(Array.isArray(poData) ? poData : []);
+      setGrnList(Array.isArray(grnData) ? grnData : []);
+      setPayables(Array.isArray(payablesData) ? payablesData : []);
+      setCatalogProducts(Array.isArray(catData) ? catData : []);
     } catch (err: any) {
-      console.warn('Could not load purchasing from server, using demo state:', err);
+      console.warn('Could not load purchasing from server:', err);
+      setSuppliers([]);
+      setPurchaseOrders([]);
+      setGrnList([]);
+      setPayables([]);
+      setCatalogProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -512,14 +299,16 @@ export const PurchasingView: React.FC = () => {
 
   // Low stock products for 2-tap reorder
   const lowStockProducts = useMemo(() => {
-    return SAMPLE_PRODUCTS.filter((p) => p.onHand <= p.minStock);
-  }, []);
+    return catalogProducts.filter((p: any) => p.stockOnHand <= (p.minStockLevel || 0));
+  }, [catalogProducts]);
 
   // ─── 2-Tap PO Creation from Reorder Suggestions ───
   const handleExecuteTwoTapReorder = async () => {
-    const groups: Record<string, typeof SAMPLE_PRODUCTS> = {};
+    if (lowStockProducts.length === 0 || suppliers.length === 0) return;
+    const groups: Record<string, any[]> = {};
     for (const prod of lowStockProducts) {
-      const supId = prod.supplierId || suppliers[0].id;
+      const supId = prod.supplierId || suppliers[0]?.id;
+      if (!supId) continue;
       if (!groups[supId]) groups[supId] = [];
       groups[supId].push(prod);
     }
@@ -529,16 +318,17 @@ export const PurchasingView: React.FC = () => {
 
     for (const [supId, prods] of Object.entries(groups)) {
       const sup = suppliers.find((s) => s.id === supId) || suppliers[0];
+      if (!sup) continue;
       const items = prods.map((p) => ({
         id: `poi-reorder-${Date.now()}-${p.id}`,
         productId: p.id,
-        productName: p.nameEn,
+        productName: p.nameEn || p.sku,
         sku: p.sku,
-        orderedQuantity: p.reorderQty,
+        orderedQuantity: p.minStockLevel ? Math.max(10, p.minStockLevel * 2) : 20,
         receivedQuantity: 0,
-        unitCost: p.costPrice,
-        taxRate: 0.15,
-        totalCost: p.reorderQty * p.costPrice,
+        unitCost: p.costPrice || 0,
+        taxRate: p.vatRate || 0.15,
+        totalCost: (p.minStockLevel ? Math.max(10, p.minStockLevel * 2) : 20) * (p.costPrice || 0),
       }));
 
       const subtotal = items.reduce((s, i) => s + i.totalCost, 0);
@@ -554,7 +344,7 @@ export const PurchasingView: React.FC = () => {
         orderNumber,
         supplierId: sup.id,
         supplierName: sup.name,
-        supplierCode: sup.code,
+        supplierCode: sup.code || 'SUP',
         supplierPhone: sup.phone,
         supplierTin: sup.tinNumber,
         status: initialStatus,
@@ -598,20 +388,25 @@ export const PurchasingView: React.FC = () => {
   };
 
   // ─── Create Purchase Order State (Manual) ───
-  const [newPoSupplierId, setNewPoSupplierId] = useState(suppliers[0]?.id || 's1');
+  const [newPoSupplierId, setNewPoSupplierId] = useState(suppliers[0]?.id || '');
   const [newPoDeliveryDate, setNewPoDeliveryDate] = useState(
     new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
   );
   const [newPoNotes, setNewPoNotes] = useState('');
   const [newPoItems, setNewPoItems] = useState<
     Array<{ productId: string; orderedQuantity: number; unitCost: number; taxRate: number }>
-  >([{ productId: SAMPLE_PRODUCTS[0].id, orderedQuantity: 50, unitCost: SAMPLE_PRODUCTS[0].costPrice, taxRate: 0.15 }]);
+  >([]);
 
   const handleAddPoLine = () => {
-    const nextProd = SAMPLE_PRODUCTS[newPoItems.length % SAMPLE_PRODUCTS.length];
+    const nextProd = catalogProducts.length > 0 ? catalogProducts[newPoItems.length % catalogProducts.length] : null;
     setNewPoItems((prev) => [
       ...prev,
-      { productId: nextProd.id, orderedQuantity: 20, unitCost: nextProd.costPrice, taxRate: 0.15 },
+      {
+        productId: nextProd?.id || '',
+        orderedQuantity: 20,
+        unitCost: nextProd?.costPrice || 0,
+        taxRate: nextProd?.vatRate || 0.15,
+      },
     ]);
   };
 
@@ -640,7 +435,7 @@ export const PurchasingView: React.FC = () => {
     const orderNumber = `PO-${datePart}-000${purchaseOrders.length + 1}`;
 
     const itemsPayload = newPoItems.map((item) => {
-      const prod = SAMPLE_PRODUCTS.find((p) => p.id === item.productId);
+      const prod = catalogProducts.find((p) => p.id === item.productId);
       return {
         id: `poi-${Date.now()}-${Math.random()}`,
         productId: item.productId,
@@ -712,12 +507,13 @@ export const PurchasingView: React.FC = () => {
   const handleApprovePO = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!poToApprove) return;
-    if (managerPin !== '1234') {
-      setApprovalError('Invalid Manager PIN. Default demo PIN is 1234.');
-      return;
-    }
 
     try {
+      const verifyRes = await posApi.verifyManagerPin(currentUser?.branchId || '', { pin: managerPin });
+      if (!verifyRes.authorized) {
+        setApprovalError(verifyRes.message || 'Invalid Manager PIN.');
+        return;
+      }
       await posApi.approvePurchaseOrder(poToApprove.id, managerPin);
     } catch {
       // offline fallback
@@ -726,7 +522,7 @@ export const PurchasingView: React.FC = () => {
     setPurchaseOrders((prev) =>
       prev.map((p) => (p.id === poToApprove.id ? { ...p, status: 'APPROVED' } : p)),
     );
-    showToast(`Purchase Order ${poToApprove.orderNumber} APPROVED by Manager!`, 'success');
+    showToast(`Purchase Order ${poToApprove.orderNumber} APPROVED!`, 'success');
     setIsApproveModalOpen(false);
   };
 
@@ -752,12 +548,12 @@ export const PurchasingView: React.FC = () => {
   const [grnPoId, setGrnPoId] = useState<string | null>(null);
   const [grnInvoiceNo, setGrnInvoiceNo] = useState(`INV-${Date.now().toString().slice(-6)}`);
   const [grnInvoiceDate, setGrnInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [grnReceivingDock, setGrnReceivingDock] = useState('Loading Dock A - Bole Central');
+  const [grnReceivingDock, setGrnReceivingDock] = useState('Main Receiving Dock');
 
   // Landed Costs
-  const [grnFreightCost, setGrnFreightCost] = useState(800);
-  const [grnDutyCost, setGrnDutyCost] = useState(300);
-  const [grnOtherCost, setGrnOtherCost] = useState(150);
+  const [grnFreightCost, setGrnFreightCost] = useState(0);
+  const [grnDutyCost, setGrnDutyCost] = useState(0);
+  const [grnOtherCost, setGrnOtherCost] = useState(0);
   const [grnAllocationMethod, setGrnAllocationMethod] = useState<'BY_VALUE' | 'BY_QUANTITY'>('BY_VALUE');
 
   // Items in GRN
@@ -792,7 +588,7 @@ export const PurchasingView: React.FC = () => {
 
     const itemsToReceive = (po.items || []).map((poi) => {
       const remaining = Math.max(0, poi.orderedQuantity - poi.receivedQuantity);
-      const prod = SAMPLE_PRODUCTS.find((p) => p.id === poi.productId);
+      const prod = catalogProducts.find((p) => p.id === poi.productId);
       return {
         productId: poi.productId,
         productName: poi.productName,
@@ -809,27 +605,7 @@ export const PurchasingView: React.FC = () => {
       };
     });
 
-    setGrnItems(
-      itemsToReceive.length > 0
-        ? itemsToReceive
-        : [
-            {
-              productId: SAMPLE_PRODUCTS[0].id,
-              productName: SAMPLE_PRODUCTS[0].nameEn,
-              sku: SAMPLE_PRODUCTS[0].sku,
-              barcode: SAMPLE_PRODUCTS[0].barcode,
-              orderedQty: 100,
-              receivedQuantity: 100,
-              acceptedQuantity: 100,
-              rejectedQuantity: 0,
-              rejectReason: '',
-              purchaseUnitCost: 85,
-              batchNumber: `BAT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-MILK`,
-              expiryDate: '2027-01-31',
-            },
-          ],
-    );
-
+    setGrnItems(itemsToReceive);
     setIsGrnWizardOpen(true);
   };
 
@@ -837,24 +613,29 @@ export const PurchasingView: React.FC = () => {
   const openDirectGrn = () => {
     setSelectedPoForGrn(null);
     setGrnPoId(null);
-    setGrnSupplierId(suppliers[0]?.id || 's1');
+    setGrnSupplierId(suppliers[0]?.id || '');
     setGrnInvoiceNo(`INV-DIR-${Date.now().toString().slice(-5)}`);
     setGrnWizardStep(1);
-    setGrnItems([
-      {
-        productId: SAMPLE_PRODUCTS[0].id,
-        productName: SAMPLE_PRODUCTS[0].nameEn,
-        sku: SAMPLE_PRODUCTS[0].sku,
-        barcode: SAMPLE_PRODUCTS[0].barcode,
-        receivedQuantity: 60,
-        acceptedQuantity: 60,
-        rejectedQuantity: 0,
-        rejectReason: '',
-        purchaseUnitCost: SAMPLE_PRODUCTS[0].costPrice,
-        batchNumber: `BAT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-MILK`,
-        expiryDate: '2027-02-15',
-      },
-    ]);
+    if (catalogProducts.length > 0) {
+      const first = catalogProducts[0];
+      setGrnItems([
+        {
+          productId: first.id,
+          productName: first.nameEn,
+          sku: first.sku,
+          barcode: first.barcode,
+          receivedQuantity: 10,
+          acceptedQuantity: 10,
+          rejectedQuantity: 0,
+          rejectReason: '',
+          purchaseUnitCost: first.costPrice || 0,
+          batchNumber: `BAT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${first.sku.slice(0, 6)}`,
+          expiryDate: new Date(Date.now() + 180 * 86400000).toISOString().split('T')[0],
+        },
+      ]);
+    } else {
+      setGrnItems([]);
+    }
     setIsGrnWizardOpen(true);
   };
 
@@ -864,8 +645,8 @@ export const PurchasingView: React.FC = () => {
     const code = scanBarcodeInput.trim();
     if (!code) return;
 
-    const matchedProduct = SAMPLE_PRODUCTS.find(
-      (p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase(),
+    const matchedProduct = catalogProducts.find(
+      (p) => p.barcode === code || p.sku?.toLowerCase() === code.toLowerCase(),
     );
 
     if (matchedProduct) {
@@ -947,8 +728,8 @@ export const PurchasingView: React.FC = () => {
 
     // AVCO Blending impact preview
     const avcoPreviews = grnItems.map((gi, idx) => {
-      const prod = SAMPLE_PRODUCTS.find((p) => p.id === gi.productId);
-      const oldQty = prod?.onHand || 20;
+      const prod = catalogProducts.find((p) => p.id === gi.productId);
+      const oldQty = prod?.stockOnHand || 0;
       const oldCost = prod?.costPrice || gi.purchaseUnitCost;
       const app = apportioned[idx];
       const landedUnitCost = app?.finalUnitCost || gi.purchaseUnitCost;
@@ -1188,18 +969,8 @@ export const PurchasingView: React.FC = () => {
       }));
       setReturnItems(items);
     } else {
-      setReturnSupplierId(suppliers[0]?.id || 's1');
-      setReturnItems([
-        {
-          productId: SAMPLE_PRODUCTS[0].id,
-          productName: SAMPLE_PRODUCTS[0].nameEn,
-          sku: SAMPLE_PRODUCTS[0].sku,
-          batchNumber: 'BAT-DEFAULT-01',
-          quantity: 2,
-          unitCost: SAMPLE_PRODUCTS[0].costPrice,
-          reason: 'Packaging breach in shipment',
-        },
-      ]);
+      setReturnSupplierId(suppliers[0]?.id || '');
+      setReturnItems([]);
     }
     setIsReturnModalOpen(true);
   };
@@ -1628,7 +1399,15 @@ export const PurchasingView: React.FC = () => {
                   {filteredPOs.length === 0 && (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-slate-400">
-                        No purchase orders matching criteria.
+                        <FileText className="mx-auto mb-2 text-slate-300 dark:text-slate-600" size={32} />
+                        <p className="font-semibold text-sm">No purchase orders yet</p>
+                        <p className="text-xs text-slate-400 mt-1">Create your first purchase order to order stock from suppliers</p>
+                        <button
+                          onClick={() => setIsPoModalOpen(true)}
+                          className="mt-3 px-3 py-1.5 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow-xs inline-flex items-center gap-1"
+                        >
+                          <Plus size={14} /> New Purchase Order
+                        </button>
                       </td>
                     </tr>
                   )}
@@ -1709,7 +1488,15 @@ export const PurchasingView: React.FC = () => {
                   {filteredGRNs.length === 0 && (
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-slate-400">
-                        No goods received notes found.
+                        <Truck className="mx-auto mb-2 text-slate-300 dark:text-slate-600" size={32} />
+                        <p className="font-semibold text-sm">No goods received notes yet</p>
+                        <p className="text-xs text-slate-400 mt-1">Receive deliveries from purchase orders or record direct receiving</p>
+                        <button
+                          onClick={openDirectGrn}
+                          className="mt-3 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs inline-flex items-center gap-1"
+                        >
+                          <Plus size={14} /> Receive Goods Wizard
+                        </button>
                       </td>
                     </tr>
                   )}
@@ -1786,6 +1573,19 @@ export const PurchasingView: React.FC = () => {
                 </div>
               </div>
             ))}
+            {filteredSuppliers.length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                <Users className="mx-auto mb-2 text-slate-300 dark:text-slate-600" size={32} />
+                <p className="font-semibold text-sm">No suppliers registered yet</p>
+                <p className="text-xs text-slate-400 mt-1">Add your first supplier to begin issuing purchase orders</p>
+                <button
+                  onClick={() => setIsSupplierModalOpen(true)}
+                  className="mt-3 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs inline-flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add Supplier
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1905,7 +1705,9 @@ export const PurchasingView: React.FC = () => {
                     {filteredPayables.length === 0 && (
                       <tr>
                         <td colSpan={9} className="py-12 text-center text-slate-400">
-                          No payables found.
+                          <CheckCircle2 className="mx-auto mb-2 text-emerald-500" size={32} />
+                          <p className="font-semibold text-sm">No outstanding payables</p>
+                          <p className="text-xs text-slate-400 mt-1">All supplier invoices are clear with zero overdue balance</p>
                         </td>
                       </tr>
                     )}
@@ -2490,33 +2292,41 @@ export const PurchasingView: React.FC = () => {
             </div>
 
             <div className="p-6 overflow-y-auto space-y-3">
-              {lowStockProducts.map((p) => {
-                const sup = suppliers.find((s) => s.id === p.supplierId) || suppliers[0];
-                return (
-                  <div
-                    key={p.id}
-                    className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="font-bold text-xs text-slate-900 dark:text-white">{p.nameEn}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">
-                        SKU: {p.sku} • On-Hand: <span className="text-rose-500 font-bold">{p.onHand}</span> / Min: {p.minStock}
+              {lowStockProducts.length === 0 ? (
+                <div className="py-12 text-center text-slate-400">
+                  <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-500" />
+                  <p className="font-semibold text-sm">All inventory levels are optimal</p>
+                  <p className="text-xs text-slate-400 mt-1">No products are currently at or below their reorder points.</p>
+                </div>
+              ) : (
+                lowStockProducts.map((p) => {
+                  const sup = suppliers.find((s) => s.id === p.supplierId) || suppliers[0];
+                  return (
+                    <div
+                      key={p.id}
+                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-bold text-xs text-slate-900 dark:text-white">{p.nameEn || p.sku}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">
+                          SKU: {p.sku} • On-Hand: <span className="text-rose-500 font-bold">{p.stockOnHand}</span> / Min: {p.minStockLevel || 0}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">
+                          Supplier: <strong className="text-purple-600">{sup?.name || 'Unassigned'}</strong>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-slate-500 mt-1">
-                        Supplier: <strong className="text-purple-600">{sup.name}</strong>
+                      <div className="text-right">
+                        <div className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          Order Qty: {p.minStockLevel ? Math.max(10, p.minStockLevel * 2) : 20}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono">
+                          Est: {fmt((p.minStockLevel ? Math.max(10, p.minStockLevel * 2) : 20) * (p.costPrice || 0))} ETB
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        Order Qty: {p.reorderQty} {p.baseUnit}
-                      </div>
-                      <div className="text-[11px] text-slate-400 font-mono">
-                        Est: {fmt(p.reorderQty * p.costPrice)} ETB
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between shrink-0">
@@ -2583,7 +2393,7 @@ export const PurchasingView: React.FC = () => {
                 <input
                   type="password"
                   maxLength={6}
-                  placeholder="Enter Manager PIN (Demo: 1234)"
+                  placeholder="Enter Manager PIN"
                   value={managerPin}
                   onChange={(e) => {
                     setManagerPin(e.target.value);
@@ -2901,7 +2711,7 @@ export const PurchasingView: React.FC = () => {
                           value={line.productId}
                           onChange={(e) => {
                             const pid = e.target.value;
-                            const prod = SAMPLE_PRODUCTS.find((p) => p.id === pid);
+                            const prod = catalogProducts.find((p) => p.id === pid);
                             setNewPoItems((prev) =>
                               prev.map((item, i) =>
                                 i === idx
@@ -2912,7 +2722,10 @@ export const PurchasingView: React.FC = () => {
                           }}
                           className="w-full text-xs rounded-lg bg-white dark:bg-slate-700 border-none p-2 text-slate-900 dark:text-white"
                         >
-                          {SAMPLE_PRODUCTS.map((p) => (
+                          {catalogProducts.length === 0 && (
+                            <option value="">No products in catalog — add products first</option>
+                          )}
+                          {catalogProducts.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.nameEn} ({p.sku})
                             </option>

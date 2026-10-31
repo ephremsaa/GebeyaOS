@@ -119,7 +119,7 @@ describe('SystemService', () => {
     it('successfully restores valid payload in transaction', async () => {
       const tables = {
         system_settings: [{ key: 'store_info', value: { name: 'Restored Store' } }],
-        categories: [{ id: 'c1', code: 'CAT1', name_en: 'Cat 1', name_am: null, parent_id: null, sort_order: 1 }],
+        categories: [{ id: 'c1', code: 'CAT1', name_en: 'Cat 1', name_am: null, parent_id: null }],
       };
       const sha256 = crypto
         .createHash('sha256')

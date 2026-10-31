@@ -457,7 +457,7 @@ export class ProductsService {
    */
   async getCategories(): Promise<any[]> {
     const res = await this.db.query(
-      `SELECT id, code, name_en, name_am FROM categories ORDER BY sort_order ASC, name_en ASC`,
+      `SELECT id, code, name_en, name_am FROM categories ORDER BY name_en ASC`,
     );
     return res.rows;
   }

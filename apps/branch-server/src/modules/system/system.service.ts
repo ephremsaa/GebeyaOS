@@ -506,10 +506,10 @@ export class SystemService {
       if (tables['categories']) {
         for (const row of tables['categories']) {
           await client.query(
-            `INSERT INTO categories (id, code, name_en, name_am, parent_id, sort_order)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            `INSERT INTO categories (id, code, name_en, name_am, parent_id)
+             VALUES ($1, $2, $3, $4, $5)
              ON CONFLICT (id) DO UPDATE SET name_en = EXCLUDED.name_en, name_am = EXCLUDED.name_am`,
-            [row.id, row.code, row.name_en, row.name_am, row.parent_id, row.sort_order],
+            [row.id, row.code, row.name_en, row.name_am, row.parent_id],
           );
         }
       }

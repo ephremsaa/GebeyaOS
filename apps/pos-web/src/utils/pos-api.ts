@@ -199,7 +199,7 @@ export const posApi = {
     const drops = movements.filter((m) => m.movement_type === 'SAFE_DROP').reduce((s, m) => s + m.amount, 0);
     const floatIn = movements.filter((m) => m.movement_type === 'ADDITIONAL_FLOAT').reduce((s, m) => s + m.amount, 0);
     const pettyCash = movements.filter((m) => m.movement_type === 'PETTY_CASH_OUT').reduce((s, m) => s + m.amount, 0);
-    const openingFloat = shift ? Number(shift.openingCashFloat || shift.opening_cash_float || 1000) : 1000;
+    const openingFloat = shift ? Number(shift.openingCashFloat || shift.opening_cash_float || 0) : 0;
 
     let cashSales = 0;
     let telebirrSales = 0;
@@ -642,17 +642,7 @@ export const posApi = {
       }
     } catch {}
 
-    // Offline supervisor PIN fallback (1234 or 0000)
-    if (dto.pin === '1234' || dto.pin === '0000') {
-      return {
-        authorized: true,
-        authorizedBy: '018e0000-0000-7000-8000-000000000041',
-        role: 'OWNER',
-        maxDiscountPercentage: 100,
-      };
-    }
-
-    return { authorized: false, message: 'Invalid supervisor PIN. Try 1234.' };
+    return { authorized: false, message: 'Manager PIN authorization failed or server unreachable.' };
   },
 
   /**
