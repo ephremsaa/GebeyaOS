@@ -406,7 +406,7 @@ export class AuthService {
     let params: any[] = [];
 
     if (slug && slug.trim()) {
-      query += ` WHERE LOWER(slug) = LOWER($1) OR id::text = $1 LIMIT 1`;
+      query += ` WHERE LOWER(slug) = LOWER($1) OR LOWER(name) = LOWER($1) OR LOWER(slug) LIKE LOWER($1) || '%' OR id::text = $1 LIMIT 1`;
       params.push(slug.trim());
     } else {
       query += ` ORDER BY created_at ASC LIMIT 1`;
