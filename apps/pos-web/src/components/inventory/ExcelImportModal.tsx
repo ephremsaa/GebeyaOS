@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useAuth } from '../../auth/AuthContext';
 import {
   FileSpreadsheet,
   Download,
@@ -34,6 +35,13 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
   onCommitSuccess,
   existingProducts,
 }) => {
+  const { currentUser, assignedBranches, terminalConfig } = useAuth();
+  const branchId =
+    currentUser?.branchId ||
+    terminalConfig?.branchId ||
+    assignedBranches?.[0]?.id ||
+    '';
+
   const [step, setStep] = useState<number>(1); // 1: Upload, 2: Preview & Fix, 3: Success Result
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
@@ -79,7 +87,10 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
       const token = localStorage.getItem('gebeyaos_access_token');
       const res = await fetch('/api/inventory/import/validate', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(branchId ? { 'x-branch-id': branchId } : {}),
+        },
         body: formData,
       });
 
@@ -150,6 +161,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          ...(branchId ? { 'x-branch-id': branchId } : {}),
         },
         body: JSON.stringify(payload),
       });

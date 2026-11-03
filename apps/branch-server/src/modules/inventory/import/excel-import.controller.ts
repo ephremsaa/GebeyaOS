@@ -20,9 +20,9 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { ImportCommitRequest } from '@gebeyaos/shared-types';
+import { ImportCommitRequest, AuthenticatedUser } from '@gebeyaos/shared-types';
 
-@Controller('inventory/import')
+@Controller(['inventory/import', 'api/inventory/import'])
 export class ExcelImportController {
   constructor(private readonly importService: ExcelImportService) {}
 
@@ -46,12 +46,13 @@ export class ExcelImportController {
   @UseInterceptors(FileInterceptor('file'))
   async validateFile(
     @UploadedFile() file: any,
+    @CurrentUser() user?: AuthenticatedUser,
     @Headers('x-branch-id') branchHeader?: string,
   ) {
     if (!file || !file.buffer) {
       throw new BadRequestException('Please provide an Excel (.xlsx) or CSV file to validate.');
     }
-    const branchId = branchHeader || '018e0000-0000-7000-8000-000000000020';
+    const branchId = branchHeader || user?.branchId || '';
     return this.importService.validateImportBuffer(file.buffer, branchId);
   }
 
@@ -60,12 +61,12 @@ export class ExcelImportController {
   @RequirePermissions('inventory:import:execute')
   @HttpCode(HttpStatus.CREATED)
   async commitImport(
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() request: ImportCommitRequest,
     @Headers('x-branch-id') branchHeader?: string,
   ) {
-    const branchId = branchHeader || '018e0000-0000-7000-8000-000000000020';
-    return this.importService.commitImport(branchId, userId, request);
+    const branchId = branchHeader || user?.branchId || '';
+    return this.importService.commitImport(branchId, user.id, request, user?.tenantId);
   }
 
   @Post(':id/undo')
@@ -74,18 +75,21 @@ export class ExcelImportController {
   @HttpCode(HttpStatus.OK)
   async undoImport(
     @Param('id') batchId: string,
-    @CurrentUser('id') managerId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Headers('x-branch-id') branchHeader?: string,
   ) {
-    const branchId = branchHeader || '018e0000-0000-7000-8000-000000000020';
-    return this.importService.undoImport(batchId, managerId, branchId);
+    const branchId = branchHeader || user?.branchId || '';
+    return this.importService.undoImport(batchId, user.id, branchId);
   }
 
   @Get('history')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('inventory:stock:view')
-  async listImportHistory(@Headers('x-branch-id') branchHeader?: string) {
-    const branchId = branchHeader || '018e0000-0000-7000-8000-000000000020';
+  async listImportHistory(
+    @CurrentUser() user?: AuthenticatedUser,
+    @Headers('x-branch-id') branchHeader?: string,
+  ) {
+    const branchId = branchHeader || user?.branchId || '';
     return this.importService.listImportHistory(branchId);
   }
 }

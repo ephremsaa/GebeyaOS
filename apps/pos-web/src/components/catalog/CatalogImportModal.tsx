@@ -74,73 +74,45 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
     setParsing(true);
 
     try {
-      const buffer = await selected.arrayBuffer();
-      const hash = await calculateSha256(buffer);
-      setFileHash(hash);
+      const formData = new FormData();
+      formData.append('file', selected);
 
-      // Check if file hash was previously uploaded in session storage or localStorage
-      const importedHashes = JSON.parse(localStorage.getItem('gebeyaos_imported_hashes') || '[]');
-      if (importedHashes.includes(hash)) {
-        setIsDuplicateFile(true);
-      } else {
-        setIsDuplicateFile(false);
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const branchId = currentUser?.branchId || '';
+
+      const res = await fetch('/api/inventory/import/validate', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(branchId ? { 'x-branch-id': branchId } : {}),
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to validate file.');
       }
 
-      // Parse text content (CSV support)
-      const text = new TextDecoder('utf-8').decode(buffer);
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-
-      if (lines.length <= 1) {
-        throw new Error('File is empty or contains only header row.');
-      }
-
-      const parsedRows: ImportRow[] = [];
-      const seenBarcodes = new Set<string>();
-
-      // Assume CSV format: Barcode,SKU,Name (EN),Name (AM),Category,Unit,Cost,Price,Quantity
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
-        const barcode = cols[0] || '';
-        const sku = cols[1] || `SKU-${i.toString().padStart(4, '0')}`;
-        const nameEn = cols[2] || '';
-        const nameAm = cols[3] || '';
-        const category = cols[4] || 'General';
-        const unit = cols[5] || 'PCS';
-        const costPrice = parseFloat(cols[6]) || 0;
-        const sellingPrice = parseFloat(cols[7]) || 0;
-        const quantity = parseFloat(cols[8]) || 0;
-
-        const issues: string[] = [];
-        if (!nameEn) issues.push('Missing English product name');
-        if (!sku) issues.push('Missing SKU');
-        if (sellingPrice < 0) issues.push('Selling price cannot be negative');
-        if (costPrice < 0) issues.push('Cost price cannot be negative');
-
-        if (barcode) {
-          if (seenBarcodes.has(barcode)) {
-            issues.push(`Duplicate barcode '${barcode}' in row ${i + 1}`);
-          } else {
-            seenBarcodes.add(barcode);
-          }
-        }
-
-        parsedRows.push({
-          rowNumber: i + 1,
-          barcode,
-          sku,
-          nameEn,
-          nameAm,
-          category,
-          unit,
-          costPrice,
-          sellingPrice,
-          quantity,
-          status: issues.length === 0 ? 'OK' : 'ERROR',
-          issues,
-        });
-      }
-
-      setRows(parsedRows);
+      const data = await res.json();
+      setFileHash(data.fileHash);
+      setIsDuplicateFile(data.duplicateFileWarning);
+      setRows(
+        data.rows.map((r: any) => ({
+          rowNumber: r.rowNumber,
+          barcode: r.barcode,
+          sku: r.sku,
+          nameEn: r.nameEn,
+          nameAm: r.nameAm,
+          category: r.category,
+          unit: r.unit,
+          costPrice: r.costPrice,
+          sellingPrice: r.sellingPrice,
+          quantity: r.quantity,
+          status: r.status,
+          issues: r.issues || [],
+        })),
+      );
     } catch (err: any) {
       setError(err.message || 'Failed to parse file.');
     } finally {
@@ -171,7 +143,7 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
       return;
     }
 
-    const validRows = rows.filter((r) => r.status === 'OK');
+    const validRows = rows.filter((r) => r.status !== 'ERROR');
     if (validRows.length === 0) {
       setError('No valid rows found to import.');
       return;
@@ -180,32 +152,33 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
     setCommitting(true);
     setError(null);
     try {
-      // Create products via API
-      for (const row of validRows) {
-        try {
-          await fetch('/api/products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sku: row.sku,
-              name_en: row.nameEn,
-              name_am: row.nameAm || null,
-              category_id: '018e0000-0000-7000-8000-000000000055', // Default Category fallback
-              uom_code: row.unit,
-              base_price: row.sellingPrice,
-              cost_price: row.costPrice,
-              barcode: row.barcode || undefined,
-            }),
-          });
-        } catch {}
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const branchId = currentUser?.branchId || '';
+
+      const res = await fetch('/api/inventory/import/commit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          ...(branchId ? { 'x-branch-id': branchId } : {}),
+        },
+        body: JSON.stringify({
+          fileName: file?.name || 'catalog_import.xlsx',
+          fileHash,
+          importMode: 'CREATE_OR_UPDATE',
+          sourceType: 'OPENING_BALANCE',
+          confirmDuplicate,
+          rows: validRows,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Import failed.');
       }
 
-      // Mark hash as imported
-      const importedHashes = JSON.parse(localStorage.getItem('gebeyaos_imported_hashes') || '[]');
-      importedHashes.push(fileHash);
-      localStorage.setItem('gebeyaos_imported_hashes', JSON.stringify(importedHashes));
-
-      setSuccess(`Successfully imported ${validRows.length} products into the catalog!`);
+      const result = await res.json();
+      setSuccess(`Successfully imported ${result.createdCount + result.updatedCount} products into the catalog!`);
       setTimeout(() => {
         onImportCompleted();
         onClose();

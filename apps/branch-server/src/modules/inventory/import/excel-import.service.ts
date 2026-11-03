@@ -5,10 +5,13 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import * as crypto from 'crypto';
+import { Readable } from 'stream';
 import { DatabaseService } from '../../../common/database/database.service';
+import { TenantContextService } from '../../../common/tenant/tenant-context.service';
 import {
   ImportMode,
   ImportSourceType,
@@ -20,6 +23,7 @@ import {
   generateUuidV7,
 } from '@gebeyaos/shared-types';
 
+const DEFAULT_TENANT_ID = '01900000-0000-7000-8000-000000000001';
 const MAX_IMPORT_ROWS = 20000;
 const PERISHABLE_CATEGORIES = new Set([
   'DAIRY & EGGS',
@@ -36,7 +40,10 @@ const PERISHABLE_CATEGORIES = new Set([
 export class ExcelImportService {
   private readonly logger = new Logger(ExcelImportService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    @Optional() private readonly tenantContext?: TenantContextService,
+  ) {}
 
   /**
    * 1. Generate Formatted Excel Template (.xlsx)
@@ -166,6 +173,68 @@ export class ExcelImportService {
   }
 
   /**
+   * Helper: Normalize Unit of Measure
+   */
+  private normalizeUnit(unitStr?: string): string {
+    const u = (unitStr || '').trim().toUpperCase();
+    if (u === 'KG' || u === 'KILOGRAM' || u === 'KGS') return 'KG';
+    if (u === 'G' || u === 'GRAM' || u === 'GRAMS') return 'G';
+    if (u === 'L' || u === 'LITER' || u === 'LITRE' || u === 'LITERS') return 'L';
+    if (u === 'ML' || u === 'MILLILITER') return 'ML';
+    if (u === 'PACK' || u === 'PACKAGE' || u === 'PCK' || u === 'PKT') return 'PACK';
+    if (u === 'BOX' || u === 'CARTON' || u === 'CTN') return 'BOX';
+    if (u === 'BUNDLE') return 'BUNDLE';
+    return 'PCS'; // Piece / Pieces / etc.
+  }
+
+  /**
+   * Helper: Parse VAT / Tax representation
+   */
+  private parseVatType(rawVat?: string): { isVat: boolean; vatRate: number } {
+    const v = (rawVat || '').trim().toUpperCase();
+    if (v.includes('0%') || v.includes('EXEMPT') || v === 'NO' || v === 'FALSE' || v === '0') {
+      return { isVat: false, vatRate: 0.0 };
+    }
+    return { isVat: true, vatRate: 0.15 };
+  }
+
+  /**
+   * Helper: Detect whether a given row contains header column titles
+   */
+  private detectHeaderRow(row: ExcelJS.Row): Record<string, number> | null {
+    const values: string[] = [];
+    row.eachCell((cell) => {
+      values.push((cell.value || '').toString().toLowerCase().trim());
+    });
+    const joined = values.join(' ');
+    const hasKeywords =
+      (joined.includes('barcode') || joined.includes('item')) &&
+      (joined.includes('sku') || joined.includes('code') || joined.includes('name') || joined.includes('price') || joined.includes('unit'));
+    if (!hasKeywords) return null;
+
+    const mapping: Record<string, number> = {};
+    row.eachCell((cell, colNumber) => {
+      const val = (cell.value || '').toString().toLowerCase().trim();
+      if (val.includes('barcode') || val.includes('ባርኮድ')) mapping['barcode'] = colNumber;
+      else if (val.includes('sku') || val.includes('product code') || val.includes('item id') || val.includes('ኤስኬዩ') || val === 'code') mapping['sku'] = colNumber;
+      else if (val.includes('name (en)') || val.includes('name en') || val.includes('items') || val.includes('item name') || val.includes('description') || (val.includes('name') && !val.includes('am')) || val.includes('ስም'))
+        mapping['nameEn'] = colNumber;
+      else if (val.includes('name (am)') || val.includes('name am') || val.includes('አማርኛ'))
+        mapping['nameAm'] = colNumber;
+      else if (val.includes('cat') || val.includes('ምድብ') || val.includes('department')) mapping['category'] = colNumber;
+      else if (val.includes('unit') || val.includes('base unit') || val.includes('uom') || val.includes('መለኪያ')) mapping['unit'] = colNumber;
+      else if (val.includes('quant') || val.includes('qty') || val.includes('stock') || val.includes('ብዛት')) mapping['quantity'] = colNumber;
+      else if (val.includes('cost') || val.includes('buy') || val.includes('የወጪ')) mapping['costPrice'] = colNumber;
+      else if (val.includes('price') || val.includes('shelf') || val.includes('sell') || val.includes('ዋጋ') || val.includes('የመሸጫ'))
+        mapping['sellingPrice'] = colNumber;
+      else if (val.includes('batch') || val.includes('ባች')) mapping['batchNumber'] = colNumber;
+      else if (val.includes('expir') || val.includes('ያበቃበት')) mapping['expiryDate'] = colNumber;
+      else if (val.includes('tax') || val.includes('vat') || val.includes('ታክስ')) mapping['isVat'] = colNumber;
+    });
+    return mapping;
+  }
+
+  /**
    * 2. Dry-Run Validation of Uploaded Excel/CSV Buffer
    */
   async validateImportBuffer(
@@ -195,12 +264,21 @@ export class ExcelImportService {
     }
 
     const workbook = new ExcelJS.Workbook();
-    try {
-      await workbook.xlsx.load(buffer as any);
-    } catch {
-      throw new BadRequestException(
-        'Invalid or corrupted spreadsheet. Please upload a valid .xlsx or .csv file.',
-      );
+    const isZip = buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B;
+
+    if (isZip) {
+      try {
+        await workbook.xlsx.load(buffer as any);
+      } catch (err: any) {
+        throw new BadRequestException('Invalid or corrupted Excel spreadsheet (.xlsx): ' + err.message);
+      }
+    } else {
+      try {
+        const stream = Readable.from(buffer);
+        await workbook.csv.read(stream);
+      } catch (err: any) {
+        throw new BadRequestException('Invalid or corrupted CSV file: ' + err.message);
+      }
     }
 
     const sheet = workbook.worksheets[0];
@@ -208,43 +286,30 @@ export class ExcelImportService {
       throw new BadRequestException('The workbook does not contain any sheets.');
     }
 
-    // Detect column mappings from header row
-    const headerRow = sheet.getRow(1);
-    const colMap: Record<string, number> = {};
-
-    headerRow.eachCell((cell, colNumber) => {
-      const val = (cell.value || '').toString().toLowerCase().trim();
-      if (val.includes('barcode') || val.includes('ባርኮድ')) colMap['barcode'] = colNumber;
-      else if (val.includes('sku') || val.includes('ኤስኬዩ')) colMap['sku'] = colNumber;
-      else if (val.includes('name (en)') || val.includes('name en') || (val.includes('name') && !val.includes('am')) || val.includes('ስም'))
-        colMap['nameEn'] = colNumber;
-      else if (val.includes('name (am)') || val.includes('name am') || val.includes('አማርኛ'))
-        colMap['nameAm'] = colNumber;
-      else if (val.includes('cat') || val.includes('ምድብ')) colMap['category'] = colNumber;
-      else if (val.includes('unit') || val.includes('መለኪያ')) colMap['unit'] = colNumber;
-      else if (val.includes('quant') || val.includes('qty') || val.includes('ብዛት')) colMap['quantity'] = colNumber;
-      else if (val.includes('cost') || val.includes('የወጪ')) colMap['costPrice'] = colNumber;
-      else if (val.includes('shelf') || val.includes('sell') || val.includes('price') || val.includes('የመሸጫ'))
-        colMap['sellingPrice'] = colNumber;
-      else if (val.includes('batch') || val.includes('ባች')) colMap['batchNumber'] = colNumber;
-      else if (val.includes('expir') || val.includes('ያበቃበት')) colMap['expiryDate'] = colNumber;
-      else if (val.includes('vat') || val.includes('ታክስ')) colMap['isVat'] = colNumber;
-    });
-
-    const parsedRows: ParsedImportRow[] = [];
-    const seenBarcodesInFile = new Set<string>();
+    let currentColMap: Record<string, number> = {};
+    const parsedBySku = new Map<string, ParsedImportRow>();
+    const seenBarcodesInFile = new Map<string, number>();
     let okCount = 0;
     let warningCount = 0;
     let errorCount = 0;
 
     const rowCount = Math.min(sheet.rowCount, MAX_IMPORT_ROWS);
 
-    for (let r = 2; r <= rowCount; r++) {
+    for (let r = 1; r <= rowCount; r++) {
       const row = sheet.getRow(r);
       if (row.actualCellCount === 0) continue;
 
+      // Check if this row is a header row (either row 1 or a secondary section header)
+      const detectedMap = this.detectHeaderRow(row);
+      if (detectedMap && Object.keys(detectedMap).length >= 3) {
+        currentColMap = detectedMap;
+        continue;
+      }
+
+      if (Object.keys(currentColMap).length === 0) continue;
+
       const getVal = (field: string) => {
-        const col = colMap[field];
+        const col = currentColMap[field];
         if (!col) return '';
         const raw = row.getCell(col).value;
         if (raw === null || raw === undefined) return '';
@@ -252,57 +317,51 @@ export class ExcelImportService {
         return raw.toString().trim();
       };
 
-      const barcode = getVal('barcode');
-      const sku = getVal('sku');
-      const nameEn = getVal('nameEn');
+      let barcode = getVal('barcode');
+      let sku = getVal('sku');
+      let nameEn = getVal('nameEn');
       const nameAm = getVal('nameAm');
-      const category = getVal('category') || 'Pantry, Grains & Spices';
-      const unit = (getVal('unit') || 'PCS').toUpperCase();
+      const category = getVal('category') || 'General';
+      const rawUnit = getVal('unit');
       const rawQty = getVal('quantity');
       const rawCost = getVal('costPrice');
       const rawSell = getVal('sellingPrice');
       const batchNumber = getVal('batchNumber') || undefined;
       const rawExpiry = getVal('expiryDate');
-      const rawVat = getVal('isVat').toUpperCase();
+      const rawVat = getVal('isVat');
 
-      const issues: string[] = [];
+      // Skip spacer or empty rows
+      if (!nameEn && !sku && !barcode) continue;
+      if (nameEn.toLowerCase() === 'items' || sku.toLowerCase() === 'product code') continue;
 
-      // Validation Checks
-      if (!barcode) issues.push('Missing Barcode');
-      if (!sku) issues.push('Missing SKU');
-      if (!nameEn) issues.push('Missing Product Name');
-
-      const quantity = parseFloat(rawQty);
-      if (isNaN(quantity) || quantity < 0) {
-        issues.push('Quantity must be a positive number');
+      if (!sku) {
+        sku = barcode || `SKU-${r.toString().padStart(4, '0')}`;
       }
 
-      const costPrice = parseFloat(rawCost);
-      if (isNaN(costPrice) || costPrice < 0) {
-        issues.push('Cost price must be a valid positive number');
-      }
-
-      const sellingPrice = parseFloat(rawSell);
-      if (isNaN(sellingPrice) || sellingPrice < 0) {
-        issues.push('Selling price must be a valid positive number');
-      }
-
-      // In-file duplicate barcode check
-      if (barcode) {
-        if (seenBarcodesInFile.has(barcode)) {
-          issues.push(`Duplicate barcode ${barcode} found in file`);
+      // Auto-assign in-store internal barcode if missing
+      let isAutoBarcode = false;
+      if (!barcode) {
+        isAutoBarcode = true;
+        const isNum = /^\d+$/.test(sku);
+        if (isNum) {
+          barcode = '200' + sku.padStart(9, '0') + '0';
         } else {
-          seenBarcodesInFile.add(barcode);
+          barcode = 'INT-' + sku.toUpperCase();
         }
       }
 
-      // Expiry Date check for perishables
-      const upperCat = category.toUpperCase();
-      const isPerishable = Array.from(PERISHABLE_CATEGORIES).some((c) => upperCat.includes(c));
+      const unit = this.normalizeUnit(rawUnit);
+      const quantity = parseFloat(rawQty) || 0;
+      const costPrice = parseFloat(rawCost) || 0;
+      const sellingPrice = parseFloat(rawSell) || 0;
+      const { isVat } = this.parseVatType(rawVat);
+
+      const issues: string[] = [];
+
+      if (!nameEn) issues.push('Missing Product Name');
 
       let formattedExpiry: string | undefined = undefined;
       if (rawExpiry) {
-        // Handle Excel serial date or ISO string
         if (!isNaN(Number(rawExpiry)) && Number(rawExpiry) > 20000) {
           const excelDate = new Date((Number(rawExpiry) - (25567 + 2)) * 86400 * 1000);
           formattedExpiry = excelDate.toISOString().slice(0, 10);
@@ -312,35 +371,42 @@ export class ExcelImportService {
 
         if (formattedExpiry) {
           const expDate = new Date(formattedExpiry);
-          if (isNaN(expDate.getTime())) {
-            issues.push('Invalid Expiry Date format (use YYYY-MM-DD)');
-          } else if (expDate < new Date()) {
+          if (!isNaN(expDate.getTime()) && expDate.getTime() < Date.now()) {
             issues.push('Expiry date is in the past');
           }
         }
-      } else if (isPerishable) {
-        issues.push('Expiry Date is required for perishable category');
       }
 
-      const isVat = rawVat.startsWith('Y') || rawVat === 'TRUE' || rawVat === '1';
+      if (!isAutoBarcode && barcode) {
+        if (seenBarcodesInFile.has(barcode)) {
+          const prevRow = seenBarcodesInFile.get(barcode)!;
+          issues.push(`Duplicate barcode '${barcode}' in file (matches row ${prevRow})`);
+        } else {
+          seenBarcodesInFile.set(barcode, r);
+        }
+      }
 
-      // Status tagging
       let status: 'OK' | 'WARNING' | 'ERROR' = 'OK';
       if (issues.length > 0) {
-        const hasCritical = issues.some((i) =>
-          i.includes('Missing') || i.includes('positive') || i.includes('past') || i.includes('Duplicate')
-        );
-        status = hasCritical ? 'ERROR' : 'WARNING';
-      } else if (existingBarcodes.has(barcode)) {
+        status = 'ERROR';
+      } else if (existingBarcodes.has(barcode) || existingSkus.has(sku.toUpperCase())) {
         status = 'WARNING';
-        issues.push('Barcode already exists in catalog (will update if selected)');
+        issues.push('Product already exists in catalog (will update price/cost/stock if selected)');
       }
 
-      if (status === 'OK') okCount++;
-      else if (status === 'WARNING') warningCount++;
-      else errorCount++;
+      const skuKey = sku.toUpperCase();
+      if (parsedBySku.has(skuKey)) {
+        // Merge with existing row from earlier in the same file
+        const existing = parsedBySku.get(skuKey)!;
+        if (rawVat) existing.isVat = isVat;
+        if (sellingPrice > 0 && existing.sellingPrice === 0) existing.sellingPrice = sellingPrice;
+        if (barcode && (!existing.barcode || existing.barcode.startsWith('200') || existing.barcode.startsWith('INT-'))) {
+          existing.barcode = barcode;
+        }
+        continue;
+      }
 
-      parsedRows.push({
+      const parsedRow: ParsedImportRow = {
         rowNumber: r,
         sku: this.sanitizeCell(sku),
         barcode: this.sanitizeCell(barcode),
@@ -348,25 +414,33 @@ export class ExcelImportService {
         nameAm: nameAm ? this.sanitizeCell(nameAm) : undefined,
         category: this.sanitizeCell(category),
         unit,
-        quantity: isNaN(quantity) ? 0 : quantity,
-        costPrice: isNaN(costPrice) ? 0 : costPrice,
-        sellingPrice: isNaN(sellingPrice) ? 0 : sellingPrice,
+        quantity,
+        costPrice,
+        sellingPrice,
         batchNumber: batchNumber ? this.sanitizeCell(batchNumber) : undefined,
         expiryDate: formattedExpiry,
         isVat,
         status,
         issues,
-      });
+      };
+
+      parsedBySku.set(skuKey, parsedRow);
+
+      if (status === 'OK') okCount++;
+      else if (status === 'WARNING') warningCount++;
+      else errorCount++;
     }
 
+    const finalRows = Array.from(parsedBySku.values());
+
     return {
-      totalRows: parsedRows.length,
+      totalRows: finalRows.length,
       okRows: okCount,
       warningRows: warningCount,
       errorRows: errorCount,
       duplicateFileWarning,
       fileHash,
-      rows: parsedRows,
+      rows: finalRows,
     };
   }
 
@@ -377,18 +451,22 @@ export class ExcelImportService {
     branchId: string,
     userId: string,
     req: ImportCommitRequest,
+    tenantId?: string,
   ): Promise<ImportCommitResult> {
     if (!req.rows || req.rows.length === 0) {
       throw new BadRequestException('No rows provided to commit.');
     }
 
+    const effectiveTenantId = tenantId || this.tenantContext?.getTenantId() || DEFAULT_TENANT_ID;
+    const effectiveBranchId = branchId || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+
     // Idempotency check: if duplicate hash and not confirmed, throw Conflict
     if (!req.confirmDuplicate) {
       const dup = await this.db.query(
         `SELECT id FROM import_batches WHERE branch_id = $1 AND file_hash = $2 AND status = 'COMPLETED' LIMIT 1`,
-        [branchId, req.fileHash],
+        [effectiveBranchId, req.fileHash],
       );
-      if (dup.rows.length > 0) {
+      if (dup?.rows?.length > 0) {
         throw new ConflictException(
           'This identical spreadsheet file was already imported. Please confirm duplicate import if you wish to proceed.',
         );
@@ -396,6 +474,7 @@ export class ExcelImportService {
     }
 
     return this.db.withTransaction(async (client) => {
+
       const batchId = generateUuidV7();
       let createdCount = 0;
       let updatedCount = 0;
@@ -405,11 +484,11 @@ export class ExcelImportService {
 
       // 1. Create import_batches master record
       await client.query(
-        `INSERT INTO import_batches (id, branch_id, user_id, file_name, file_hash, import_mode, source_type, supplier_id, total_rows, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'COMPLETED')`,
+        `INSERT INTO import_batches (id, branch_id, user_id, file_name, file_hash, import_mode, source_type, supplier_id, total_rows, status, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'COMPLETED', $10)`,
         [
           batchId,
-          branchId,
+          effectiveBranchId,
           userId,
           req.fileName,
           req.fileHash,
@@ -417,14 +496,17 @@ export class ExcelImportService {
           req.sourceType,
           req.supplierId || null,
           req.rows.length,
+          effectiveTenantId,
         ],
       );
 
-      // Pre-fetch Category & Unit mappings
-      const catRes = await client.query(`SELECT id, name_en FROM categories`);
-      const defaultCatId = catRes.rows[0]?.id || '018e0000-0000-7000-8000-000000000055';
+      // Pre-fetch Category & Unit mappings for this tenant
+      const catRes = await client.query(
+        `SELECT id, name_en FROM categories WHERE tenant_id = $1`,
+        [effectiveTenantId],
+      );
       const catMap = new Map<string, string>();
-      for (const c of catRes.rows) catMap.set(c.name_en.toLowerCase(), c.id);
+      for (const c of catRes.rows) catMap.set(c.name_en.toLowerCase().trim(), c.id);
 
       const uomRes = await client.query(`SELECT code FROM units_of_measure`);
       const validUoms = new Set<string>(uomRes.rows.map((u: any) => u.code));
@@ -435,18 +517,43 @@ export class ExcelImportService {
           continue;
         }
 
-        // Find existing product by barcode or SKU
+        // Find existing product by barcode or SKU in this tenant
         const prodCheck = await client.query(
           `SELECT p.id, p.sku, pb.id as barcode_id, pb.barcode
            FROM products p
-           LEFT JOIN product_barcodes pb ON pb.product_id = p.id AND pb.barcode = $1
-           WHERE pb.barcode = $1 OR UPPER(p.sku) = UPPER($2)
+           LEFT JOIN product_barcodes pb ON pb.product_id = p.id AND pb.tenant_id = p.tenant_id AND pb.barcode = $1
+           WHERE p.tenant_id = $3 AND (pb.barcode = $1 OR UPPER(p.sku) = UPPER($2))
            LIMIT 1`,
-          [row.barcode, row.sku],
+          [row.barcode, row.sku, effectiveTenantId],
         );
 
         let productId: string;
-        let isNewProduct = false;
+
+        // Resolve or auto-create category for this tenant
+        const catName = (row.category || 'General').trim();
+        let categoryId: string | undefined = catMap.get(catName.toLowerCase());
+        if (!categoryId) {
+          const newCatId = generateUuidV7();
+          const cleanCode =
+            catName.toUpperCase().replace(/[^A-Z0-9]/g, '_').slice(0, 15) ||
+            'CAT';
+          const code = `${cleanCode}_${Date.now().toString().slice(-4)}`;
+          const insCat = await client.query(
+            `INSERT INTO categories (id, code, name_en, is_active, tenant_id)
+             VALUES ($1, $2, $3, true, $4)
+             ON CONFLICT (tenant_id, code) DO UPDATE SET name_en = EXCLUDED.name_en
+             RETURNING id`,
+            [newCatId, code, catName, effectiveTenantId],
+          );
+          categoryId = insCat.rows[0].id as string;
+          catMap.set(catName.toLowerCase(), categoryId);
+        }
+        const resolvedCategoryId: string = categoryId;
+
+        const isVat = row.isVat ?? true;
+        const vatRate = isVat ? 0.15 : 0.0;
+        const isWeighed = row.unit === 'KG' || row.unit === 'G';
+        const uomCode = row.unit && validUoms.has(row.unit) ? row.unit : 'PCS';
 
         if (prodCheck.rows.length > 0) {
           // Existing Product
@@ -466,15 +573,22 @@ export class ExcelImportService {
                    base_price = $3,
                    cost_price = $4,
                    is_vat_applicable = $5,
+                   vat_rate = $6,
+                   is_weighed = $7,
+                   category_id = COALESCE($8, category_id),
                    updated_at = clock_timestamp()
-               WHERE id = $6`,
+               WHERE id = $9 AND tenant_id = $10`,
               [
                 row.nameEn,
                 row.nameAm || null,
                 row.sellingPrice,
                 row.costPrice,
-                row.isVat ?? true,
+                isVat,
+                vatRate,
+                isWeighed,
+                resolvedCategoryId,
                 productId,
+                effectiveTenantId,
               ],
             );
             updatedCount++;
@@ -486,32 +600,33 @@ export class ExcelImportService {
             continue;
           }
 
-          isNewProduct = true;
           productId = generateUuidV7();
-          const categoryId = catMap.get(row.category.toLowerCase()) || defaultCatId;
-          const uomCode = validUoms.has(row.unit) ? row.unit : 'PCS';
 
           await client.query(
-            `INSERT INTO products (id, sku, name_en, name_am, category_id, uom_code, base_price, cost_price, is_vat_applicable, min_stock_level)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 10)`,
+            `INSERT INTO products (id, sku, name_en, name_am, category_id, uom_code, base_price, cost_price, is_vat_applicable, vat_rate, is_weighed, min_stock_level, tenant_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 10, $12)`,
             [
               productId,
               row.sku.toUpperCase(),
               row.nameEn,
               row.nameAm || null,
-              categoryId,
+              resolvedCategoryId,
               uomCode,
               row.sellingPrice,
               row.costPrice,
-              row.isVat ?? true,
+              isVat,
+              vatRate,
+              isWeighed,
+              effectiveTenantId,
             ],
           );
 
           // Insert primary barcode
           await client.query(
-            `INSERT INTO product_barcodes (id, product_id, barcode, is_primary, pack_multiplier)
-             VALUES ($1, $2, $3, TRUE, 1) ON CONFLICT (barcode) DO NOTHING`,
-            [generateUuidV7(), productId, row.barcode],
+            `INSERT INTO product_barcodes (id, product_id, barcode, is_primary, pack_multiplier, tenant_id)
+             VALUES ($1, $2, $3, TRUE, 1, $4)
+             ON CONFLICT (tenant_id, barcode) DO NOTHING`,
+            [generateUuidV7(), productId, row.barcode, effectiveTenantId],
           );
           createdCount++;
         }
@@ -522,16 +637,17 @@ export class ExcelImportService {
           batchIdRef = generateUuidV7();
           const expDate = row.expiryDate ? new Date(row.expiryDate) : null;
           await client.query(
-            `INSERT INTO batches (id, branch_id, product_id, batch_number, expiry_date, unit_cost, initial_quantity, current_quantity)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
+            `INSERT INTO batches (id, branch_id, product_id, batch_number, expiry_date, unit_cost, initial_quantity, current_quantity, tenant_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8)`,
             [
               batchIdRef,
-              branchId,
+              effectiveBranchId,
               productId,
               row.batchNumber || `BATCH-${Date.now()}`,
               expDate,
               row.costPrice,
               row.quantity,
+              effectiveTenantId,
             ],
           );
         }
@@ -550,17 +666,17 @@ export class ExcelImportService {
             `SELECT balance_after FROM stock_ledger
              WHERE branch_id = $1 AND product_id = $2
              ORDER BY created_at DESC LIMIT 1`,
-            [branchId, productId],
+            [effectiveBranchId, productId],
           );
           const currentBal = balRes.rows.length > 0 ? parseFloat(balRes.rows[0].balance_after) : 0;
           const newBal = currentBal + row.quantity;
 
           await client.query(
-            `INSERT INTO stock_ledger (id, branch_id, product_id, batch_id, movement_type, quantity_change, balance_after, unit_cost, reference_type, reference_id, notes, created_by)
-             VALUES ($1, $2, $3, $4, 'PURCHASE_RECEIVE', $5, $6, $7, 'IMPORT_BATCH', $8, $9, $10)`,
+            `INSERT INTO stock_ledger (id, branch_id, product_id, batch_id, movement_type, quantity_change, balance_after, unit_cost, reference_type, reference_id, notes, created_by, tenant_id)
+             VALUES ($1, $2, $3, $4, 'PURCHASE_RECEIVE', $5, $6, $7, 'IMPORT_BATCH', $8, $9, $10, $11)`,
             [
               stockLedgerId,
-              branchId,
+              effectiveBranchId,
               productId,
               batchIdRef,
               row.quantity,
@@ -569,6 +685,7 @@ export class ExcelImportService {
               batchId,
               `Excel Import: ${req.fileName} (Row ${row.rowNumber}) - ${reason}`,
               userId,
+              effectiveTenantId,
             ],
           );
 
@@ -577,8 +694,8 @@ export class ExcelImportService {
 
         // Record import row detail
         await client.query(
-          `INSERT INTO import_batch_rows (id, batch_id, row_number, sku, barcode, product_id, batch_id_ref, stock_ledger_id, quantity_imported, unit_cost, status, raw_data)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'OK', $11)`,
+          `INSERT INTO import_batch_rows (id, batch_id, row_number, sku, barcode, product_id, batch_id_ref, stock_ledger_id, quantity_imported, unit_cost, status, raw_data, tenant_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'OK', $11, $12)`,
           [
             generateUuidV7(),
             batchId,
@@ -591,6 +708,7 @@ export class ExcelImportService {
             row.quantity,
             row.costPrice,
             JSON.stringify(row),
+            effectiveTenantId,
           ],
         );
       }
@@ -605,11 +723,11 @@ export class ExcelImportService {
 
       // Log audit entry
       await client.query(
-        `INSERT INTO audit_logs (id, branch_id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, $3, 'INVENTORY_IMPORT_COMMITTED', 'import_batches', $4, $5)`,
+        `INSERT INTO audit_logs (id, branch_id, user_id, action, entity_name, entity_id, details, tenant_id)
+         VALUES ($1, $2, $3, 'INVENTORY_IMPORT_COMMITTED', 'import_batches', $4, $5, $6)`,
         [
           generateUuidV7(),
-          branchId,
+          effectiveBranchId,
           userId,
           batchId,
           JSON.stringify({
@@ -618,6 +736,7 @@ export class ExcelImportService {
             updatedCount,
             totalQtyAdded,
           }),
+          effectiveTenantId,
         ],
       );
 
@@ -641,7 +760,7 @@ export class ExcelImportService {
    */
   async undoImport(batchId: string, managerId: string, branchId: string) {
     const batchRes = await this.db.query(
-      `SELECT id, file_name, status, branch_id FROM import_batches WHERE id = $1`,
+      `SELECT id, file_name, status, branch_id, tenant_id FROM import_batches WHERE id = $1`,
       [batchId],
     );
     if (batchRes.rows.length === 0) {
@@ -670,18 +789,18 @@ export class ExcelImportService {
           `SELECT balance_after FROM stock_ledger
            WHERE branch_id = $1 AND product_id = $2
            ORDER BY created_at DESC LIMIT 1`,
-          [branchId, row.product_id],
+          [batch.branch_id || branchId, row.product_id],
         );
         const curBal = balRes.rows.length > 0 ? parseFloat(balRes.rows[0].balance_after) : 0;
         const newBal = Math.max(0, curBal - parseFloat(row.quantity_imported));
 
         // Insert compensating reversing movement
         await client.query(
-          `INSERT INTO stock_ledger (id, branch_id, product_id, batch_id, movement_type, quantity_change, balance_after, unit_cost, reference_type, reference_id, notes, created_by)
-           VALUES ($1, $2, $3, $4, 'ADJUSTMENT', $5, $6, $7, 'IMPORT_REVERSAL', $8, $9, $10)`,
+          `INSERT INTO stock_ledger (id, branch_id, product_id, batch_id, movement_type, quantity_change, balance_after, unit_cost, reference_type, reference_id, notes, created_by, tenant_id)
+           VALUES ($1, $2, $3, $4, 'ADJUSTMENT', $5, $6, $7, 'IMPORT_REVERSAL', $8, $9, $10, $11)`,
           [
             revLedgerId,
-            branchId,
+            batch.branch_id || branchId,
             row.product_id,
             row.batch_id_ref,
             -parseFloat(row.quantity_imported),
@@ -690,6 +809,7 @@ export class ExcelImportService {
             batchId,
             `Compensating reversal of import batch: ${batch.file_name}`,
             managerId,
+            batch.tenant_id,
           ],
         );
 
@@ -711,14 +831,15 @@ export class ExcelImportService {
 
       // Audit log
       await client.query(
-        `INSERT INTO audit_logs (id, branch_id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, $3, 'INVENTORY_IMPORT_REVERTED', 'import_batches', $4, $5)`,
+        `INSERT INTO audit_logs (id, branch_id, user_id, action, entity_name, entity_id, details, tenant_id)
+         VALUES ($1, $2, $3, 'INVENTORY_IMPORT_REVERTED', 'import_batches', $4, $5, $6)`,
         [
           generateUuidV7(),
-          branchId,
+          batch.branch_id || branchId,
           managerId,
           batchId,
           JSON.stringify({ revertedItemsCount: revertedCount }),
+          batch.tenant_id,
         ],
       );
 
