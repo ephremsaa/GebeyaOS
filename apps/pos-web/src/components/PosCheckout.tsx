@@ -498,6 +498,7 @@ export const PosCheckout: React.FC = () => {
       setCompletedReceiptNo(result.sale.receiptNumber);
       setCompletedReceiptText(result.thermalReceipt);
       setCompletedSaleId(result.sale.id);
+      setIsPaymentOpen(false);
 
       // Refresh inventory levels in the background
       posApi.getCatalog(branchId).then(setCatalog).catch(() => {});

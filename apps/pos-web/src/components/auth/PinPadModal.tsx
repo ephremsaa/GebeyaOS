@@ -176,7 +176,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md select-none animate-in fade-in duration-150"
+      data-testid="pinpad-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md select-none animate-in fade-in duration-150"
       style={{ background: 'rgba(15, 23, 42, 0.85)' }}
     >
       <div className="w-full max-w-4xl bg-surface border border-border-subtle rounded-3xl shadow-modal overflow-hidden flex flex-col md:flex-row max-h-[92vh]">

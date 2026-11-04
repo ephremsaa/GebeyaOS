@@ -380,8 +380,8 @@ export const ShiftManagement: React.FC = () => {
     window.print();
   };
 
-  const fmt = (n: number) =>
-    n.toLocaleString('en-ET', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n?: number | null) =>
+    (Number(n) || 0).toLocaleString('en-ET', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="page-container select-none">
@@ -1459,11 +1459,11 @@ export const ShiftManagement: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>OPENED:</span>
-                  <span>{new Date(zReportData.openedAt).toLocaleString()}</span>
+                  <span>{zReportData?.openedAt ? new Date(zReportData.openedAt).toLocaleString() : '—'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>CLOSED:</span>
-                  <span>{new Date(zReportData.closedAt).toLocaleString()}</span>
+                  <span>{zReportData?.closedAt ? new Date(zReportData.closedAt).toLocaleString() : '—'}</span>
                 </div>
               </div>
 

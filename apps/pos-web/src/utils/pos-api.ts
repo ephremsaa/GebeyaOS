@@ -336,7 +336,11 @@ export const posApi = {
           'x-branch-id': branchId,
           'x-user-id': cashierId,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          closingCashCounted: payload.closing_cash_counted ?? (payload as any).closingCashCounted ?? 0,
+          closing_cash_counted: payload.closing_cash_counted ?? (payload as any).closingCashCounted ?? 0,
+          notes: payload.notes,
+        }),
       });
 
       if (res.ok) {
