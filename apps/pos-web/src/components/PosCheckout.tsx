@@ -9,6 +9,7 @@ import {
 } from '@gebeyaos/shared-types';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
+import { useShift } from '../context/ShiftContext';
 import { Pill, SearchInput, SearchInputHandle, Button, EmptyState } from './ui';
 import { BasketPanel } from './BasketPanel';
 import { WeightModal } from './WeightModal';
@@ -41,10 +42,16 @@ export const PosCheckout: React.FC = () => {
   const { language, t, formatCurrency } = useI18n();
   const { currentUser } = useAuth();
 
-  const branchId = currentUser?.branchId || '018e0000-0000-7000-8000-000000000020';
-  const cashierId = currentUser?.id || '018e0000-0000-7000-8000-000000000041';
-  const terminalId = '018e0000-0000-7000-8000-000000000031';
-  const terminalCode = 'POS-01';
+  const {
+    currentShift,
+    isShiftOpen,
+    isLoadingShift,
+    terminalId,
+    terminalCode,
+    branchId,
+    openShift,
+  } = useShift();
+  const cashierId = currentUser?.id || '01a19309-1e78-7e91-a0a7-56edac4beb90';
   const userRole = currentUser?.role || 'CASHIER';
 
   // State: Cart & Held Baskets
@@ -56,10 +63,6 @@ export const PosCheckout: React.FC = () => {
     amount: number;
     authorizedBy?: string;
   } | null>(null);
-
-  // State: Shift Gate
-  const [currentShift, setCurrentShift] = useState<Shift | null>(null);
-  const [isShiftModalOpen, setIsShiftModalOpen] = useState<boolean>(false);
 
   // State: Catalog & Search
   const [catalog, setCatalog] = useState<PosCatalogItem[]>([]);
@@ -93,41 +96,31 @@ export const PosCheckout: React.FC = () => {
 
   const searchInputRef = useRef<SearchInputHandle>(null);
 
-  // Initial Data Load (Shift check, catalog, held baskets)
-  const refreshCatalogAndShift = async () => {
+  // Initial Data Load (Catalog & held baskets)
+  const refreshCatalog = async () => {
     setIsLoadingCatalog(true);
     try {
-      const [shiftResult, catalogItems, held] = await Promise.all([
-        posApi.getCurrentShift(terminalId, branchId),
+      const [catalogItems, held] = await Promise.all([
         posApi.getCatalog(branchId),
         posApi.getHeldBaskets(branchId, terminalId),
       ]);
-
-      if (shiftResult.open && shiftResult.shift) {
-        setCurrentShift(shiftResult.shift);
-        setIsShiftModalOpen(false);
-      } else {
-        setCurrentShift(null);
-        setIsShiftModalOpen(true);
-      }
-
       setCatalog(catalogItems);
       setHeldBaskets(held);
     } catch (err) {
-      console.error('Error loading checkout state:', err);
+      console.error('Error loading checkout catalog:', err);
     } finally {
       setIsLoadingCatalog(false);
     }
   };
 
   useEffect(() => {
-    refreshCatalogAndShift();
+    refreshCatalog();
   }, [branchId, terminalId]);
 
   // Focus search input on mount and keep focused
   useEffect(() => {
     searchInputRef.current?.focus();
-  }, [isShiftModalOpen, isPaymentOpen, isHeldDrawerOpen, isRefundModalOpen]);
+  }, [isShiftOpen, isPaymentOpen, isHeldDrawerOpen, isRefundModalOpen]);
 
   // Global keyboard shortcuts (F2: search, F4: pay, F6: hold/resume)
   useEffect(() => {
@@ -407,9 +400,10 @@ export const PosCheckout: React.FC = () => {
 
   // Open Shift Handler
   const handleOpenShift = async (openingCashFloat: number, notes?: string) => {
-    const opened = await posApi.openShift(branchId, terminalId, cashierId, openingCashFloat, notes);
-    setCurrentShift(opened);
-    setIsShiftModalOpen(false);
+    const res = await openShift(openingCashFloat, notes);
+    if (!res.success) {
+      alert(res.error || 'Failed to open shift');
+    }
   };
 
   // Discount Handlers
@@ -574,10 +568,10 @@ export const PosCheckout: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={refreshCatalogAndShift}
+            onClick={refreshCatalog}
             disabled={isLoadingCatalog}
             className="h-[52px] px-3.5 rounded-xl border border-border-subtle bg-surface hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors flex items-center justify-center cursor-pointer shadow-soft"
-            title="Refresh Catalog & Shift"
+            title="Refresh Catalog"
             aria-label="Refresh"
           >
             <RefreshCw size={18} className={isLoadingCatalog ? 'animate-spin text-primary' : ''} />
@@ -767,7 +761,7 @@ export const PosCheckout: React.FC = () => {
 
       {/* 6. Shift Gate Modal (blocks terminal until shift opened) */}
       <OpenShiftModal
-        isOpen={isShiftModalOpen}
+        isOpen={!isLoadingShift && !isShiftOpen}
         onOpenShift={handleOpenShift}
         cashierName={currentUser?.fullName || 'Cashier'}
         terminalCode={terminalCode}

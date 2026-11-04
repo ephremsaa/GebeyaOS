@@ -21,6 +21,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useShift } from '../context/ShiftContext';
 import { useI18n } from '../i18n/I18nContext';
 import {
   posApi,
@@ -50,17 +51,21 @@ export const ShiftManagement: React.FC = () => {
   const { currentUser } = useAuth();
   const { t, formatCurrency } = useI18n();
 
-  // Cashier & Terminal identity
-  const terminalId = '018e0000-0000-7000-8000-000000000010';
-  const terminalCode = 'POS-01';
-  const branchId = currentUser?.branchId || '018e0000-0000-7000-8000-000000000020';
+  const {
+    currentShift,
+    isShiftOpen,
+    terminalId,
+    terminalCode,
+    branchId,
+    openShift,
+    closeShift,
+    refreshShift,
+  } = useShift();
+
   const branchName = currentUser?.branchName || 'Bole Medhanialem Branch';
   const cashierName = currentUser?.fullName || 'Cashier';
-  const cashierId = currentUser?.id || '018e0000-0000-7000-8000-000000000042';
+  const cashierId = currentUser?.id || '01a19309-1e78-7e91-a0a7-56edac4beb90';
   const userRole = currentUser?.role || 'CASHIER';
-
-  // Live Shift State
-  const [currentShift, setCurrentShift] = useState<Shift | null>(null);
   const [xReport, setXReport] = useState<XReportData | null>(null);
   const [cashDrops, setCashDrops] = useState<CashMovementRecord[]>([]);
   const [heldBaskets, setHeldBaskets] = useState<HeldBasketRecord[]>([]);
@@ -127,24 +132,22 @@ export const ShiftManagement: React.FC = () => {
     setStatusMsg(null);
 
     try {
-      const [shiftResult, held] = await Promise.all([
-        posApi.getCurrentShift(terminalId, branchId),
+      await refreshShift();
+      const [held] = await Promise.all([
         posApi.getHeldBaskets(branchId, terminalId),
       ]);
-
       setHeldBaskets(held);
 
-      if (shiftResult.open && shiftResult.shift) {
-        setCurrentShift(shiftResult.shift);
+      const active = currentShift;
+      if (active && active.id) {
         // Query live X-Report and Movements
         const [report, movements] = await Promise.all([
-          posApi.getXReport(shiftResult.shift.id, userRole, branchId),
-          posApi.getShiftMovements(shiftResult.shift.id, branchId),
+          posApi.getXReport(active.id, userRole, branchId),
+          posApi.getShiftMovements(active.id, branchId),
         ]);
         setXReport(report);
         setCashDrops(movements.filter((m) => m.movement_type === 'SAFE_DROP'));
       } else {
-        setCurrentShift(null);
         setXReport(null);
         setCashDrops([]);
       }

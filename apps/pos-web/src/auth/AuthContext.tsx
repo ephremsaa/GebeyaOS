@@ -131,7 +131,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
 
-  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('gebeyaos_session_locked') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -189,31 +195,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [companyCode, checkCompanyCode]);
 
-  // Inactivity Auto-Lock Timer (Configurable per paired terminal)
+  // Inactivity Auto-Lock Timer (Configurable per paired terminal, default 10 minutes)
   const autoLockMinutes = terminalConfig?.autoLockMinutes && terminalConfig.autoLockMinutes > 0
     ? terminalConfig.autoLockMinutes
-    : 3;
+    : 10;
   const inactivityTimeoutMs = autoLockMinutes * 60 * 1000;
+  const lastActivityRef = useRef<number>(Date.now());
 
   const resetInactivityTimer = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     if (!currentUser || isLocked) return;
 
     idleTimerRef.current = setTimeout(() => {
+      // Modal Guard: never lock if a payment or checkout modal is active
+      const hasActiveModal = !!document.querySelector('[role="dialog"], [data-modal="active"], .modal-open');
+      if (hasActiveModal) {
+        // Modal is active (e.g. cash counting, scale weighing), delay lock check
+        idleTimerRef.current = setTimeout(resetInactivityTimer, 60000);
+        return;
+      }
+
       setIsLocked(true);
+      try {
+        sessionStorage.setItem('gebeyaos_session_locked', 'true');
+      } catch {}
     }, inactivityTimeoutMs);
   }, [currentUser, isLocked, inactivityTimeoutMs]);
 
   useEffect(() => {
-    const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll'];
-    const handleActivity = () => resetInactivityTimer();
+    const activityEvents = ['pointerdown', 'pointermove', 'mousedown', 'keydown', 'keyup', 'touchstart', 'scroll'];
 
-    activityEvents.forEach((evt) => window.addEventListener(evt, handleActivity));
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityRef.current > 500) {
+        lastActivityRef.current = now;
+        resetInactivityTimer();
+      }
+    };
+
+    activityEvents.forEach((evt) => {
+      window.addEventListener(evt, handleActivity, { capture: true, passive: true });
+    });
+    window.addEventListener('gebeyaos:activity', handleActivity);
+
     resetInactivityTimer();
 
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      activityEvents.forEach((evt) => window.removeEventListener(evt, handleActivity));
+      activityEvents.forEach((evt) => {
+        window.removeEventListener(evt, handleActivity, { capture: true });
+      });
+      window.removeEventListener('gebeyaos:activity', handleActivity);
     };
   }, [resetInactivityTimer]);
 
@@ -427,6 +459,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('gebeyaos_access_token');
       localStorage.removeItem('gebeyaos_refresh_token');
       localStorage.removeItem('gebeyaos_user');
+      try {
+        sessionStorage.removeItem('gebeyaos_session_locked');
+      } catch {}
       setCurrentUser(null);
       setIsLocked(false);
       setIsSessionExpired(false);
@@ -435,12 +470,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const lockSession = () => {
     setIsLocked(true);
+    try {
+      sessionStorage.setItem('gebeyaos_session_locked', 'true');
+    } catch {}
   };
 
   const unlockSession = async (pin: string, userId?: string) => {
-    const res = await pinLogin(pin, userId);
+    const targetId = userId || currentUser?.id;
+    const res = await pinLogin(pin, targetId);
     if (res.success) {
       setIsLocked(false);
+      try {
+        sessionStorage.removeItem('gebeyaos_session_locked');
+      } catch {}
+      resetInactivityTimer();
     }
     return res;
   };

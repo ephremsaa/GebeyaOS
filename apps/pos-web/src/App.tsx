@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { I18nProvider } from './i18n/I18nContext';
 import { AuthProvider, useAuth } from './auth/AuthContext';
+import { ShiftProvider } from './context/ShiftContext';
 import { TopBar } from './components/TopBar';
 import { NavigationRail, NavTabId } from './components/NavigationRail';
 import { DashboardView } from './components/DashboardView';
@@ -231,7 +232,9 @@ const MainApp: React.FC = () => {
 export const App: React.FC = () => (
   <I18nProvider>
     <AuthProvider>
-      <MainApp />
+      <ShiftProvider>
+        <MainApp />
+      </ShiftProvider>
     </AuthProvider>
   </I18nProvider>
 );
