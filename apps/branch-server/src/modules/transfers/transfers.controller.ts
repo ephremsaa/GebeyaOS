@@ -16,7 +16,7 @@ import {
   ReceiveTransferDto,
 } from './transfers.dto';
 
-@Controller('transfers')
+@Controller(['transfers', 'api/transfers'])
 export class TransfersController {
   constructor(private readonly transfersService: TransfersService) {}
 

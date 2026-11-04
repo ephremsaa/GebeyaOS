@@ -467,7 +467,7 @@ export class ProductsService {
    */
   async getUoms(): Promise<any[]> {
     const res = await this.db.query(
-      `SELECT code, name_en, name_am, is_fractional FROM units_of_measure ORDER BY code ASC`,
+      `SELECT code, name_en, name_am, allow_fractions AS is_fractional FROM units_of_measure ORDER BY code ASC`,
     );
     return res.rows;
   }

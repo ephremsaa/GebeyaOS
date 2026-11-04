@@ -102,9 +102,25 @@ export class PosService {
       );
 
       if (activeCheck.rows.length > 0) {
-        throw new BadRequestException(
-          `Terminal ${dto.terminalId} already has an active open shift (${activeCheck.rows[0].id})`,
+        const existing = await client.query<any>(
+          `SELECT * FROM shifts WHERE id = $1`,
+          [activeCheck.rows[0].id],
         );
+        const shift = existing?.rows?.[0] || activeCheck.rows[0];
+        this.logger.log(`Idempotent openShift: Returning existing active shift ${shift.id} for terminal ${dto.terminalId}`);
+        return {
+          id: shift.id,
+          branchId: shift.branch_id || branchId,
+          terminalId: shift.terminal_id || dto.terminalId,
+          cashierId: shift.cashier_id || cashierId,
+          shiftNumber: shift.shift_number ? Number(shift.shift_number) : 1,
+          openingCashFloat: parseFloat(shift.opening_cash_float || '0'),
+          expectedCashSystem: parseFloat(shift.expected_cash_system || '0'),
+          status: shift.status || 'OPEN',
+          notes: shift.notes || null,
+          openedAt: shift.opened_at ? new Date(shift.opened_at).toISOString() : new Date().toISOString(),
+          createdAt: shift.created_at ? new Date(shift.created_at).toISOString() : new Date().toISOString(),
+        };
       }
 
       // 2. Next shift number for this terminal
@@ -1084,6 +1100,14 @@ export class PosService {
   /**
    * Retrieves active open shift for a terminal.
    */
+  async resolveTerminalId(branchId: string): Promise<string | null> {
+    const res = await this.db.query<{ id: string }>(
+      `SELECT id FROM terminals WHERE branch_id = $1 AND is_active = true ORDER BY created_at ASC LIMIT 1`,
+      [branchId],
+    );
+    return res.rows[0]?.id || null;
+  }
+
   async getCurrentShift(branchId: string, terminalId: string): Promise<{ open: boolean; shift: Shift | null }> {
     const res = await this.db.query<any>(
       `SELECT * FROM shifts 

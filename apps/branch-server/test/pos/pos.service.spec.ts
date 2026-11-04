@@ -85,17 +85,32 @@ describe('PosService', () => {
       );
     });
 
-    it('rejects opening a shift if terminal already has an active open shift', async () => {
+    it('idempotently returns existing shift if terminal already has an active open shift', async () => {
       mockClient.query.mockResolvedValueOnce({
         rows: [{ id: 'existing-shift-01' }],
       });
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{
+          id: 'existing-shift-01',
+          branch_id: 'b-01',
+          terminal_id: 'term-01',
+          cashier_id: 'cashier-01',
+          shift_number: 1,
+          opening_cash_float: '500.00',
+          expected_cash_system: '500.00',
+          status: 'OPEN',
+          opened_at: new Date(),
+          created_at: new Date(),
+        }],
+      });
 
-      await expect(
-        service.openShift('b-01', 'cashier-01', {
-          terminalId: 'term-01',
-          openingCashFloat: 500,
-        }),
-      ).rejects.toThrow(BadRequestException);
+      const res = await service.openShift('b-01', 'cashier-01', {
+        terminalId: 'term-01',
+        openingCashFloat: 500,
+      });
+
+      expect(res.id).toBe('existing-shift-01');
+      expect(res.status).toBe('OPEN');
     });
   });
 

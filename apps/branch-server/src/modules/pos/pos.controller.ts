@@ -22,7 +22,7 @@ import {
   ReprintReceiptDto,
 } from './pos.dto';
 
-@Controller('pos')
+@Controller(['pos', 'api/pos'])
 export class PosController {
   constructor(private readonly posService: PosService) {}
 
@@ -33,7 +33,11 @@ export class PosController {
     @Headers('x-branch-id') branchIdHeader?: string,
   ) {
     const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
-    const terminalId = terminalIdQuery || terminalIdHeader || '00000000-0000-0000-0000-000000000010';
+    let terminalId = terminalIdQuery || terminalIdHeader;
+    if (!terminalId || terminalId === '00000000-0000-0000-0000-000000000010') {
+      const resolved = await this.posService.resolveTerminalId(branchId);
+      terminalId = resolved || '00000000-0000-0000-0000-000000000010';
+    }
     return this.posService.getCurrentShift(branchId, terminalId);
   }
 

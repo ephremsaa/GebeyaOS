@@ -250,6 +250,11 @@ export class ProductQueryDto {
   @IsNumber()
   @Type(() => Number)
   offset?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  page?: number;
 }
 
 export class CreateCategoryDto {
