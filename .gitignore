@@ -27,8 +27,11 @@ lerna-debug.log*
 # Runtime and logs
 logs/
 *.log
+# Tests & Coverage
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
 
 # Backups and local databases
 backups/*.sql.gz
