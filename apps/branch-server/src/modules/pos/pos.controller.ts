@@ -70,6 +70,15 @@ export class PosController {
     return this.posService.recordCashMovement(branchId, shiftId, dto);
   }
 
+  @Get('shifts/:id/movements')
+  async getShiftMovements(
+    @Param('id') shiftId: string,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    return this.posService.getShiftMovements(branchId, shiftId);
+  }
+
   @Get('shifts/:id/x-report')
   async getXReport(
     @Param('id') shiftId: string,

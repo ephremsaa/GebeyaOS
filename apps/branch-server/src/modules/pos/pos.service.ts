@@ -93,12 +93,14 @@ export class PosService {
     dto: OpenShiftDto,
   ): Promise<Shift> {
     await this.verifyTenantLicense();
+    const termId = dto.getResolvedTerminalId ? dto.getResolvedTerminalId() : (dto.terminalId || (dto as any).terminal_id);
+    const floatAmt = dto.getResolvedOpeningCashFloat ? dto.getResolvedOpeningCashFloat() : (dto.openingCashFloat ?? (dto as any).opening_cash_float ?? 0);
     return this.db.withTransaction(async (client) => {
       // 1. Check for existing open shift on this terminal
       const activeCheck = await client.query<{ id: string }>(
         `SELECT id FROM shifts
          WHERE branch_id = $1 AND terminal_id = $2 AND status = 'OPEN'`,
-        [branchId, dto.terminalId],
+        [branchId, termId],
       );
 
       if (activeCheck.rows.length > 0) {
@@ -107,11 +109,11 @@ export class PosService {
           [activeCheck.rows[0].id],
         );
         const shift = existing?.rows?.[0] || activeCheck.rows[0];
-        this.logger.log(`Idempotent openShift: Returning existing active shift ${shift.id} for terminal ${dto.terminalId}`);
+        this.logger.log(`Idempotent openShift: Returning existing active shift ${shift.id} for terminal ${termId}`);
         return {
           id: shift.id,
           branchId: shift.branch_id || branchId,
-          terminalId: shift.terminal_id || dto.terminalId,
+          terminalId: shift.terminal_id || termId,
           cashierId: shift.cashier_id || cashierId,
           shiftNumber: shift.shift_number ? Number(shift.shift_number) : 1,
           openingCashFloat: parseFloat(shift.opening_cash_float || '0'),
@@ -128,7 +130,7 @@ export class PosService {
         `SELECT COALESCE(MAX(shift_number), 0) + 1 as next_shift
          FROM shifts
          WHERE branch_id = $1 AND terminal_id = $2`,
-        [branchId, dto.terminalId],
+        [branchId, termId],
       );
       const shiftNumber = parseInt(shiftNumRes.rows[0].next_shift, 10);
 
@@ -140,10 +142,10 @@ export class PosService {
          RETURNING *`,
         [
           branchId,
-          dto.terminalId,
+          termId,
           cashierId,
           shiftNumber,
-          dto.openingCashFloat,
+          floatAmt,
           dto.notes || null,
         ],
       );
@@ -154,7 +156,7 @@ export class PosService {
         `INSERT INTO cash_movements (
            shift_id, branch_id, movement_type, amount, reason, authorized_by
          ) VALUES ($1, $2, 'FLOAT_IN', $3, 'Opening cash float', $4)`,
-        [shift.id, branchId, dto.openingCashFloat, cashierId],
+        [shift.id, branchId, floatAmt, cashierId],
       );
 
       return {
@@ -219,6 +221,34 @@ export class PosService {
       authorizedBy: row.authorized_by,
       createdAt: row.created_at.toISOString(),
     };
+  }
+
+  /**
+   * Retrieves all cash movements recorded for a shift.
+   */
+  async getShiftMovements(branchId: string, shiftId: string): Promise<any[]> {
+    const res = await this.db.query<any>(
+      `SELECT
+         id,
+         shift_id as "shiftId",
+         shift_id,
+         branch_id as "branchId",
+         movement_type as "movementType",
+         movement_type,
+         amount::numeric as amount,
+         reason,
+         authorized_by as "authorizedBy",
+         created_at as "createdAt",
+         created_at
+       FROM cash_movements
+       WHERE shift_id = $1 AND branch_id = $2
+       ORDER BY created_at ASC`,
+      [shiftId, branchId],
+    );
+    return res.rows.map((r: any) => ({
+      ...r,
+      amount: parseFloat(r.amount),
+    }));
   }
 
   /**
@@ -343,7 +373,7 @@ export class PosService {
 
       const xReport = await this.getXReport(branchId, shiftId);
       const expectedCash = xReport.expectedCashInDrawer;
-      const counted = dto.closingCashCounted;
+      const counted = dto.getResolvedClosingCash ? dto.getResolvedClosingCash() : (dto.closingCashCounted ?? (dto as any).closing_cash_counted ?? 0);
       const variance = Math.round((counted - expectedCash + Number.EPSILON) * 100) / 100;
 
       await client.query(

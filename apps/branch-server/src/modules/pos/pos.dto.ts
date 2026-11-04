@@ -18,16 +18,34 @@ import {
 
 export class OpenShiftDto {
   @IsUUID()
-  @IsNotEmpty()
-  terminalId!: string;
+  @IsOptional()
+  terminalId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  terminal_id?: string;
 
   @IsNumber()
   @Min(0)
-  openingCashFloat!: number;
+  @IsOptional()
+  openingCashFloat?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  opening_cash_float?: number;
 
   @IsString()
   @IsOptional()
   notes?: string;
+
+  getResolvedTerminalId(): string {
+    return this.terminalId || this.terminal_id || '';
+  }
+
+  getResolvedOpeningCashFloat(): number {
+    return this.openingCashFloat ?? this.opening_cash_float ?? 0;
+  }
 }
 
 export class RecordCashMovementDto {
@@ -51,11 +69,21 @@ export class RecordCashMovementDto {
 export class CloseShiftDto {
   @IsNumber()
   @Min(0)
-  closingCashCounted!: number;
+  @IsOptional()
+  closingCashCounted?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  closing_cash_counted?: number;
 
   @IsString()
   @IsOptional()
   notes?: string;
+
+  getResolvedClosingCash(): number {
+    return this.closingCashCounted ?? this.closing_cash_counted ?? 0;
+  }
 }
 
 export class SaleLineItemDto {
