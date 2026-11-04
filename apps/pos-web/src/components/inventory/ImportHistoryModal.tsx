@@ -71,7 +71,7 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
     >
       <div className="modal-content max-w-4xl max-h-[90vh] flex flex-col p-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center shadow-md">
               <History size={20} />
@@ -100,7 +100,7 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
         )}
 
         {/* Table */}
-        <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-800 rounded-2xl my-4 min-h-[260px]">
+        <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-700 rounded-2xl my-4 min-h-[260px]">
           <table className="data-table text-xs">
             <thead>
               <tr>
@@ -196,7 +196,7 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end pt-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex justify-end pt-3 border-t border-slate-200 dark:border-slate-700">
           <button type="button" onClick={onClose} className="btn-secondary text-xs">
             Close History
           </button>

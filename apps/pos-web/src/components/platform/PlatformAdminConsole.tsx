@@ -1308,7 +1308,7 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
       );
     }
     return (
-      <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold flex items-center gap-1">
+      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
         <Key size={11} /> Billing Operator
       </span>
     );
@@ -1463,7 +1463,7 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
                   <Laptop size={24} />
                 </div>
                 <div>

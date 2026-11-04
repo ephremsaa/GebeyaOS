@@ -196,9 +196,9 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
       />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-250">
+        <div className="w-screen max-w-2xl bg-white dark:bg-slate-800 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-700 animate-in slide-in-from-right duration-250">
           {/* Header */}
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-start justify-between">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-start justify-between">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
@@ -226,8 +226,8 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
           </div>
 
           {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-4 gap-2 p-4 bg-slate-100/60 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 text-center">
-            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-4 gap-2 p-4 bg-slate-100/60 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-700 text-center">
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
               <div className="text-[10px] font-bold text-slate-400 uppercase">On Hand</div>
               <div
                 className={`text-sm font-black font-mono ${
@@ -238,21 +238,21 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
               </div>
             </div>
 
-            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
               <div className="text-[10px] font-bold text-slate-400 uppercase">Shelf Price</div>
               <div className="text-sm font-black font-mono text-gebeya-600">
                 {effectivePrice.toFixed(2)} ETB
               </div>
             </div>
 
-            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
               <div className="text-[10px] font-bold text-slate-400 uppercase">Unit Cost</div>
               <div className="text-sm font-black font-mono text-slate-700 dark:text-slate-300">
                 {canViewCost ? `${cost.toFixed(2)} ETB` : '••••••'}
               </div>
             </div>
 
-            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
               <div className="text-[10px] font-bold text-slate-400 uppercase">Min Stock</div>
               <div className="text-sm font-black font-mono text-slate-500">
                 {minStock} {product.uom_code}
@@ -261,7 +261,7 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
           </div>
 
           {/* Navigation Tabs */}
-          <div className="px-6 pt-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="px-6 pt-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div className="flex gap-4">
               <button
                 type="button"
@@ -301,7 +301,7 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => onPrintLabel(product)}
-                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold flex items-center gap-1 text-slate-700 dark:text-slate-300 transition"
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold flex items-center gap-1 text-slate-700 dark:text-slate-300 transition"
               >
                 <Printer size={13} />
                 Label
@@ -334,11 +334,11 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
                 </div>
 
                 {ledgerEntries.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                  <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     No ledger movements recorded for this item yet.
                   </div>
                 ) : (
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-800">
                     {ledgerEntries.map((entry) => {
                       const isPositive = entry.quantityChange > 0;
                       return (
@@ -404,11 +404,11 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
                 </div>
 
                 {batches.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                  <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     No active batches found for this product.
                   </div>
                 ) : (
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-800">
                     {batches.map((batch) => {
                       const exp = getExpiryStatus(batch.expiryDate);
 
@@ -463,7 +463,7 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between">
             <span className="text-[11px] text-slate-400">
               GebeyaOS Inventory Engine • Real-time FEFO Allocation
             </span>

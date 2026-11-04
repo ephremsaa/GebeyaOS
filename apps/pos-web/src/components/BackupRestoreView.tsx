@@ -158,7 +158,7 @@ export const BackupRestoreView: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* PANEL A: ONE-CLICK BACKUP */}
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
@@ -227,10 +227,10 @@ export const BackupRestoreView: React.FC = () => {
         </div>
 
         {/* PANEL B: RESTORE DRILL & INTEGRITY CHECK */}
-        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
                 <Upload size={20} />
               </div>
               <div>
@@ -251,7 +251,7 @@ export const BackupRestoreView: React.FC = () => {
                 onChange={handleFileSelect}
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />
-              <FileCheck size={28} className="mx-auto text-purple-500 mb-2" />
+              <FileCheck size={28} className="mx-auto text-emerald-500 mb-2" />
               <div className="text-xs font-bold text-slate-800 dark:text-white">
                 {uploadedFile ? uploadedFile.name : 'Click or drag a GebeyaOS backup JSON file here'}
               </div>
@@ -328,7 +328,7 @@ export const BackupRestoreView: React.FC = () => {
           <button
             onClick={handleExecuteRestore}
             disabled={restoring || !parsedPayload}
-            className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95 disabled:opacity-50"
+            className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95 disabled:opacity-50"
           >
             <Upload size={16} />
             {restoring ? 'Executing Restore Drill...' : 'Confirm & Execute Database Restore'}

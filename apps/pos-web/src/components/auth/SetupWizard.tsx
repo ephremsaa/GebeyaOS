@@ -74,16 +74,16 @@ export const SetupWizard: React.FC = () => {
       className="min-h-screen w-screen flex flex-col items-center justify-center p-4 select-none"
       style={{ background: 'var(--bg-page)', color: 'var(--text-main)' }}
     >
-      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-10 flex flex-col gap-6">
+      <div className="w-full max-w-2xl bg-card border border-border-subtle rounded-3xl shadow-modal p-6 sm:p-10 flex flex-col gap-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between pb-4 border-b border-border-subtle">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gebeya-600 text-white flex items-center justify-center shadow-lg shadow-gebeya-600/30">
+            <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
               <Store size={26} />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">{t('setupWizardTitle')}</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t('setupWizardSubtitle')}</p>
+              <h1 className="text-2xl font-black tracking-tight text-text-main">{t('setupWizardTitle')}</h1>
+              <p className="text-xs text-text-muted">{t('setupWizardSubtitle')}</p>
             </div>
           </div>
           <span className="badge-warning text-xs font-bold px-3 py-1">Step {step} of 3</span>
@@ -99,8 +99,8 @@ export const SetupWizard: React.FC = () => {
         {/* Step 1: Store & Branch */}
         {step === 1 && (
           <div className="flex flex-col gap-4 animate-in fade-in duration-150">
-            <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Store size={18} className="text-gebeya-600" />
+            <h2 className="text-base font-bold text-text-main flex items-center gap-2">
+              <Store size={18} className="text-primary" />
               1. Store Identity &amp; Fiscal Details
             </h2>
 
@@ -195,8 +195,8 @@ export const SetupWizard: React.FC = () => {
         {/* Step 2: Language & Receipts */}
         {step === 2 && (
           <div className="flex flex-col gap-4 animate-in fade-in duration-150">
-            <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-gebeya-600" />
+            <h2 className="text-base font-bold text-text-main flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-primary" />
               2. Language &amp; Receipt Template
             </h2>
 
@@ -208,8 +208,8 @@ export const SetupWizard: React.FC = () => {
                   onClick={() => setLanguage('en')}
                   className={`flex-1 py-3 rounded-2xl border font-bold text-sm transition-all ${
                     language === 'en'
-                      ? 'border-gebeya-600 bg-gebeya-50 dark:bg-gebeya-950/40 text-gebeya-600'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-500'
+                      ? 'border-primary bg-secondary/40 text-primary'
+                      : 'border-border-subtle text-text-muted hover:text-text-main'
                   }`}
                 >
                   English (EN)
@@ -219,8 +219,8 @@ export const SetupWizard: React.FC = () => {
                   onClick={() => setLanguage('am')}
                   className={`flex-1 py-3 rounded-2xl border font-bold text-sm transition-all ${
                     language === 'am'
-                      ? 'border-gebeya-600 bg-gebeya-50 dark:bg-gebeya-950/40 text-gebeya-600'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-500'
+                      ? 'border-primary bg-secondary/40 text-primary'
+                      : 'border-border-subtle text-text-muted hover:text-text-main'
                   }`}
                 >
                   አማርኛ (Amharic)
@@ -273,8 +273,8 @@ export const SetupWizard: React.FC = () => {
         {/* Step 3: Owner Credentials */}
         {step === 3 && (
           <form onSubmit={handleFinish} className="flex flex-col gap-4 animate-in fade-in duration-150">
-            <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <ShieldCheck size={18} className="text-gebeya-600" />
+            <h2 className="text-base font-bold text-text-main flex items-center gap-2">
+              <ShieldCheck size={18} className="text-primary" />
               3. {t('ownerAccount')}
             </h2>
 

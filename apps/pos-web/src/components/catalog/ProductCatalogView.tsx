@@ -384,7 +384,7 @@ export const ProductCatalogView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <FolderPlus size={15} className="text-gebeya-600" />
             {language === 'am' ? 'ምድቦች' : 'Categories'}
@@ -392,7 +392,7 @@ export const ProductCatalogView: React.FC = () => {
 
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <UploadCloud size={15} className="text-indigo-600" />
             {language === 'am' ? 'ማስመጣት (Import)' : 'Import'}
@@ -400,7 +400,7 @@ export const ProductCatalogView: React.FC = () => {
 
           <button
             onClick={() => handleExportCsv(false)}
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <Download size={15} className="text-slate-600" />
             {language === 'am' ? 'ማውጣት (Export)' : 'Export CSV'}
@@ -418,7 +418,7 @@ export const ProductCatalogView: React.FC = () => {
 
       {/* 2. Stats Bar & KPI Chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               {language === 'am' ? 'ጠቅላላ እቃዎች' : 'Total Catalog'}
@@ -432,7 +432,7 @@ export const ProductCatalogView: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               {language === 'am' ? 'ንቁ እቃዎች' : 'Active Products'}
@@ -451,7 +451,7 @@ export const ProductCatalogView: React.FC = () => {
           className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
             lowStockFilter
               ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-rose-300'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-rose-300'
           }`}
         >
           <div>
@@ -469,7 +469,7 @@ export const ProductCatalogView: React.FC = () => {
 
         <div
           onClick={() => setIsCategoryModalOpen(true)}
-          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-gebeya-300 transition cursor-pointer flex items-center justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-gebeya-300 transition cursor-pointer flex items-center justify-between"
         >
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -486,7 +486,7 @@ export const ProductCatalogView: React.FC = () => {
       </div>
 
       {/* 3. Search and Multi-Filter Bar */}
-      <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl mb-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+      <div className="p-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl mb-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
         {/* Search Input */}
         <div className="relative flex-1 min-w-[240px]">
           <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
@@ -533,7 +533,7 @@ export const ProductCatalogView: React.FC = () => {
               onClick={() => setStatusFilter('active')}
               className={`px-3 py-1.5 rounded-lg transition ${
                 statusFilter === 'active'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -543,7 +543,7 @@ export const ProductCatalogView: React.FC = () => {
               onClick={() => setStatusFilter('all')}
               className={`px-3 py-1.5 rounded-lg transition ${
                 statusFilter === 'all'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -553,7 +553,7 @@ export const ProductCatalogView: React.FC = () => {
               onClick={() => setStatusFilter('archived')}
               className={`px-3 py-1.5 rounded-lg transition ${
                 statusFilter === 'archived'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -616,7 +616,7 @@ export const ProductCatalogView: React.FC = () => {
               </button>
 
               {isBulkCategoryOpen && (
-                <div className="absolute right-0 bottom-full mb-2 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-3 z-50 text-slate-900 dark:text-white animate-in fade-in">
+                <div className="absolute right-0 bottom-full mb-2 w-64 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 z-50 text-slate-900 dark:text-white animate-in fade-in">
                   <div className="text-xs font-bold mb-2">Assign Category:</div>
                   <select
                     value={bulkCategoryTarget}
@@ -676,11 +676,11 @@ export const ProductCatalogView: React.FC = () => {
       )}
 
       {/* 5. Product Table */}
-      <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs flex flex-col">
+      <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden shadow-xs flex flex-col">
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-left border-collapse text-xs">
             {/* Table Header */}
-            <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold text-[10px] sticky top-0 backdrop-blur-xs z-10 border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold text-[10px] sticky top-0 backdrop-blur-xs z-10 border-b border-slate-200 dark:border-slate-700">
               <tr>
                 <th className="p-3.5 w-10 text-center">
                   <button
@@ -852,7 +852,7 @@ export const ProductCatalogView: React.FC = () => {
                             Type A 15%
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-[10px] font-bold">
+                          <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold">
                             Type B Exempt
                           </span>
                         )}
@@ -952,7 +952,7 @@ export const ProductCatalogView: React.FC = () => {
         </div>
 
         {/* Table Footer */}
-        <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between text-xs text-slate-500">
+        <div className="p-3.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between text-xs text-slate-500">
           <span>
             Showing {products.length} of {totalCount} items
           </span>
@@ -1015,7 +1015,7 @@ export const ProductCatalogView: React.FC = () => {
       {/* Archive Confirmation with Stock Warning Modal */}
       {isArchiveModalOpen && archiveTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 space-y-4">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div
                 className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold ${

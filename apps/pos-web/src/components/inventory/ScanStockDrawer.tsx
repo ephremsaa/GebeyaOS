@@ -280,7 +280,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
     >
       <div className="modal-content max-w-4xl max-h-[92vh] flex flex-col p-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gebeya-600 text-white flex items-center justify-center shadow-md shadow-gebeya-600/30">
               <Scan size={20} />
@@ -361,7 +361,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
         )}
 
         {/* Scanned Items Table */}
-        <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-800 rounded-2xl min-h-[220px]">
+        <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-700 rounded-2xl min-h-[220px]">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400 gap-2">
               <Scan size={36} className="text-slate-300 dark:text-slate-700" />
@@ -508,7 +508,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800 mt-4">
+        <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
           <span className="text-xs font-semibold text-slate-500">
             Total Scanned: <strong>{items.reduce((acc, i) => acc + i.quantity, 0)} units</strong> ({items.length} items)
           </span>

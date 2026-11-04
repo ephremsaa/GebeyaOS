@@ -128,9 +128,9 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* 2. Main Tabbed Layout */}
-      <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col md:flex-row">
+      <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col md:flex-row">
         {/* Left Vertical Nav */}
-        <div className="w-full md:w-56 bg-slate-50 dark:bg-slate-850 p-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 flex flex-row md:flex-col gap-2">
+        <div className="w-full md:w-56 bg-slate-50 dark:bg-slate-850 p-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 flex flex-row md:flex-col gap-2">
           <button
             onClick={() => setActiveTab('store')}
             className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left ${

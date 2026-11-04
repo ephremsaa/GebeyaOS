@@ -18,6 +18,8 @@ import {
   Phone,
   Mail,
   Key,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAuth, AssignedBranch } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
@@ -40,7 +42,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
     resetPassword,
     updateUserPassword,
   } = useAuth();
-  const { t, language, setLanguage } = useI18n();
+  const { t, language, setLanguage, isDarkMode, toggleDarkMode } = useI18n();
 
   // Multi-step flow state
   // Step 1: Company Code, Step 2: Credentials, Step 3: Branch Selection
@@ -234,45 +236,57 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
       className="min-h-screen w-screen flex flex-col items-center justify-center p-4 relative select-none"
       style={{ background: 'var(--bg-page)', color: 'var(--text-main)' }}
     >
-      {/* Top Header: Offline status badge + Language toggle */}
+      {/* Top Header: Offline status badge + Language & Theme toggles */}
       <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold shadow-xs">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-slate-600 dark:text-slate-300">{t('workingOfflineBadge')}</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-border-subtle text-xs font-semibold shadow-xs">
+          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+          <span className="text-text-muted">{t('workingOfflineBadge')}</span>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-xs">
-          <Globe size={14} className="text-slate-400 ml-1.5" />
+        <div className="flex items-center gap-2">
+          {/* Quick 1-Click Dark / Light Mode Toggle */}
           <button
             type="button"
-            onClick={() => setLanguage('en')}
-            className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
-              language === 'en'
-                ? 'bg-gebeya-600 text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+            onClick={toggleDarkMode}
+            title={isDarkMode ? 'Switch to Light Mode (Emerald Professional)' : 'Switch to Dark Mode (Midnight Emerald)'}
+            className="w-8 h-8 rounded-xl bg-card border border-border-subtle flex items-center justify-center text-text-muted hover:text-primary transition-all cursor-pointer shadow-xs active:scale-95"
           >
-            EN
+            {isDarkMode ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-slate-600" />}
           </button>
-          <button
-            type="button"
-            onClick={() => setLanguage('am')}
-            className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
-              language === 'am'
-                ? 'bg-gebeya-600 text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            አማ
-          </button>
+
+          <div className="flex items-center gap-1.5 bg-card border border-border-subtle p-1 rounded-xl shadow-xs">
+            <Globe size={14} className="text-text-dim ml-1.5" />
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
+                language === 'en'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-text-muted hover:text-text-main'
+              }`}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('am')}
+              className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
+                language === 'am'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-text-muted hover:text-text-main'
+              }`}
+            >
+              አማ
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Login Card */}
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 flex flex-col gap-5 z-10">
+      <div className="w-full max-w-md bg-card border border-border-subtle rounded-3xl shadow-modal p-6 sm:p-8 flex flex-col gap-5 z-10">
         {/* Brand / Logo */}
         <div className="flex flex-col items-center text-center gap-2">
-          <div className="w-14 h-14 rounded-2xl bg-gebeya-600 text-white flex items-center justify-center shadow-lg shadow-gebeya-600/30">
+          <div className="w-14 h-14 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
             <Store size={30} />
           </div>
           <h1 className="text-2xl font-black tracking-tight">
@@ -327,16 +341,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                   placeholder={t('companyCodePlaceholder')}
                   value={inputCompanyCode}
                   onChange={(e) => setInputCompanyCode(e.target.value.toLowerCase())}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm font-semibold uppercase tracking-wider focus:outline-hidden focus:border-gebeya-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-input border border-border-subtle text-text-main text-sm font-semibold uppercase tracking-wider focus:outline-hidden focus:border-primary transition-all"
                 />
               </div>
-              {companyError && <p className="text-[11px] text-red-500 mt-1.5">{companyError}</p>}
+              {companyError && <p className="text-[11px] text-danger mt-1.5">{companyError}</p>}
             </div>
 
             <button
               type="submit"
               disabled={companyLoading || !inputCompanyCode.trim()}
-              className="btn-primary w-full py-3 rounded-2xl font-bold text-sm shadow-md shadow-gebeya-600/20 active:scale-98 transition-all flex items-center justify-center gap-2"
+              className="btn-primary w-full py-3 rounded-2xl font-bold text-sm shadow-soft active:scale-98 transition-all flex items-center justify-center gap-2"
             >
               {companyLoading ? 'Checking...' : t('companyCodeContinue')} <ArrowRight size={16} />
             </button>
@@ -347,17 +361,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
         {currentStep === 'credentials' && !isForcedPasswordChange && (
           <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
             {/* Active Company Pill & Change button */}
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-2 border border-border-subtle text-xs">
               <div className="flex items-center gap-2">
-                <Building2 size={14} className="text-gebeya-600" />
-                <span className="font-bold text-slate-700 dark:text-slate-200 uppercase">
+                <Building2 size={14} className="text-primary" />
+                <span className="font-bold text-text-main uppercase">
                   {inputCompanyCode}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setCurrentStep('company')}
-                className="text-[11px] font-semibold text-gebeya-600 hover:underline cursor-pointer"
+                className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
               >
                 {t('companyCodeChange')}
               </button>
@@ -365,11 +379,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
 
             {/* Username or Phone */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-text-muted mb-1.5">
                 {t('usernameOrPhone')}
               </label>
               <div className="relative">
-                <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
                 <input
                   type="text"
                   required
@@ -377,7 +391,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                   placeholder="admin or +251 91 122 3344"
                   value={usernameOrPhone}
                   onChange={(e) => setUsernameOrPhone(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm focus:outline-hidden focus:border-gebeya-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-input border border-border-subtle text-text-main text-sm focus:outline-hidden focus:border-primary transition-all"
                 />
               </div>
             </div>
@@ -385,7 +399,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-semibold text-text-muted">
                   {t('password')}
                 </label>
                 <button
@@ -394,25 +408,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                     setForgotUsername(usernameOrPhone);
                     setShowForgotModal(true);
                   }}
-                  className="text-[11px] font-semibold text-gebeya-600 hover:underline cursor-pointer"
+                  className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
                 >
                   {t('forgotPasswordLink')}
                 </button>
               </div>
               <div className="relative">
-                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm focus:outline-hidden focus:border-gebeya-500 transition-all font-mono"
+                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-input border border-border-subtle text-text-main text-sm focus:outline-hidden focus:border-primary transition-all font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-main"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -421,7 +435,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
               {/* Password strength indicator */}
               {password.length > 0 && (
                 <div className="mt-2 flex items-center gap-2">
-                  <div className="flex-1 flex gap-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className="flex-1 flex gap-1 h-1.5 bg-surface-2 rounded-full overflow-hidden">
                     {[1, 2, 3, 4].map((level) => (
                       <div
                         key={level}
@@ -431,7 +445,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                       />
                     ))}
                   </div>
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                  <span className="text-[10px] font-bold text-text-muted shrink-0">
                     {t(passStrength.labelKey)}
                   </span>
                 </div>
@@ -440,12 +454,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
 
             {/* Optional TOTP 2FA input if required */}
             {requires2FA && (
-              <div className="p-3.5 rounded-2xl bg-primary/5 border border-primary/20 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-gebeya-600">
+              <div className="p-3.5 rounded-2xl bg-secondary/30 border border-primary/20 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-primary">
                   <ShieldCheck size={16} />
                   <span>{t('totpPromptTitle')}</span>
                 </div>
-                <p className="text-[11px] text-slate-500 leading-tight">
+                <p className="text-[11px] text-text-muted leading-tight">
                   {t('totpPromptDesc')}
                 </p>
                 <input
@@ -456,7 +470,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                   placeholder="123456"
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full text-center tracking-[0.4em] font-mono text-lg py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-bold focus:outline-hidden focus:border-gebeya-500"
+                  className="w-full text-center tracking-[0.4em] font-mono text-lg py-2 rounded-xl bg-input border border-border-subtle font-bold focus:outline-hidden focus:border-primary"
                 />
               </div>
             )}
@@ -464,7 +478,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="btn-primary w-full py-3 text-sm font-bold rounded-2xl mt-1 justify-center shadow-md shadow-gebeya-600/25 active:scale-98 transition-all flex items-center gap-2"
+              className="btn-primary w-full py-3 text-sm font-bold rounded-2xl mt-1 justify-center shadow-soft active:scale-98 transition-all flex items-center gap-2"
             >
               {isLoading ? 'Verifying...' : requires2FA ? t('totpVerifyAction') : t('loginAction')}
             </button>
@@ -560,16 +574,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                   onClick={() => setSelectedBranchId(b.id)}
                   className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
                     selectedBranchId === b.id
-                      ? 'border-gebeya-600 bg-gebeya-50/50 dark:bg-gebeya-950/20 text-gebeya-900 dark:text-gebeya-100'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                      ? 'border-primary bg-secondary/30 text-text-main'
+                      : 'border-border-subtle hover:border-primary/50'
                   }`}
                 >
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold">{b.name}</span>
-                    <span className="text-[11px] font-mono text-slate-500">Code: {b.code}</span>
+                    <span className="text-sm font-bold text-text-main">{b.name}</span>
+                    <span className="text-[11px] font-mono text-text-muted">Code: {b.code}</span>
                   </div>
                   {selectedBranchId === b.id && (
-                    <div className="w-6 h-6 rounded-full bg-gebeya-600 text-white flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center">
                       <Check size={14} />
                     </div>
                   )}
@@ -579,7 +593,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
 
             <button
               type="submit"
-              className="btn-primary w-full py-3 rounded-2xl font-bold text-sm shadow-md"
+              className="btn-primary w-full py-3 rounded-2xl font-bold text-sm shadow-soft"
             >
               {t('enterBranchAction')}
             </button>
@@ -590,34 +604,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
         {onSwitchToPin && currentStep === 'credentials' && !isForcedPasswordChange && (
           <>
             <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <div className="flex-1 h-px bg-border-subtle" />
+              <span className="text-[11px] font-semibold text-text-dim uppercase tracking-wider">
                 or
               </span>
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+              <div className="flex-1 h-px bg-border-subtle" />
             </div>
 
             <button
               type="button"
               onClick={onSwitchToPin}
-              className="btn-secondary w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200"
+              className="btn-secondary w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-text-main"
             >
-              <KeyRound size={16} className="text-gebeya-600" />
+              <KeyRound size={16} className="text-primary" />
               {t('pinLogin')}
             </button>
           </>
         )}
 
         {/* Bottom Navigation Links */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80">
+        <div className="flex items-center justify-between pt-3 border-t border-border-subtle">
           <button
             type="button"
             onClick={() => {
               window.location.hash = '#register';
             }}
-            className="text-[11px] text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
+            className="text-[11px] text-text-muted hover:text-primary transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
           >
-            <Store size={13} className="text-emerald-600 dark:text-emerald-400" />
+            <Store size={13} className="text-primary" />
             {language === 'am' ? 'ሱፐርማርኬትዎን ያስመዝግቡ' : 'Register your supermarket'}
           </button>
 
@@ -626,9 +640,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             onClick={() => {
               window.location.hash = '#platform';
             }}
-            className="text-[11px] text-slate-400 hover:text-emerald-500 transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
+            className="text-[11px] text-text-dim hover:text-primary transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
           >
-            <ShieldAlert size={13} className="text-emerald-500" />
+            <ShieldAlert size={13} className="text-primary" />
             Platform HQ
           </button>
         </div>
@@ -637,34 +651,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
       {/* FORGOT PASSWORD MODAL */}
       {showForgotModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+          <div className="w-full max-w-sm bg-card border border-border-subtle rounded-3xl p-6 shadow-modal flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+              <h3 className="text-base font-bold text-text-main">
                 {t('resetPasswordTitle')}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowForgotModal(false)}
-                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="text-xs text-text-dim hover:text-text-main cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {forgotError && (
-              <p className="text-xs text-red-500 font-semibold">{forgotError}</p>
+              <p className="text-xs text-danger font-semibold">{forgotError}</p>
             )}
             {forgotMsg && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">{forgotMsg}</p>
+              <p className="text-xs text-primary font-semibold">{forgotMsg}</p>
             )}
 
             {forgotStep === 'request' ? (
               <form onSubmit={handleSendResetCode} className="flex flex-col gap-3">
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-text-muted">
                   Enter your username or registered phone to receive a 6-digit reset code (10-minute expiry).
                 </p>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-text-muted mb-1">
                     {t('usernameOrPhone')}
                   </label>
                   <input
@@ -673,7 +687,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                     value={forgotUsername}
                     onChange={(e) => setForgotUsername(e.target.value)}
                     placeholder="admin or +251 91 122 3344"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-hidden focus:border-gebeya-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-text-main text-sm focus:outline-hidden focus:border-primary"
                   />
                 </div>
                 <button
@@ -686,7 +700,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             ) : (
               <form onSubmit={handleExecuteReset} className="flex flex-col gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-text-muted mb-1">
                     {t('resetCodeLabel')}
                   </label>
                   <input
@@ -696,12 +710,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                     value={resetCode}
                     onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="123456"
-                    className="w-full text-center tracking-[0.4em] font-mono text-base py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold focus:outline-hidden focus:border-gebeya-500"
+                    className="w-full text-center tracking-[0.4em] font-mono text-base py-2 rounded-xl bg-input border border-border-subtle text-text-main font-bold focus:outline-hidden focus:border-primary"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-text-muted mb-1">
                     New Password (min 10 chars)
                   </label>
                   <input
@@ -710,11 +724,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                     value={resetNewPass}
                     onChange={(e) => setResetNewPass(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-hidden focus:border-gebeya-500 font-mono"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-text-main text-sm focus:outline-hidden focus:border-primary font-mono"
                   />
                   {resetNewPass.length > 0 && (
                     <div className="mt-1.5 flex items-center gap-2">
-                      <div className="flex-1 flex gap-1 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="flex-1 flex gap-1 h-1 bg-surface-2 rounded-full overflow-hidden">
                         {[1, 2, 3, 4].map((l) => (
                           <div
                             key={l}
@@ -724,7 +738,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
                           />
                         ))}
                       </div>
-                      <span className="text-[10px] font-bold text-slate-500">
+                      <span className="text-[10px] font-bold text-text-muted">
                         {t(resetPassStrength.labelKey)}
                       </span>
                     </div>

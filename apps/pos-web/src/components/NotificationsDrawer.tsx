@@ -78,9 +78,9 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-2xs animate-in fade-in select-none">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-200">
+      <div className="w-full max-w-md bg-white dark:bg-slate-800 h-full shadow-2xl border-l border-slate-200 dark:border-slate-700 flex flex-col animate-in slide-in-from-right duration-200">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
               <Bell size={18} />
@@ -147,8 +147,8 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                 iconColor = 'text-blue-500';
               } else if (item.type === 'EXPIRY') {
                 Icon = Clock;
-                colorClasses = 'bg-purple-50 border-purple-200 text-purple-900 dark:bg-purple-950/30 dark:border-purple-800 dark:text-purple-200';
-                iconColor = 'text-purple-500';
+                colorClasses = 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200';
+                iconColor = 'text-amber-500';
               } else if (item.type === 'CASH_THRESHOLD') {
                 Icon = DollarSign;
                 colorClasses = 'bg-indigo-50 border-indigo-200 text-indigo-900 dark:bg-indigo-950/30 dark:border-indigo-800 dark:text-indigo-200';
@@ -200,7 +200,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+        <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 flex items-center justify-between">
           <span>Branch LAN Guardian</span>
           <button
             onClick={fetchAlerts}

@@ -11,13 +11,14 @@ import {
   CheckCircle2,
   KeyRound,
   Shield,
+  Search,
+  Terminal,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
 import { StatusDot, Modal, Button, Input } from './ui';
 import { UserProfileModal } from './auth/UserProfileModal';
 import { TerminalPairModal } from './auth/TerminalPairModal';
-import { Terminal } from 'lucide-react';
 
 export interface TopBarProps {
   onOpenCommandPalette?: () => void;
@@ -25,7 +26,11 @@ export interface TopBarProps {
   unreadNotificationsCount?: number;
 }
 
-export const TopBar: React.FC<TopBarProps> = () => {
+export const TopBar: React.FC<TopBarProps> = ({
+  onOpenCommandPalette,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
+}) => {
   const { language, setLanguage, t, isDarkMode, toggleDarkMode, setUserThemePreference } = useI18n();
   const { currentUser, logout, lockSession, switchCashier, updateUserPassword, updateUserPin } = useAuth();
 
@@ -133,8 +138,57 @@ export const TopBar: React.FC<TopBarProps> = () => {
         </div>
       )}
 
-      {/* Right: Sync Status Dot, then User Avatar Menu */}
-      <div className="flex items-center gap-3">
+      {/* Center: Quick Search / Command Palette shortcut */}
+      {onOpenCommandPalette && (
+        <button
+          type="button"
+          onClick={onOpenCommandPalette}
+          className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-2 hover:bg-border-subtle border border-border-subtle text-text-muted hover:text-text-main text-xs font-medium transition-all cursor-pointer w-64 justify-between shadow-soft"
+        >
+          <span className="flex items-center gap-2 truncate">
+            <Search size={14} className="text-primary" />
+            <span>{language === 'am' ? 'እቃ፣ ትዕዛዝ ፈልግ...' : 'Search items, actions...'}</span>
+          </span>
+          <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-surface rounded border border-border-subtle text-text-dim">
+            Ctrl+K
+          </kbd>
+        </button>
+      )}
+
+      {/* Right: Quick Controls, Sync Status Dot, User Avatar Menu */}
+      <div className="flex items-center gap-2.5">
+        {/* Quick Language Toggle */}
+        <div className="flex items-center bg-surface-2 rounded-full p-0.5 border border-border-subtle">
+          <button
+            type="button"
+            onClick={() => setLanguage('en')}
+            className={`px-2 py-0.5 text-xs font-bold rounded-full transition-all ${
+              language === 'en' ? 'bg-primary text-white shadow-soft' : 'text-text-muted hover:text-text-main'
+            }`}
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => setLanguage('am')}
+            className={`px-2 py-0.5 text-xs font-bold rounded-full transition-all ${
+              language === 'am' ? 'bg-primary text-white shadow-soft' : 'text-text-muted hover:text-text-main'
+            }`}
+          >
+            አማ
+          </button>
+        </div>
+
+        {/* Quick 1-Click Dark / Light Mode Toggle */}
+        <button
+          type="button"
+          onClick={handleToggleTheme}
+          title={isDarkMode ? 'Switch to Light Mode (Emerald Professional)' : 'Switch to Dark Mode (Midnight Emerald)'}
+          className="w-8 h-8 rounded-full bg-surface-2 hover:bg-border-subtle border border-border-subtle flex items-center justify-center text-text-muted hover:text-primary transition-all cursor-pointer shadow-soft active:scale-95"
+        >
+          {isDarkMode ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-slate-600" />}
+        </button>
+
         {/* Sync Status Dot */}
         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 border border-border-subtle text-xs text-text-muted">
           <span className="relative flex h-2 w-2">

@@ -522,7 +522,7 @@ export const StockTakeView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <ClipboardList className="text-purple-600" size={26} />
+            <ClipboardList className="text-emerald-600" size={26} />
             {language === 'am' ? 'የክምችት ቆጠራ እና ማስተካከያ' : 'Stocktake & Physical Cycle Count'}
           </h1>
           <p className="text-xs text-slate-500">
@@ -537,14 +537,14 @@ export const StockTakeView: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setActiveSession(null)}
-                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-xs"
+                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-xs"
               >
                 &larr; {language === 'am' ? 'ወደ ዝርዝር ተመለስ' : 'All Sessions'}
               </button>
 
               <button
                 onClick={openShrinkageReport}
-                className="px-3.5 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-xs font-bold flex items-center gap-1.5 hover:bg-purple-100 transition shadow-xs"
+                className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-100 transition shadow-xs"
               >
                 <FileSpreadsheet size={15} />
                 {language === 'am' ? 'የብክነት ሪፖርት' : 'Shrinkage Report'}
@@ -553,7 +553,7 @@ export const StockTakeView: React.FC = () => {
           ) : (
             <button
               onClick={() => setIsStartModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black flex items-center gap-2 shadow-md transition active:scale-95"
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-2 shadow-md transition active:scale-95"
             >
               <Plus size={16} />
               {language === 'am' ? 'አዲስ ቆጠራ ጀምር' : 'Start Count Session'}
@@ -566,10 +566,10 @@ export const StockTakeView: React.FC = () => {
       {activeSession ? (
         <div className="flex-1 flex flex-col gap-3 overflow-hidden">
           {/* Active Session Status & Control Card */}
-          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col gap-3">
+          <div className="p-4 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="font-mono text-sm font-black text-purple-600 px-3 py-1.5 rounded-2xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800">
+                <span className="font-mono text-sm font-black text-emerald-600 px-3 py-1.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
                   {activeSession.countNumber}
                 </span>
 
@@ -633,7 +633,7 @@ export const StockTakeView: React.FC = () => {
                 ) : (
                   <button
                     onClick={openShrinkageReport}
-                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition"
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition"
                   >
                     <FileSpreadsheet size={15} />
                     View Final Variance Report
@@ -655,7 +655,7 @@ export const StockTakeView: React.FC = () => {
                       </span>
                       <button
                         onClick={() => setShowManagerPinModal(true)}
-                        className="ml-2 text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:underline"
+                        className="ml-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
                       >
                         Reveal Expected (Manager PIN)
                       </button>
@@ -742,10 +742,10 @@ export const StockTakeView: React.FC = () => {
 
           {/* Rapid Scan-to-Count Box (Hardware Wedge & Mobile Friendly) */}
           {activeSession.status === 'IN_PROGRESS' && (
-            <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-1 max-w-md">
                 <div className="relative flex-1">
-                  <Barcode size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-600" />
+                  <Barcode size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600" />
                   <input
                     ref={scanInputRef}
                     type="text"
@@ -758,7 +758,7 @@ export const StockTakeView: React.FC = () => {
                       }
                     }}
                     placeholder="Scan product barcode (keyboard wedge or camera)..."
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
 
@@ -794,7 +794,7 @@ export const StockTakeView: React.FC = () => {
                     onClick={() => setFilterTab('ALL')}
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
                       filterTab === 'ALL'
-                        ? 'bg-white dark:bg-slate-900 text-purple-600 shadow-xs'
+                        ? 'bg-white dark:bg-slate-800 text-emerald-600 shadow-xs'
                         : 'text-slate-500 hover:text-slate-900'
                     }`}
                   >
@@ -805,7 +805,7 @@ export const StockTakeView: React.FC = () => {
                     onClick={() => setFilterTab('DISCREPANCIES')}
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
                       filterTab === 'DISCREPANCIES'
-                        ? 'bg-white dark:bg-slate-900 text-rose-600 shadow-xs'
+                        ? 'bg-white dark:bg-slate-800 text-rose-600 shadow-xs'
                         : 'text-slate-500 hover:text-slate-900'
                     }`}
                   >
@@ -816,7 +816,7 @@ export const StockTakeView: React.FC = () => {
                     onClick={() => setFilterTab('RECOUNT')}
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
                       filterTab === 'RECOUNT'
-                        ? 'bg-white dark:bg-slate-900 text-amber-600 shadow-xs'
+                        ? 'bg-white dark:bg-slate-800 text-amber-600 shadow-xs'
                         : 'text-slate-500 hover:text-slate-900'
                     }`}
                   >
@@ -829,11 +829,11 @@ export const StockTakeView: React.FC = () => {
 
           {/* Camera Scanner Preview Fallback */}
           {isCameraActive && (
-            <div className="p-3 bg-purple-900/90 text-white rounded-2xl flex flex-col items-center justify-center gap-2 animate-in fade-in">
+            <div className="p-3 bg-emerald-900/90 text-white rounded-2xl flex flex-col items-center justify-center gap-2 animate-in fade-in">
               <div className="text-xs font-bold flex items-center gap-1.5">
                 <Camera size={16} /> Mobile Camera Live Scanner Active
               </div>
-              <div className="w-full max-w-sm h-36 bg-black/60 rounded-xl border-2 border-dashed border-purple-400 flex items-center justify-center relative overflow-hidden">
+              <div className="w-full max-w-sm h-36 bg-black/60 rounded-xl border-2 border-dashed border-emerald-400 flex items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-x-0 h-0.5 bg-red-500 animate-pulse" />
                 <span className="text-[11px] text-slate-300">Point phone camera at barcode label</span>
               </div>
@@ -849,10 +849,10 @@ export const StockTakeView: React.FC = () => {
           )}
 
           {/* Items Audit & Variance Review Table */}
-          <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
+          <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col">
             <div className="flex-1 overflow-auto">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="py-3 px-4">SKU & Product</th>
                     <th className="py-3 px-3 text-center">UOM</th>
@@ -911,7 +911,7 @@ export const StockTakeView: React.FC = () => {
                               {item.categoryName && (
                                 <>
                                   <span>•</span>
-                                  <span className="text-purple-600 dark:text-purple-400">{item.categoryName}</span>
+                                  <span className="text-emerald-600 dark:text-emerald-400">{item.categoryName}</span>
                                 </>
                               )}
                             </div>
@@ -973,12 +973,12 @@ export const StockTakeView: React.FC = () => {
                                     onChange={(e) =>
                                       handleUpdateCount(item.productId, parseFloat(e.target.value) || 0)
                                     }
-                                    className="w-20 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-center font-mono font-black text-xs focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                                    className="w-20 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-center font-mono font-black text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                                   />
 
                                   <button
                                     onClick={() => handleUpdateCount(item.productId, item.countedQuantity + 1)}
-                                    className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 font-bold text-xs text-purple-700 dark:text-purple-300 flex items-center justify-center active:scale-95 transition"
+                                    className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 font-bold text-xs text-emerald-700 dark:text-emerald-300 flex items-center justify-center active:scale-95 transition"
                                     title="+1"
                                   >
                                     +1
@@ -1085,8 +1085,8 @@ export const StockTakeView: React.FC = () => {
         </div>
       ) : (
         /* Past Sessions History List View */
-        <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
                 {language === 'am' ? 'ያለፉ የቆጠራ ክፍለ-ጊዜዎች' : 'Audit Sessions Registry'}
@@ -1099,7 +1099,7 @@ export const StockTakeView: React.FC = () => {
                     onClick={() => setSessionFilter(tab)}
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
                       sessionFilter === tab
-                        ? 'bg-white dark:bg-slate-900 text-purple-600 shadow-xs'
+                        ? 'bg-white dark:bg-slate-800 text-emerald-600 shadow-xs'
                         : 'text-slate-500 hover:text-slate-900'
                     }`}
                   >
@@ -1120,7 +1120,7 @@ export const StockTakeView: React.FC = () => {
 
           <div className="flex-1 overflow-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
+              <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="py-3 px-4">Count Number</th>
                   <th className="py-3 px-4">Scope / Location</th>
@@ -1142,7 +1142,7 @@ export const StockTakeView: React.FC = () => {
                       onClick={() => loadSessionDetails(s.id)}
                       className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition"
                     >
-                      <td className="py-3 px-4 font-mono font-black text-purple-600">
+                      <td className="py-3 px-4 font-mono font-black text-emerald-600">
                         {s.countNumber}
                       </td>
                       <td className="py-3 px-4">
@@ -1182,7 +1182,7 @@ export const StockTakeView: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button className="px-3 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition flex items-center gap-1 mx-auto">
+                        <button className="px-3 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition flex items-center gap-1 mx-auto">
                           <span>Open</span>
                           <ArrowRight size={12} />
                         </button>
@@ -1198,9 +1198,9 @@ export const StockTakeView: React.FC = () => {
       {/* 3. Start Stocktake Session Modal */}
       {isStartModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6">
             <h2 className="text-base font-black text-slate-900 dark:text-white mb-1 flex items-center gap-2">
-              <ClipboardList className="text-purple-600" size={22} />
+              <ClipboardList className="text-emerald-600" size={22} />
               {language === 'am' ? 'አዲስ የክምችት ቆጠራ ጀምር' : 'Start Stocktake Count Session'}
             </h2>
             <p className="text-xs text-slate-500 mb-4 leading-relaxed">
@@ -1220,7 +1220,7 @@ export const StockTakeView: React.FC = () => {
                       onClick={() => setNewScope(sc)}
                       className={`py-2 px-2.5 rounded-xl text-xs font-bold border text-center transition ${
                         newScope === sc
-                          ? 'bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 shadow-xs'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 shadow-xs'
                           : 'bg-slate-50 dark:bg-slate-800 text-slate-600 border-slate-200 dark:border-slate-700'
                       }`}
                     >
@@ -1291,7 +1291,7 @@ export const StockTakeView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={starting}
-                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black shadow-md transition active:scale-95 disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md transition active:scale-95 disabled:opacity-50"
                 >
                   {starting ? 'Capturing Snapshot...' : 'Start Count'}
                 </button>
@@ -1304,8 +1304,8 @@ export const StockTakeView: React.FC = () => {
       {/* 4. Manager PIN Reveal Modal (Blind Count Override) */}
       {showManagerPinModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-sm p-6 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 text-purple-600 flex items-center justify-center mx-auto mb-3">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto mb-3">
               <Lock size={22} />
             </div>
 
@@ -1322,7 +1322,7 @@ export const StockTakeView: React.FC = () => {
               value={managerPinInput}
               onChange={(e) => setManagerPinInput(e.target.value)}
               placeholder="••••"
-              className="w-32 mx-auto text-center font-mono text-xl tracking-widest py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-hidden focus:ring-2 focus:ring-purple-500 mb-3"
+              className="w-32 mx-auto text-center font-mono text-xl tracking-widest py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 mb-3"
             />
 
             {pinError && <div className="text-xs font-bold text-rose-600 mb-3">{pinError}</div>}
@@ -1340,7 +1340,7 @@ export const StockTakeView: React.FC = () => {
               </button>
               <button
                 onClick={handleRevealExpected}
-                className="flex-1 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black shadow-sm transition"
+                className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm transition"
               >
                 Verify PIN
               </button>
@@ -1352,13 +1352,13 @@ export const StockTakeView: React.FC = () => {
       {/* 5. Manager Approval & Reconciliation Modal */}
       {isReconcileModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6">
             <h2 className="text-base font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
               <CheckCircle2 className="text-emerald-600" size={22} />
               Manager Stocktake Reconciliation
             </h2>
             <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-              This will atomically commit <strong className="text-slate-900 dark:text-white">COUNT_VARIANCE</strong> adjustment ledger entries under reason <code className="font-mono text-purple-600">stocktake</code>. The session will become strictly immutable.
+              This will atomically commit <strong className="text-slate-900 dark:text-white">COUNT_VARIANCE</strong> adjustment ledger entries under reason <code className="font-mono text-emerald-600">stocktake</code>. The session will become strictly immutable.
             </p>
 
             {/* Financial Summary */}
@@ -1439,11 +1439,11 @@ export const StockTakeView: React.FC = () => {
       {/* 6. Comprehensive Stocktake & Shrinkage Report Modal */}
       {isReportModalOpen && reportData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-3xl p-6 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl p-6 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700 mb-4">
               <div>
                 <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <FileSpreadsheet className="text-purple-600" size={22} />
+                  <FileSpreadsheet className="text-emerald-600" size={22} />
                   Stocktake Shrinkage & Category Variance Report
                 </h2>
                 <p className="text-xs text-slate-500 font-mono">
@@ -1491,18 +1491,18 @@ export const StockTakeView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-3 rounded-2xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800">
-                <div className="text-[10px] font-bold text-purple-600 uppercase">Shrinkage %</div>
-                <div className="font-mono font-black text-sm text-purple-700 dark:text-purple-300">
+              <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                <div className="text-[10px] font-bold text-emerald-600 uppercase">Shrinkage %</div>
+                <div className="font-mono font-black text-sm text-emerald-700 dark:text-emerald-300">
                   {reportData.shrinkagePercent}%
                 </div>
               </div>
             </div>
 
             {/* Category Breakdown Table */}
-            <div className="flex-1 overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800 mb-4">
+            <div className="flex-1 overflow-auto rounded-2xl border border-slate-200 dark:border-slate-700 mb-4">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="py-2.5 px-4">Category</th>
                     <th className="py-2.5 px-3 text-center">Items</th>
@@ -1543,7 +1543,7 @@ export const StockTakeView: React.FC = () => {
               </table>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
               <span className="text-xs text-slate-400">
                 Audited with GebeyaOS Real-Time Inventory & Stock Ledger Engine
               </span>

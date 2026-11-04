@@ -68,9 +68,9 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gebeya-100 dark:bg-gebeya-950/60 text-gebeya-600 flex items-center justify-center">
               <FolderPlus size={20} />
@@ -95,7 +95,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Create New Category Form */}
-          <form onSubmit={handleCreate} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 space-y-3">
+          <form onSubmit={handleCreate} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Plus size={14} className="text-gebeya-600" />
@@ -133,7 +133,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                       setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 16));
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                 />
               </div>
 
@@ -146,7 +146,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   placeholder="ለምሳሌ መጠጦች"
                   value={nameAm}
                   onChange={(e) => setNameAm(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                 />
               </div>
 
@@ -159,7 +159,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   placeholder="BEV"
                   value={code}
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono uppercase text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono uppercase text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                 />
               </div>
             </div>
@@ -181,7 +181,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
               {language === 'am' ? 'ያሉ ምድቦች' : 'Existing Categories'}
             </h3>
-            <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-800">
               {categories.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">
                   No categories found. Create one above!
@@ -221,7 +221,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end">
+        <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex justify-end">
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"

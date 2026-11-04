@@ -642,7 +642,7 @@ export const UserManagementView: React.FC = () => {
   const getRoleBadgeClass = (role: string) => {
     switch (role.toUpperCase()) {
       case 'OWNER':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300';
+        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300';
       case 'HQ_ADMIN':
         return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-300';
       case 'BRANCH_MANAGER':
@@ -669,7 +669,7 @@ export const UserManagementView: React.FC = () => {
       return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200';
     }
     if (action.includes('ROLE') || action.includes('PERMISSION')) {
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200';
+      return 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border-teal-200';
     }
     return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-200';
   };
@@ -781,7 +781,7 @@ export const UserManagementView: React.FC = () => {
           {/* Quick Metrics Ribbon */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3 flex-shrink-0">
             <div className="glass-panel p-3 rounded-xl flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-700 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 flex items-center justify-center">
                 <Users size={18} />
               </div>
               <div>
@@ -923,7 +923,7 @@ export const UserManagementView: React.FC = () => {
                         key={user.id}
                         onClick={() => setDrawerUser(user)}
                         className={`cursor-pointer transition-colors hover:bg-surface-2/60 ${
-                          !user.isActive ? 'opacity-60 bg-slate-50/50 dark:bg-slate-900/30' : ''
+                          !user.isActive ? 'opacity-60 bg-slate-50/50 dark:bg-slate-800/40' : ''
                         }`}
                       >
                         {/* Name & Username */}
@@ -937,7 +937,7 @@ export const UserManagementView: React.FC = () => {
                                 {user.fullName}
                                 {isLastOwner && (
                                   <span
-                                    className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300"
+                                    className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
                                     title="Last Sovereign Owner of the Store"
                                   >
                                     Sole Owner
@@ -1197,7 +1197,7 @@ export const UserManagementView: React.FC = () => {
           {/* Audit Header & Filter Ribbon */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3 flex-shrink-0">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-300">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300">
                 <ShieldAlert size={14} />
                 Append-Only Immutable Ledger (Hash Chained)
               </span>
@@ -1562,7 +1562,7 @@ export const UserManagementView: React.FC = () => {
 
                 {/* Deactivate Button with Last-Owner Rule Warning */}
                 {drawerUser.role === 'OWNER' && drawerUser.isActive && activeOwnersCount <= 1 ? (
-                  <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-300 text-purple-800 dark:text-purple-300 text-[11px] flex items-center gap-2">
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-center gap-2">
                     <AlertTriangle size={15} className="flex-shrink-0" />
                     <span>The last Owner of the store cannot be deactivated or demoted.</span>
                   </div>

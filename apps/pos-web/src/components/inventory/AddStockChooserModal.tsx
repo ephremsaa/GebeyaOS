@@ -28,7 +28,7 @@ export const AddStockChooserModal: React.FC<AddStockChooserModalProps> = ({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="modal-content max-w-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
           <div>
             <h2 className="modal-title">Add Stock to Inventory</h2>
             <p className="text-xs text-slate-500">
@@ -53,7 +53,7 @@ export const AddStockChooserModal: React.FC<AddStockChooserModalProps> = ({
               onClose();
               onSelectScan();
             }}
-            className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-gebeya-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-gebeya-50/40 dark:hover:bg-gebeya-950/20 text-left transition-all flex items-center justify-between group active:scale-98"
+            className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-gebeya-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-gebeya-50/40 dark:hover:bg-gebeya-950/20 text-left transition-all flex items-center justify-between group active:scale-98"
           >
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-gebeya-600 text-white flex items-center justify-center shadow-md shadow-gebeya-600/30 group-hover:scale-105 transition-transform">
@@ -79,7 +79,7 @@ export const AddStockChooserModal: React.FC<AddStockChooserModalProps> = ({
               onClose();
               onSelectManual();
             }}
-            className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 text-left transition-all flex items-center justify-between group active:scale-98"
+            className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 text-left transition-all flex items-center justify-between group active:scale-98"
           >
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/30 group-hover:scale-105 transition-transform">
@@ -104,7 +104,7 @@ export const AddStockChooserModal: React.FC<AddStockChooserModalProps> = ({
               onClose();
               onSelectExcel();
             }}
-            className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 text-left transition-all flex items-center justify-between group active:scale-98"
+            className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 text-left transition-all flex items-center justify-between group active:scale-98"
           >
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30 group-hover:scale-105 transition-transform">
@@ -125,7 +125,7 @@ export const AddStockChooserModal: React.FC<AddStockChooserModalProps> = ({
         </div>
 
         {/* Footer actions: Write-off adjustment & Import History */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 text-xs">
+        <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700 text-xs">
           <button
             type="button"
             onClick={() => {

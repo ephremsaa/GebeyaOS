@@ -116,7 +116,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   const allowedSecondary = secondaryTabs.filter((t) => t.allowed);
 
   return (
-    <nav className="w-[88px] min-w-[88px] bg-surface border-r border-border-subtle flex flex-col items-center py-3 justify-between flex-shrink-0 select-none z-20 overflow-y-auto no-scrollbar">
+    <nav className="w-[84px] min-w-[84px] bg-sidebar border-r border-border-subtle flex flex-col items-center py-3.5 justify-between flex-shrink-0 select-none z-20 overflow-y-auto no-scrollbar">
       <div className="flex flex-col gap-1 w-full px-2">
         {/* Top: Checkout & Shift */}
         {allowedPrimary.map((item) => {
@@ -126,14 +126,17 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
               key={item.id}
               type="button"
               onClick={() => onTabChange(item.id)}
-              className={`w-full min-h-[58px] rounded-xl flex flex-col items-center justify-center gap-1.5 transition-colors duration-fast active:scale-95 cursor-pointer ${
+              className={`w-full min-h-[58px] rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all duration-fast active:scale-95 cursor-pointer relative ${
                 isActive
-                  ? 'bg-primary-soft text-primary font-semibold'
+                  ? 'bg-secondary text-primary font-bold shadow-xs'
                   : 'text-text-muted hover:text-text-main hover:bg-surface-2'
               }`}
               title={item.label}
               aria-label={item.label}
             >
+              {isActive && (
+                <span className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-primary rounded-r-full" />
+              )}
               {item.icon}
               <span className="text-[12px] leading-tight text-center">{item.label}</span>
             </button>
@@ -154,14 +157,17 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => onTabChange(item.id)}
-                className={`w-full min-h-[52px] rounded-xl flex flex-col items-center justify-center gap-1 transition-colors duration-fast active:scale-95 cursor-pointer ${
+                className={`w-full min-h-[52px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-fast active:scale-95 cursor-pointer relative ${
                   isActive
-                    ? 'bg-primary-soft text-primary font-semibold'
+                    ? 'bg-secondary text-primary font-bold shadow-xs'
                     : 'text-text-muted hover:text-text-main hover:bg-surface-2'
                 }`}
                 title={item.label}
                 aria-label={item.label}
               >
+                {isActive && (
+                  <span className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r-full" />
+                )}
                 {item.icon}
                 <span className="text-[12px] leading-tight text-center truncate w-full px-1">
                   {item.label}

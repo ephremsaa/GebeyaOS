@@ -390,9 +390,9 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-250">
+        <div className="w-screen max-w-xl bg-white dark:bg-slate-800 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-700 animate-in slide-in-from-right duration-250">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-gebeya-100 dark:bg-gebeya-950/60 text-gebeya-600 flex items-center justify-center font-bold">
                 <Package size={20} />
@@ -435,7 +435,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
             )}
 
             {/* 1. Barcode Scanner & Inline Warning (UX Focus: 30 seconds) */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <Barcode size={16} className="text-gebeya-600" />
@@ -446,7 +446,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   <button
                     type="button"
                     onClick={handleGenerateEan}
-                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gebeya-50 hover:text-gebeya-600 text-[10px] font-bold flex items-center gap-1 transition"
+                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gebeya-50 hover:text-gebeya-600 text-[10px] font-bold flex items-center gap-1 transition"
                   >
                     <Sparkles size={11} className="text-gebeya-500" />
                     + Gen EAN-13
@@ -454,7 +454,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   <button
                     type="button"
                     onClick={handleGenerateCode128}
-                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gebeya-50 hover:text-gebeya-600 text-[10px] font-bold transition"
+                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gebeya-50 hover:text-gebeya-600 text-[10px] font-bold transition"
                   >
                     + Code128
                   </button>
@@ -468,10 +468,10 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   placeholder="Scan or type barcode (e.g. 6281006560027)..."
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border font-mono text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 ${
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border font-mono text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 ${
                     duplicateWarning?.exists
                       ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/20'
-                      : 'border-slate-200 dark:border-slate-800 focus:ring-gebeya-500'
+                      : 'border-slate-200 dark:border-slate-700 focus:ring-gebeya-500'
                   }`}
                 />
                 {barcodeChecking && (
@@ -506,7 +506,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     placeholder="e.g. Sunflower Cooking Oil 5L"
                     value={nameEn}
                     onChange={(e) => setNameEn(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                   />
                 </div>
 
@@ -519,7 +519,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     placeholder="ለምሳሌ የሱፍ ዘይት 5 ሊትር"
                     value={nameAm}
                     onChange={(e) => setNameAm(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                   />
                 </div>
               </div>
@@ -534,7 +534,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     required
                     value={sku}
                     onChange={(e) => setSku(e.target.value.toUpperCase())}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                   />
                 </div>
 
@@ -547,7 +547,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     placeholder="https://images.unsplash.com/..."
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                   />
                 </div>
               </div>
@@ -571,7 +571,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                 >
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -588,7 +588,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                 <select
                   value={uomCode}
                   onChange={(e) => setUomCode(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
                 >
                   {uoms.map((u) => (
                     <option key={u.code} value={u.code}>
@@ -600,7 +600,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
             </div>
 
             {/* 4. Pack Multiplier Conversion */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <Layers size={14} className="text-indigo-500" />
@@ -621,7 +621,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     min="1"
                     value={packMultiplier}
                     onChange={(e) => setPackMultiplier(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold"
+                    className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
                   />
                 </div>
                 <div>
@@ -654,7 +654,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     required
                     value={basePrice || ''}
                     onChange={(e) => setBasePrice(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 text-xs font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 text-xs font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
 
@@ -668,7 +668,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     min="0"
                     value={costPrice || ''}
                     onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
 
@@ -683,7 +683,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     placeholder="Optional override"
                     value={branchOverridePrice}
                     onChange={(e) => setBranchOverridePrice(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold text-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
                 </div>
               </div>
@@ -735,14 +735,14 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     placeholder="e.g. Supplier invoice cost revision, periodic tariff update"
                     value={priceChangeReason}
                     onChange={(e) => setPriceChangeReason(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
               )}
             </div>
 
             {/* 6. Deli / Scale Options */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 space-y-2">
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -769,7 +769,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                       placeholder="00123"
                       value={scalePlu}
                       onChange={(e) => setScalePlu(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold"
+                      className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
                     />
                   </div>
                   <div className="text-[11px] text-slate-500 flex items-center">
@@ -790,7 +790,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   min="0"
                   value={minStockLevel}
                   onChange={(e) => setMinStockLevel(parseInt(e.target.value, 10) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -803,13 +803,13 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   min="0"
                   value={maxStockLevel}
                   onChange={(e) => setMaxStockLevel(parseInt(e.target.value, 10) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
                 />
               </div>
             </div>
 
             {/* 8. Active vs Archived Status with Stock Warning */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Archive size={15} className="text-slate-500" />
@@ -855,7 +855,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
           </div>
 
           {/* Footer Action Bar */}
-          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between gap-3">
+          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={onClose}

@@ -521,9 +521,9 @@ export const ReportsView: React.FC = () => {
         <div className="kpi-card p-4 rounded-xl glass-panel border border-[var(--border-subtle)]">
           <div className="kpi-label flex items-center justify-between text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
             <span>Transactions &amp; Basket</span>
-            <PieChart size={15} style={{ color: '#7c3aed' }} />
+            <PieChart size={15} style={{ color: 'var(--primary)' }} />
           </div>
-          <div className="kpi-value text-2xl font-bold tabular mt-1" style={{ color: '#7c3aed' }}>
+          <div className="kpi-value text-2xl font-bold tabular mt-1" style={{ color: 'var(--primary)' }}>
             {dailySales?.totalSalesCount || 0}
           </div>
           <div className="flex items-center justify-between text-xs mt-2" style={{ color: 'var(--text-dim)' }}>
@@ -636,7 +636,7 @@ export const ReportsView: React.FC = () => {
                     ? '#2563eb'
                     : t.paymentMethod === 'CBE_BIRR'
                     ? '#d97706'
-                    : '#7c3aed';
+                    : '#059669';
 
                 return (
                   <div key={t.paymentMethod}>

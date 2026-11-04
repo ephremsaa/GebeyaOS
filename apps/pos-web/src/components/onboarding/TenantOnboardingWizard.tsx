@@ -574,7 +574,7 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
               </div>
 
               <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
                   <Store size={16} />
                 </div>
                 <div className="flex-1">

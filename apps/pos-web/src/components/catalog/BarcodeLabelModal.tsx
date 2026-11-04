@@ -49,9 +49,9 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-cyan-100 dark:bg-cyan-950/60 text-cyan-600 flex items-center justify-center">
               <Printer size={20} />
@@ -74,7 +74,7 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
         </div>
 
         {/* Configuration Toolbar */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <label className="text-xs font-bold text-slate-600 dark:text-slate-300">
               {language === 'am' ? 'የመለያ መጠን:' : 'Format:'}
@@ -84,7 +84,7 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
                 onClick={() => setLabelSize('50x30')}
                 className={`px-3 py-1.5 rounded-lg transition ${
                   labelSize === '50x30'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300'
                 }`}
               >
@@ -94,7 +94,7 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
                 onClick={() => setLabelSize('40x25')}
                 className={`px-3 py-1.5 rounded-lg transition ${
                   labelSize === '40x25'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300'
                 }`}
               >
@@ -104,7 +104,7 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
                 onClick={() => setLabelSize('a4_sheet')}
                 className={`px-3 py-1.5 rounded-lg transition ${
                   labelSize === 'a4_sheet'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-300'
                 }`}
               >
@@ -124,7 +124,7 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
                 max="50"
                 value={copiesPerItem}
                 onChange={(e) => setCopiesPerItem(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-16 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-center"
+                className="w-16 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-center"
               />
             </div>
 
@@ -213,7 +213,7 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
         </div>
 
         {/* Footer info */}
-        <div className="px-6 py-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+        <div className="px-6 py-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-400 flex items-center justify-between">
           <span>Compatible with thermal barcode printers (Xprinter, Zebra, Rongta, Bixolon) and standard laser sheets.</span>
           <button
             onClick={onClose}

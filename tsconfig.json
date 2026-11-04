@@ -8,6 +8,8 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "baseUrl": ".",
     "paths": {
       "@gebeyaos/shared-types": ["packages/shared-types/src"],
@@ -19,6 +21,7 @@
     "apps/branch-server/test/**/*",
     "apps/hq-server/src/**/*",
     "apps/hq-server/test/**/*",
+    "apps/pos-web/src/**/*",
     "packages/shared-types/src/**/*",
     "packages/sync-protocol/src/**/*",
     "scripts/**/*"
@@ -27,7 +30,6 @@
     "node_modules",
     "dist",
     "backend",
-    "apps/pos-web",
     "scratch"
   ]
 }

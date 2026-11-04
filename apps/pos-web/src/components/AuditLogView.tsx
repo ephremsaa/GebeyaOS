@@ -84,7 +84,7 @@ export const AuditLogView: React.FC = () => {
     let classes = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
     if (action.includes('LOGIN')) classes = 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300';
     else if (action.includes('PRICE') || action.includes('OVERRIDE')) classes = 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300';
-    else if (action.includes('IMPORT') || action.includes('STOCK')) classes = 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300';
+    else if (action.includes('IMPORT') || action.includes('STOCK')) classes = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300';
     else if (action.includes('RESTORE')) classes = 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300';
     else if (action.includes('SETTINGS')) classes = 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300';
 
@@ -113,7 +113,7 @@ export const AuditLogView: React.FC = () => {
 
         <button
           onClick={fetchLogs}
-          className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 flex items-center gap-1.5 transition self-start sm:self-auto"
+          className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 flex items-center gap-1.5 transition self-start sm:self-auto"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           {language === 'am' ? 'አድስ' : 'Refresh'}
@@ -121,7 +121,7 @@ export const AuditLogView: React.FC = () => {
       </div>
 
       {/* 2. Filter Bar */}
-      <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 mb-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+      <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex flex-wrap items-center gap-3">
           {/* Action Filter */}
           <select
@@ -200,10 +200,10 @@ export const AuditLogView: React.FC = () => {
       </div>
 
       {/* 3. Audit Log Table */}
-      <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
+      <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col">
         <div className="flex-1 overflow-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
+            <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="py-3 px-4">Timestamp</th>
                 <th className="py-3 px-4">User & Role</th>
@@ -298,7 +298,7 @@ export const AuditLogView: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 flex justify-between items-center">
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500 flex justify-between items-center">
           <span>Total Records: {total}</span>
           <span className="text-[11px] text-slate-400">Write-once append-only database audit log</span>
         </div>
@@ -307,8 +307,8 @@ export const AuditLogView: React.FC = () => {
       {/* 4. JSON Payload Inspector Modal */}
       {selectedLog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                   <Terminal size={16} className="text-indigo-600" />
@@ -356,7 +356,7 @@ export const AuditLogView: React.FC = () => {
               </div>
             </div>
 
-            <div className="px-6 py-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <div className="px-6 py-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 flex justify-end">
               <button
                 onClick={() => setSelectedLog(null)}
                 className="px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white font-bold text-xs"

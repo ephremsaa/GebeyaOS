@@ -215,7 +215,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
     >
       <div className="modal-content max-w-5xl max-h-[94vh] flex flex-col p-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30">
               <FileSpreadsheet size={20} />
@@ -345,7 +345,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             </div>
 
             {/* In-Browser Inline Editor Table */}
-            <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-800 rounded-2xl min-h-[300px]">
+            <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-700 rounded-2xl min-h-[300px]">
               <table className="data-table text-xs">
                 <thead>
                   <tr>
@@ -484,7 +484,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             )}
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -541,7 +541,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
               </div>
               <div className="kpi-card text-center">
                 <span className="text-[10px] text-slate-400 font-bold uppercase">Units Added</span>
-                <span className="text-2xl font-black text-purple-600">{commitResult.totalQuantityAdded}</span>
+                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{commitResult.totalQuantityAdded}</span>
               </div>
               <div className="kpi-card text-center">
                 <span className="text-[10px] text-slate-400 font-bold uppercase">Failed / Skipped</span>

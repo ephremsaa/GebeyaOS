@@ -8,84 +8,104 @@
     --font-ethiopic: 'Noto Sans Ethiopic', 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-    /* Light Theme (Default) */
-    --bg-page: #F6F7F9;
+    /* 🌞 Light Mode – Emerald Professional */
+    --primary: #059669;
+    --primary-hover: #047857;
+    --primary-soft: #D1FAE5;
+    --primary-fg: #FFFFFF;
+
+    --secondary: #D1FAE5;
+    --secondary-hover: #A7F3D0;
+    --secondary-fg: #047857;
+
+    --bg-page: #F8FAFC;
+    --bg-sidebar: #FFFFFF;
     --bg-surface: #FFFFFF;
-    --bg-surface-2: #F1F3F5;
-    --bg-elevated: #F1F3F5;
+    --bg-surface-2: #F1F5F9;
+    --bg-elevated: #FFFFFF;
+    --bg-card: #FFFFFF;
     --bg-input: #FFFFFF;
 
-    --border-subtle: #E3E6EA;
-    --border-strong: #E3E6EA;
+    --text-main: #0F172A;
+    --text-muted: #64748B;
+    --text-dim: #94A3B8;
 
-    --text-main: #101828;
-    --text-muted: #667085;
-    --text-dim: #98A2B3;
+    --border-subtle: #E2E8F0;
+    --border-strong: #CBD5E1;
 
-    /* Accents */
-    --primary: #16A34A;
-    --primary-hover: #15803D;
-    --primary-soft: #DCFCE7;
-    --primary-fg: #FFFFFF;
+    --success: #16A34A;
+    --success-soft: #DCFCE7;
+    --success-fg: #FFFFFF;
 
     --warning: #F59E0B;
     --warning-soft: #FEF3C7;
     --warning-fg: #FFFFFF;
 
-    --danger: #DC2626;
+    --danger: #EF4444;
     --danger-soft: #FEE2E2;
     --danger-fg: #FFFFFF;
 
-    --info: #2563EB;
-    --info-soft: #DBEAFE;
+    --info: #0284C7;
+    --info-soft: #E0F2FE;
     --info-fg: #FFFFFF;
 
     /* Radii */
-    --radius-card: 12px;
+    --radius-card: 14px;
     --radius-input: 12px;
-    --radius-panel: 16px;
+    --radius-panel: 18px;
     --radius-pill: 9999px;
 
-    /* Depth: One soft shadow */
-    --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.06);
-    --shadow-modal: 0 20px 25px -5px rgba(16, 24, 40, 0.1), 0 8px 10px -6px rgba(16, 24, 40, 0.06);
+    /* Depth: Refined clean elevation */
+    --shadow-soft: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+    --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+    --shadow-modal: 0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
   }
 
   .dark {
-    /* Dark Theme */
+    /* 🌙 Dark Mode – Midnight Emerald */
+    --primary: #10B981;
+    --primary-hover: #34D399;
+    --primary-soft: rgba(16, 185, 129, 0.16);
+    --primary-fg: #0B1220;
+
+    --secondary: #064E3B;
+    --secondary-hover: #065F46;
+    --secondary-fg: #6EE7B7;
+
     --bg-page: #0B1220;
-    --bg-surface: #111A2B;
-    --bg-surface-2: #172033;
-    --bg-elevated: #172033;
-    --bg-input: #172033;
+    --bg-sidebar: #111827;
+    --bg-surface: #1E293B;
+    --bg-surface-2: #162032;
+    --bg-elevated: #1E293B;
+    --bg-card: #1E293B;
+    --bg-input: #162032;
 
-    --border-subtle: #243049;
-    --border-strong: #243049;
+    --text-main: #F8FAFC;
+    --text-muted: #94A3B8;
+    --text-dim: #64748B;
 
-    --text-main: #F2F4F7;
-    --text-muted: #98A2B3;
-    --text-dim: #667085;
+    --border-subtle: #334155;
+    --border-strong: #475569;
 
-    /* Accents (slightly brighter for dark theme) */
-    --primary: #22C55E;
-    --primary-hover: #16A34A;
-    --primary-soft: rgba(34, 197, 94, 0.15);
-    --primary-fg: #FFFFFF;
+    --success: #22C55E;
+    --success-soft: rgba(34, 197, 94, 0.16);
+    --success-fg: #FFFFFF;
 
     --warning: #FBBF24;
-    --warning-soft: rgba(251, 191, 36, 0.15);
+    --warning-soft: rgba(251, 191, 36, 0.16);
     --warning-fg: #0B1220;
 
-    --danger: #EF4444;
-    --danger-soft: rgba(239, 68, 68, 0.15);
+    --danger: #F87171;
+    --danger-soft: rgba(248, 113, 113, 0.16);
     --danger-fg: #FFFFFF;
 
-    --info: #3B82F6;
-    --info-soft: rgba(59, 130, 246, 0.15);
+    --info: #38BDF8;
+    --info-soft: rgba(56, 189, 248, 0.16);
     --info-fg: #FFFFFF;
 
-    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+    --shadow-soft: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+    --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+    --shadow-modal: 0 25px 35px -5px rgba(0, 0, 0, 0.75), 0 12px 15px -6px rgba(0, 0, 0, 0.5);
   }
 
   /* Base Typography & Defaults */
@@ -243,6 +263,68 @@
   .btn-ghost:hover:not(:disabled) {
     background-color: var(--bg-surface-2);
     color: var(--text-main);
+  }
+
+  /* Form Field System */
+  .field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-muted);
+  }
+
+  .field-input {
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 14px;
+    font-size: 14px;
+    border-radius: var(--radius-input);
+    background-color: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border-subtle);
+    transition: all 150ms ease;
+    outline: none;
+  }
+  .field-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.18);
+  }
+  .dark .field-input:focus {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+  }
+  .field-input::placeholder {
+    color: var(--text-dim);
+  }
+  .field-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Badges & Alerts */
+  .badge-warning {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-pill);
+    background-color: var(--warning-soft);
+    color: var(--warning);
+    font-weight: 600;
+  }
+  .badge-neutral {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-pill);
+    background-color: var(--bg-surface-2);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    font-weight: 500;
+    padding: 2px 8px;
+  }
+  .alert-danger {
+    background-color: var(--danger-soft);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    border-radius: var(--radius-card);
   }
 
   /* Thermal Receipt preview */

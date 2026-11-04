@@ -137,7 +137,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 2. Top KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Today's Sales */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">
               {language === 'am' ? 'የዛሬ ሽያጭ (ጠቅላላ)' : "Today's Gross Sales"}
@@ -160,7 +160,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Customer / Transaction Count */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">
               {language === 'am' ? 'የተስተናገዱ ደንበኞች' : 'Customers Served'}
@@ -183,7 +183,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Inventory Stock Alerts */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">
               {language === 'am' ? 'የቀነሰ ክምችት ማስጠንቀቂያ' : 'Low Stock Alerts'}
@@ -219,7 +219,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Payment Channels (Cash vs Telebirr) */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">
               {language === 'am' ? 'የገንዘብ ሳጥን እና ዲጂታል' : 'Cash & Digital Total'}
@@ -266,7 +266,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               if (onOpenAddStock) onOpenAddStock();
               else onNavigate('inventory');
             }}
-            className="p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
+            className="p-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
           >
             <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition">
               <PlusCircle size={20} />
@@ -279,9 +279,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Cycle Stocktake */}
           <button
             onClick={() => onNavigate('stocktake')}
-            className="p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
+            className="p-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
           >
-            <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center group-hover:scale-110 transition">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition">
               <ClipboardList size={20} />
             </div>
             <span className="text-xs font-bold text-center leading-tight">
@@ -292,7 +292,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Reorder Suggestions */}
           <button
             onClick={() => onNavigate('reorder')}
-            className="p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
+            className="p-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
           >
             <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center group-hover:scale-110 transition">
               <Truck size={20} />
@@ -305,7 +305,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Product Catalog */}
           <button
             onClick={() => onNavigate('catalog')}
-            className="p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
+            className="p-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
           >
             <div className="w-10 h-10 rounded-xl bg-cyan-100 dark:bg-cyan-950/60 text-cyan-600 flex items-center justify-center group-hover:scale-110 transition">
               <Tag size={20} />
@@ -318,7 +318,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Daily Reports */}
           <button
             onClick={() => onNavigate('reports')}
-            className="p-4 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
+            className="p-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col items-center justify-center gap-2 shadow-xs transition active:scale-95 group"
           >
             <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center group-hover:scale-110 transition">
               <BarChart3 size={20} />
@@ -333,7 +333,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 4. Operational Insights & Navigation Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* System & Sync Health */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-extrabold text-slate-900 dark:text-white">
@@ -372,7 +372,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Quick Audit & Security Shortcuts */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div>
             <span className="text-sm font-extrabold text-slate-900 dark:text-white block mb-4">
               {language === 'am' ? 'ደህንነት እና አስተዳደር' : 'Management & Security'}

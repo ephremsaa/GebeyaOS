@@ -139,7 +139,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       category: 'Navigation',
       label: 'Stocktake & Cycle Count',
       sublabel: 'Audit physical stock, variances, and reconciliation',
-      icon: <ClipboardList size={16} className="text-purple-500" />,
+      icon: <ClipboardList size={16} className="text-emerald-500" />,
       run: () => {
         onNavigate('stocktake');
         onClose();
@@ -322,11 +322,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
           <Search size={20} className="text-gebeya-600 flex-shrink-0" />
           <input
             ref={inputRef}
@@ -409,7 +409,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         </div>
 
         {/* Footer shortcuts */}
-        <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
+        <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 text-[10px] text-slate-400 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span>Use <kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&uarr;</kbd> <kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&darr;</kbd> to navigate</span>
             <span><kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&crarr;</kbd> to select</span>

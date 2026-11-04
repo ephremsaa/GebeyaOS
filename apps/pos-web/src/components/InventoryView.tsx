@@ -312,7 +312,7 @@ export const InventoryView: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsHistoryOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
             title="View past bulk imports and audit log"
           >
             <History size={15} className="text-slate-500" />
@@ -333,7 +333,7 @@ export const InventoryView: React.FC = () => {
 
       {/* ─── KPI Alert Chips ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               {language === 'am' ? 'ጠቅላላ እቃዎች' : 'Tracked Items'}
@@ -352,7 +352,7 @@ export const InventoryView: React.FC = () => {
           className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
             statusFilter === 'low_stock'
               ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-rose-300'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-rose-300'
           }`}
         >
           <div>
@@ -371,7 +371,7 @@ export const InventoryView: React.FC = () => {
           className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
             statusFilter === 'out_of_stock'
               ? 'bg-slate-100 dark:bg-slate-800 border-slate-400'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'
           }`}
         >
           <div>
@@ -392,7 +392,7 @@ export const InventoryView: React.FC = () => {
           className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
             fefoSort
               ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-amber-300'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-amber-300'
           }`}
         >
           <div>
@@ -418,7 +418,7 @@ export const InventoryView: React.FC = () => {
       )}
 
       {/* ─── Filters & Search Toolbar ─── */}
-      <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl mb-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+      <div className="p-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl mb-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
         {/* Search */}
         <div className="relative flex-1 min-w-[240px]">
           <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
@@ -463,7 +463,7 @@ export const InventoryView: React.FC = () => {
             onClick={() => setStatusFilter('all')}
             className={`px-3 py-1.5 rounded-lg transition ${
               statusFilter === 'all'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
           >
@@ -473,7 +473,7 @@ export const InventoryView: React.FC = () => {
             onClick={() => setStatusFilter('in_stock')}
             className={`px-3 py-1.5 rounded-lg transition ${
               statusFilter === 'in_stock'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
           >
@@ -483,7 +483,7 @@ export const InventoryView: React.FC = () => {
             onClick={() => setStatusFilter('low_stock')}
             className={`px-3 py-1.5 rounded-lg transition ${
               statusFilter === 'low_stock'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
           >
@@ -493,7 +493,7 @@ export const InventoryView: React.FC = () => {
             onClick={() => setStatusFilter('out_of_stock')}
             className={`px-3 py-1.5 rounded-lg transition ${
               statusFilter === 'out_of_stock'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
           >
@@ -512,10 +512,10 @@ export const InventoryView: React.FC = () => {
       </div>
 
       {/* ─── Inventory Master Table ─── */}
-      <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs flex flex-col">
+      <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden shadow-xs flex flex-col">
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-left border-collapse text-xs">
-            <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold text-[10px] sticky top-0 backdrop-blur-xs z-10 border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold text-[10px] sticky top-0 backdrop-blur-xs z-10 border-b border-slate-200 dark:border-slate-700">
               <tr>
                 <th className="p-3.5">{language === 'am' ? 'እቃ እና SKU' : 'Product & SKU'}</th>
                 <th className="p-3.5">{language === 'am' ? 'ምድብ' : 'Category'}</th>
@@ -667,7 +667,7 @@ export const InventoryView: React.FC = () => {
         </div>
 
         {/* Table Footer */}
-        <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between text-xs text-slate-500">
+        <div className="p-3.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between text-xs text-slate-500">
           <span>
             Showing {sortedProducts.length} of {totalCount} inventory items
           </span>
@@ -751,8 +751,8 @@ export const InventoryView: React.FC = () => {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none"
           onClick={(e) => e.target === e.currentTarget && setIsAdjModalOpen(false)}
         >
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-6 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center font-bold">
                   <FileEdit size={20} />
@@ -872,7 +872,7 @@ export const InventoryView: React.FC = () => {
                       placeholder="Enter Supervisor PIN (1234)..."
                       value={managerPin}
                       onChange={(e) => setManagerPin(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 text-xs font-mono font-bold tracking-widest text-slate-900 dark:text-white"
+                      className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-xs font-mono font-bold tracking-widest text-slate-900 dark:text-white"
                     />
                   </div>
                 </div>
