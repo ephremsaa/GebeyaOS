@@ -33,7 +33,7 @@ export class SystemController {
 
   @Get('settings')
   async getSettings(@Headers('x-branch-id') branchIdHeader?: string) {
-    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '01a19309-1d43-7444-b260-5b2ffac3e40c';
     return this.systemService.getSettings(branchId);
   }
 
@@ -42,8 +42,10 @@ export class SystemController {
   async saveSetting(
     @Body() dto: UpdateSystemSettingDto,
     @Headers('x-user-id') userIdHeader?: string,
+    @Headers('x-branch-id') branchIdHeader?: string,
   ) {
-    await this.systemService.saveSetting(dto, userIdHeader);
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    await this.systemService.saveSetting(dto, userIdHeader, branchId);
     return { success: true, key: dto.key };
   }
 

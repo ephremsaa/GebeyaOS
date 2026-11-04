@@ -262,3 +262,4 @@ describe('Shift State Machine & Idempotency', () => {
     expect(store.status).toBe('NONE');
   });
 });
+

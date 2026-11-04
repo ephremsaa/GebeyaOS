@@ -16,3 +16,4 @@ This document tracks secondary polish items and non-critical enhancements discov
 ### 3. Central HQ Cloud Sync Connectivity
 - **Status:** Expected Branch-Isolated Behavior
 - **Details:** When running branch-server in standalone store LAN mode without an active cloud HQ connection, `SyncClientService` logs `Sync push failed: Connection refused`. This is normal and expected; branch outbox safely queues all changes locally in PostgreSQL until HQ connection is re-established.
+

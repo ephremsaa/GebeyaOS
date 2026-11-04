@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Settings,
   Store,
@@ -9,9 +9,18 @@ import {
   CheckCircle2,
   AlertTriangle,
   Building2,
-  Smartphone,
-  Shield,
   Key,
+  MapPin,
+  Phone,
+  FileText,
+  Percent,
+  Coins,
+  ShieldCheck,
+  Radio,
+  Eye,
+  Check,
+  Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
@@ -19,27 +28,34 @@ import { BranchActivationModal } from './settings/BranchActivationModal';
 
 export const SettingsView: React.FC = () => {
   const { language } = useI18n();
-  const { hasRole } = useAuth();
+  const { currentUser } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'store' | 'receipt' | 'fiscal' | 'sync'>('store');
   const [loading, setLoading] = useState<boolean>(true);
-  const [saving, setSaving] = useState<boolean>(false);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
+  const [pingStatus, setPingStatus] = useState<'idle' | 'testing' | 'online' | 'offline'>('idle');
 
-  // Settings state
+  // Active user / branch context
+  const branchId = currentUser?.branchId || localStorage.getItem('gebeyaos_branch_id') || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+  const userId = currentUser?.id || '';
+  const token = sessionStorage.getItem('gebeyaos_token') || localStorage.getItem('gebeyaos_token');
+
+  // Form states
   const [storeInfo, setStoreInfo] = useState({
     name: '',
     code: '',
-    tradeName: 'Gebeya Retail PLC',
+    tradeName: '',
     tinNumber: '',
     vatNumber: '',
-    phone: '+251 911 234567',
-    address: 'Bole Medhanialem, Addis Ababa, Ethiopia',
+    phone: '',
+    address: '',
   });
 
   const [receiptConfig, setReceiptConfig] = useState({
-    headerText: 'እንኳን ደህና መጡ! / Welcome to Gebeya Supermarket',
+    headerText: 'እንኳን ደህና መጡ! / Welcome to our Supermarket',
     footerText: 'ዕቃዎች ከተገዙበት ቀን ጀምሮ በ3 ቀናት ውስጥ በደረሰኝ ይመለሳሉ።\nGoods exchangeable within 3 days with receipt.\nThank you for shopping with us!',
     taxInvoiceTitle: 'OFFICIAL CASH SALES INVOICE',
     showCashierName: true,
@@ -54,24 +70,60 @@ export const SettingsView: React.FC = () => {
   });
 
   const [syncConfig, setSyncConfig] = useState({
-    hqUrl: 'http://hq.local:4000/api/sync',
+    hqUrl: 'http://localhost:4000/api/sync',
     autoSyncIntervalSeconds: 30,
     offlineGracePeriodHours: 72,
+  });
+
+  // Track initial state to detect unsaved changes
+  const [initialState, setInitialState] = useState<{
+    store: any;
+    receipt: any;
+    fiscal: any;
+    sync: any;
+  }>({
+    store: {},
+    receipt: {},
+    fiscal: {},
+    sync: {},
   });
 
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/system/settings');
+      setErrorToast(null);
+
+      const headers: Record<string, string> = {
+        'x-branch-id': branchId,
+        'x-user-id': userId,
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/system/settings', { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data.store_info) setStoreInfo(data.store_info);
-        if (data.receipt_config) setReceiptConfig(data.receipt_config);
-        if (data.financial_config) setFiscalConfig(data.financial_config);
-        if (data.sync_config) setSyncConfig(data.sync_config);
+        const loadedStore = data.store_info || {};
+        const loadedReceipt = data.receipt_config || {};
+        const loadedFiscal = data.financial_config || {};
+        const loadedSync = data.sync_config || {};
+
+        setStoreInfo((prev) => ({ ...prev, ...loadedStore }));
+        setReceiptConfig((prev) => ({ ...prev, ...loadedReceipt }));
+        setFiscalConfig((prev) => ({ ...prev, ...loadedFiscal }));
+        setSyncConfig((prev) => ({ ...prev, ...loadedSync }));
+
+        setInitialState({
+          store: loadedStore,
+          receipt: loadedReceipt,
+          fiscal: loadedFiscal,
+          sync: loadedSync,
+        });
+      } else {
+        setErrorToast('Could not load settings from branch server');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load settings', err);
+      setErrorToast('Network error loading settings');
     } finally {
       setLoading(false);
     }
@@ -79,486 +131,835 @@ export const SettingsView: React.FC = () => {
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [branchId]);
 
-  const handleSave = async (key: string, value: any) => {
-    setSaving(true);
+  // Dirty detection for current tab
+  const isDirty = useMemo(() => {
+    if (activeTab === 'store') {
+      return JSON.stringify(storeInfo) !== JSON.stringify({ ...storeInfo, ...initialState.store });
+    }
+    if (activeTab === 'receipt') {
+      return JSON.stringify(receiptConfig) !== JSON.stringify({ ...receiptConfig, ...initialState.receipt });
+    }
+    if (activeTab === 'fiscal') {
+      return JSON.stringify(fiscalConfig) !== JSON.stringify({ ...fiscalConfig, ...initialState.fiscal });
+    }
+    if (activeTab === 'sync') {
+      return JSON.stringify(syncConfig) !== JSON.stringify({ ...syncConfig, ...initialState.sync });
+    }
+    return false;
+  }, [activeTab, storeInfo, receiptConfig, fiscalConfig, syncConfig, initialState]);
+
+  const handleSave = async (key: string, value: any, label: string) => {
+    setSavingKey(key);
+    setErrorToast(null);
+
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-branch-id': branchId,
+        'x-user-id': userId,
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/system/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ key, value }),
       });
 
       if (res.ok) {
-        setSuccessToast(`Settings for ${key.replace('_', ' ')} updated successfully.`);
-        setTimeout(() => setSuccessToast(null), 3000);
+        setSuccessToast(`${label} saved successfully.`);
+        setTimeout(() => setSuccessToast(null), 3500);
+
+        // Update initial baseline
+        setInitialState((prev) => ({
+          ...prev,
+          [key === 'store_info'
+            ? 'store'
+            : key === 'receipt_config'
+            ? 'receipt'
+            : key === 'financial_config'
+            ? 'fiscal'
+            : 'sync']: value,
+        }));
       } else {
-        alert('Failed to save settings.');
+        const errorData = await res.json().catch(() => ({}));
+        setErrorToast(errorData.message || `Failed to save ${label}. Check server connection.`);
       }
-    } catch (err) {
-      alert('Error saving settings');
+    } catch (err: any) {
+      setErrorToast(err?.message || `Error saving ${label}. Check network connection.`);
     } finally {
-      setSaving(false);
+      setSavingKey(null);
     }
   };
 
+  const handleTestPing = async () => {
+    setPingStatus('testing');
+    try {
+      const res = await fetch(`${syncConfig.hqUrl}/health`, { method: 'GET' }).catch(() => null);
+      if (res && res.ok) {
+        setPingStatus('online');
+      } else {
+        setPingStatus('offline');
+      }
+    } catch {
+      setPingStatus('offline');
+    }
+    setTimeout(() => setPingStatus('idle'), 4000);
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 overflow-hidden select-none">
-      {/* 1. Header Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <Settings className="text-gebeya-600" size={24} />
-            {language === 'am' ? 'የስርዓት እና የቅርንጫፍ ቅንብሮች' : 'System & Branch Settings'}
-          </h1>
-          <p className="text-xs text-slate-500">
-            {language === 'am'
-              ? 'የሱቅ መረጃ፣ የደረሰኝ አቀማመጥ፣ የቫት (VAT) ተመን እና የማመሳሰል ጊዜ'
-              : 'Configure branch identification, receipt headers, tax parameters, and sync intervals.'}
-          </p>
+    <div className="flex-1 flex flex-col h-full bg-page p-4 sm:p-6 overflow-hidden select-none">
+      {/* ─── 1. Header Toolbar ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-soft">
+            <Settings size={22} className="stroke-[2.2]" />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold text-text-main flex items-center gap-2 tracking-tight">
+              {language === 'am' ? 'የስርዓት እና የቅርንጫፍ ቅንብሮች' : 'System & Branch Settings'}
+            </h1>
+            <p className="text-xs text-text-muted">
+              {language === 'am'
+                ? 'የሱቅ መረጃ፣ የደረሰኝ አቀማመጥ፣ የቫት (VAT) ተመን እና የማመሳሰል ጊዜ'
+                : 'Configure branch identification, receipt layout, tax parameters, and HQ sync intervals.'}
+            </p>
+          </div>
         </div>
 
-        {successToast && (
-          <div className="px-3.5 py-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
-            <CheckCircle2 size={15} />
-            {successToast}
-          </div>
-        )}
+        {/* Status Pills */}
+        <div className="flex items-center gap-2">
+          {successToast && (
+            <div className="px-3.5 py-1.5 rounded-xl bg-success/15 border border-success/30 text-success text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200 shadow-soft">
+              <CheckCircle2 size={15} />
+              <span>{successToast}</span>
+            </div>
+          )}
+
+          {errorToast && (
+            <div className="px-3.5 py-1.5 rounded-xl bg-danger/15 border border-danger/30 text-danger text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200 shadow-soft">
+              <AlertTriangle size={15} />
+              <span>{errorToast}</span>
+            </div>
+          )}
+
+          {isDirty && !successToast && !errorToast && (
+            <div className="px-3 py-1 rounded-xl bg-warning/15 border border-warning/30 text-warning text-xs font-bold flex items-center gap-1.5 animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-warning" />
+              <span>Unsaved changes</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 2. Main Tabbed Layout */}
-      <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col md:flex-row">
-        {/* Left Vertical Nav */}
-        <div className="w-full md:w-56 bg-slate-50 dark:bg-slate-850 p-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 flex flex-row md:flex-col gap-2">
-          <button
-            onClick={() => setActiveTab('store')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left ${
-              activeTab === 'store'
-                ? 'bg-gebeya-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Building2 size={16} />
-            {language === 'am' ? 'የቅርንጫፍ መረጃ' : 'Branch Details'}
-          </button>
+      {/* ─── 2. Main Tabbed Layout Card ─── */}
+      <div className="flex-1 bg-surface rounded-3xl border border-border-subtle shadow-soft overflow-hidden flex flex-col md:flex-row min-h-0">
+        {/* Left Sub-Navigation */}
+        <div className="w-full md:w-64 bg-surface-2 p-3 sm:p-4 border-b md:border-b-0 md:border-r border-border-subtle flex flex-row md:flex-col justify-between shrink-0 gap-2">
+          <div className="flex flex-row md:flex-col gap-1.5 w-full overflow-x-auto md:overflow-visible">
+            {/* Tab 1 */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('store')}
+              className={`px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all duration-150 text-left cursor-pointer shrink-0 md:shrink md:w-full ${
+                activeTab === 'store'
+                  ? 'bg-primary text-white shadow-soft font-extrabold'
+                  : 'text-text-muted hover:text-text-main hover:bg-surface/80 dark:hover:bg-surface/60'
+              }`}
+            >
+              <Building2 size={17} className={activeTab === 'store' ? 'text-white' : 'text-primary'} />
+              <div className="flex flex-col min-w-0">
+                <span className="truncate">{language === 'am' ? 'የቅርንጫፍ መረጃ' : 'Branch Details'}</span>
+                <span className={`text-[10px] font-normal truncate ${activeTab === 'store' ? 'text-white/80' : 'text-text-dim'}`}>
+                  Store & TIN / VAT
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('receipt')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left ${
-              activeTab === 'receipt'
-                ? 'bg-gebeya-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Receipt size={16} />
-            {language === 'am' ? 'የደረሰኝ አቀማመጥ' : 'Receipt Customization'}
-          </button>
+            {/* Tab 2 */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('receipt')}
+              className={`px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all duration-150 text-left cursor-pointer shrink-0 md:shrink md:w-full ${
+                activeTab === 'receipt'
+                  ? 'bg-primary text-white shadow-soft font-extrabold'
+                  : 'text-text-muted hover:text-text-main hover:bg-surface/80 dark:hover:bg-surface/60'
+              }`}
+            >
+              <Receipt size={17} className={activeTab === 'receipt' ? 'text-white' : 'text-primary'} />
+              <div className="flex flex-col min-w-0">
+                <span className="truncate">{language === 'am' ? 'የደረሰኝ አቀማመጥ' : 'Receipt Layout'}</span>
+                <span className={`text-[10px] font-normal truncate ${activeTab === 'receipt' ? 'text-white/80' : 'text-text-dim'}`}>
+                  80mm thermal slip
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('fiscal')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left ${
-              activeTab === 'fiscal'
-                ? 'bg-gebeya-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <DollarSign size={16} />
-            {language === 'am' ? 'የቫት እና የገንዘብ ተመን' : 'Fiscal & Currency'}
-          </button>
+            {/* Tab 3 */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('fiscal')}
+              className={`px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all duration-150 text-left cursor-pointer shrink-0 md:shrink md:w-full ${
+                activeTab === 'fiscal'
+                  ? 'bg-primary text-white shadow-soft font-extrabold'
+                  : 'text-text-muted hover:text-text-main hover:bg-surface/80 dark:hover:bg-surface/60'
+              }`}
+            >
+              <DollarSign size={17} className={activeTab === 'fiscal' ? 'text-white' : 'text-primary'} />
+              <div className="flex flex-col min-w-0">
+                <span className="truncate">{language === 'am' ? 'የቫት እና የገንዘብ ተመን' : 'Fiscal & Currency'}</span>
+                <span className={`text-[10px] font-normal truncate ${activeTab === 'fiscal' ? 'text-white/80' : 'text-text-dim'}`}>
+                  15% VAT & safe drop
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('sync')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left ${
-              activeTab === 'sync'
-                ? 'bg-gebeya-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <RefreshCw size={16} />
-            {language === 'am' ? 'የማመሳሰል ክፍተቶች' : 'Sync & Cloud HQ'}
-          </button>
+            {/* Tab 4 */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('sync')}
+              className={`px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all duration-150 text-left cursor-pointer shrink-0 md:shrink md:w-full ${
+                activeTab === 'sync'
+                  ? 'bg-primary text-white shadow-soft font-extrabold'
+                  : 'text-text-muted hover:text-text-main hover:bg-surface/80 dark:hover:bg-surface/60'
+              }`}
+            >
+              <RefreshCw size={17} className={activeTab === 'sync' ? 'text-white' : 'text-primary'} />
+              <div className="flex flex-col min-w-0">
+                <span className="truncate">{language === 'am' ? 'የማመሳሰል ክፍተቶች' : 'Sync & Cloud HQ'}</span>
+                <span className={`text-[10px] font-normal truncate ${activeTab === 'sync' ? 'text-white/80' : 'text-text-dim'}`}>
+                  Hub & intervals
+                </span>
+              </div>
+            </button>
+          </div>
+
+          {/* Bottom Action: Activation Codes */}
+          <div className="hidden md:block pt-3 border-t border-border-subtle mt-auto">
+            <button
+              type="button"
+              onClick={() => setIsActivationModalOpen(true)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-surface hover:bg-surface-2 text-text-main text-xs font-bold flex items-center justify-between border border-border-subtle transition-colors duration-150 cursor-pointer shadow-soft group"
+            >
+              <div className="flex items-center gap-2">
+                <Key size={15} className="text-primary group-hover:rotate-45 transition-transform" />
+                <span>Activation Codes</span>
+              </div>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
+                LAN
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* Right Active Tab Content */}
-        <div className="flex-1 p-6 overflow-y-auto">
-          {/* TAB 1: STORE INFO */}
-          {activeTab === 'store' && (
-            <div className="max-w-2xl space-y-4 animate-in fade-in">
-              <h2 className="text-base font-extrabold text-slate-900 dark:text-white mb-2">
-                Branch & Store Identification
-              </h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Store Brand Name
-                  </label>
-                  <input
-                    type="text"
-                    value={storeInfo.name}
-                    onChange={(e) => setStoreInfo({ ...storeInfo, name: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Branch Code
-                  </label>
-                  <input
-                    type="text"
-                    value={storeInfo.code}
-                    onChange={(e) => setStoreInfo({ ...storeInfo, code: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Registered Trade Name (Legal Entity)
-                  </label>
-                  <input
-                    type="text"
-                    value={storeInfo.tradeName}
-                    onChange={(e) => setStoreInfo({ ...storeInfo, tradeName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    TIN (Taxpayer Identification No.)
-                  </label>
-                  <input
-                    type="text"
-                    value={storeInfo.tinNumber}
-                    onChange={(e) => setStoreInfo({ ...storeInfo, tinNumber: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    VAT Registration Number
-                  </label>
-                  <input
-                    type="text"
-                    value={storeInfo.vatNumber}
-                    onChange={(e) => setStoreInfo({ ...storeInfo, vatNumber: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Store Phone Number
-                  </label>
-                  <input
-                    type="text"
-                    value={storeInfo.phone}
-                    onChange={(e) => setStoreInfo({ ...storeInfo, phone: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                  Physical Store Address
-                </label>
-                <input
-                  type="text"
-                  value={storeInfo.address}
-                  onChange={(e) => setStoreInfo({ ...storeInfo, address: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
-                />
-              </div>
-
-              <div className="pt-3 flex items-center gap-3">
-                <button
-                  onClick={() => handleSave('store_info', storeInfo)}
-                  disabled={saving}
-                  className="px-5 py-2.5 rounded-xl bg-gebeya-600 hover:bg-gebeya-700 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition active:scale-95 disabled:opacity-50"
-                >
-                  <Save size={15} />
-                  {saving ? 'Saving...' : 'Save Branch Details'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsActivationModalOpen(true)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-2 border border-slate-200 dark:border-slate-700 transition"
-                >
-                  <Key size={14} className="text-emerald-500" />
-                  Branch Activation Codes
-                </button>
-              </div>
+        {/* Right Tab Content */}
+        <div className="flex-1 p-5 sm:p-7 overflow-y-auto bg-surface">
+          {loading ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 py-16 text-text-muted">
+              <Loader2 size={32} className="animate-spin text-primary" />
+              <p className="text-xs font-medium">Loading store configuration...</p>
             </div>
-          )}
+          ) : (
+            <>
+              {/* ──────── TAB 1: STORE / BRANCH DETAILS ──────── */}
+              {activeTab === 'store' && (
+                <div className="max-w-3xl space-y-6 animate-in fade-in duration-200">
+                  <div className="pb-3 border-b border-border-subtle flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-text-main">
+                        {language === 'am' ? 'የቅርንጫፍ መለያ እና የታክስ መረጃ' : 'Branch & Store Identification'}
+                      </h2>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        These official details print on receipts, fiscal journals, and goods received notes.
+                      </p>
+                    </div>
+                  </div>
 
-          {/* TAB 2: RECEIPT CONFIG */}
-          {activeTab === 'receipt' && (
-            <div className="max-w-2xl space-y-4 animate-in fade-in">
-              <h2 className="text-base font-extrabold text-slate-900 dark:text-white mb-2">
-                Thermal POS Receipt Template
-              </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Store Brand Name */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5">
+                        Store Brand Name
+                      </label>
+                      <input
+                        type="text"
+                        value={storeInfo.name}
+                        onChange={(e) => setStoreInfo({ ...storeInfo, name: e.target.value })}
+                        placeholder="e.g. Kerod Supermarket"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-semibold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                      />
+                    </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                  Official Invoice Title
-                </label>
-                <input
-                  type="text"
-                  value={receiptConfig.taxInvoiceTitle}
-                  onChange={(e) =>
-                    setReceiptConfig({ ...receiptConfig, taxInvoiceTitle: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
-                />
-              </div>
+                    {/* Branch Code */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
+                        <span>Branch Identifier Code</span>
+                        <span className="text-[10px] font-normal text-text-dim">Assigned by HQ</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={storeInfo.code}
+                        onChange={(e) => setStoreInfo({ ...storeInfo, code: e.target.value })}
+                        placeholder="e.g. TULU-01"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs uppercase"
+                      />
+                    </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                  Header Welcome Greeting
-                </label>
-                <textarea
-                  rows={2}
-                  value={receiptConfig.headerText}
-                  onChange={(e) =>
-                    setReceiptConfig({ ...receiptConfig, headerText: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium"
-                />
-              </div>
+                    {/* Registered Trade Name */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5">
+                        Registered Trade Name (Legal Entity)
+                      </label>
+                      <input
+                        type="text"
+                        value={storeInfo.tradeName}
+                        onChange={(e) => setStoreInfo({ ...storeInfo, tradeName: e.target.value })}
+                        placeholder="e.g. Leka Trading PLC"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-semibold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                      />
+                    </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                  Footer Policy / Thank You Message
-                </label>
-                <textarea
-                  rows={3}
-                  value={receiptConfig.footerText}
-                  onChange={(e) =>
-                    setReceiptConfig({ ...receiptConfig, footerText: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium"
-                />
-              </div>
+                    {/* TIN Number */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
+                        <span>TIN (Taxpayer Identification No.)</span>
+                        <span className="text-[10px] font-normal text-text-dim">10 digits</span>
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={10}
+                        value={storeInfo.tinNumber}
+                        onChange={(e) => setStoreInfo({ ...storeInfo, tinNumber: e.target.value.replace(/\D/g, '') })}
+                        placeholder="e.g. 0082842324"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs tracking-wider"
+                      />
+                    </div>
 
-              <div className="flex items-center gap-6 pt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={receiptConfig.showCashierName}
-                    onChange={(e) =>
-                      setReceiptConfig({ ...receiptConfig, showCashierName: e.target.checked })
-                    }
-                    className="w-4 h-4 rounded text-gebeya-600"
-                  />
-                  <span className="text-xs font-bold">Print Cashier Name on Slip</span>
-                </label>
+                    {/* VAT Number */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5">
+                        VAT Registration Number
+                      </label>
+                      <input
+                        type="text"
+                        value={storeInfo.vatNumber}
+                        onChange={(e) => setStoreInfo({ ...storeInfo, vatNumber: e.target.value })}
+                        placeholder="e.g. 9988776655"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs tracking-wider"
+                      />
+                    </div>
 
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={receiptConfig.showTinVat}
-                    onChange={(e) =>
-                      setReceiptConfig({ ...receiptConfig, showTinVat: e.target.checked })
-                    }
-                    className="w-4 h-4 rounded text-gebeya-600"
-                  />
-                  <span className="text-xs font-bold">Print Branch TIN & VAT No.</span>
-                </label>
-              </div>
+                    {/* Store Phone */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5">
+                        Store Phone Number
+                      </label>
+                      <div className="relative">
+                        <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
+                        <input
+                          type="text"
+                          value={storeInfo.phone}
+                          onChange={(e) => setStoreInfo({ ...storeInfo, phone: e.target.value })}
+                          placeholder="e.g. 0941515030"
+                          className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-semibold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="pt-3">
-                <button
-                  onClick={() => handleSave('receipt_config', receiptConfig)}
-                  disabled={saving}
-                  className="px-5 py-2.5 rounded-xl bg-gebeya-600 hover:bg-gebeya-700 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition active:scale-95 disabled:opacity-50"
-                >
-                  <Save size={15} />
-                  {saving ? 'Saving...' : 'Save Receipt Layout'}
-                </button>
-              </div>
-            </div>
-          )}
+                  {/* Physical Address */}
+                  <div>
+                    <label className="text-xs font-bold text-text-muted block mb-1.5">
+                      Physical Store Address
+                    </label>
+                    <div className="relative">
+                      <MapPin size={16} className="absolute left-3.5 top-3 text-text-dim" />
+                      <input
+                        type="text"
+                        value={storeInfo.address}
+                        onChange={(e) => setStoreInfo({ ...storeInfo, address: e.target.value })}
+                        placeholder="e.g. Tulu Dimtu, Cameroon St, Addis Ababa, Ethiopia"
+                        className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-semibold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                      />
+                    </div>
+                  </div>
 
-          {/* TAB 3: FISCAL & CURRENCY */}
-          {activeTab === 'fiscal' && (
-            <div className="max-w-2xl space-y-4 animate-in fade-in">
-              <h2 className="text-base font-extrabold text-slate-900 dark:text-white mb-2">
-                Ethiopian Fiscal & Currency Settings
-              </h2>
+                  {/* Save Button Row */}
+                  <div className="pt-4 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSave('store_info', storeInfo, 'Branch details')}
+                      disabled={savingKey === 'store_info'}
+                      className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer disabled:opacity-50"
+                    >
+                      {savingKey === 'store_info' ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          <span>Save Branch Details</span>
+                        </>
+                      )}
+                    </button>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Store Currency
-                  </label>
-                  <input
-                    type="text"
-                    disabled
-                    value={fiscalConfig.defaultCurrency}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-500"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Fixed to Ethiopian Birr (ETB)
-                  </span>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Standard VAT Rate
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="1"
-                      value={fiscalConfig.vatRate}
-                      onChange={(e) =>
-                        setFiscalConfig({ ...fiscalConfig, vatRate: parseFloat(e.target.value) || 0.15 })
-                      }
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                    />
-                    <span className="text-xs font-bold text-slate-500">
-                      ({(fiscalConfig.vatRate * 100).toFixed(0)}%)
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsActivationModalOpen(true)}
+                      className="md:hidden px-4 py-2.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold flex items-center gap-2 border border-border-subtle transition-colors cursor-pointer"
+                    >
+                      <Key size={14} className="text-primary" />
+                      <span>Activation Codes</span>
+                    </button>
                   </div>
                 </div>
+              )}
 
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Withholding Tax Rate (Suppliers &gt; 10,000 ETB)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="1"
-                    value={fiscalConfig.withholdingTaxRate}
-                    onChange={(e) =>
-                      setFiscalConfig({
-                        ...fiscalConfig,
-                        withholdingTaxRate: parseFloat(e.target.value) || 0.02,
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                  />
+              {/* ──────── TAB 2: RECEIPT CUSTOMIZATION + LIVE PREVIEW ──────── */}
+              {activeTab === 'receipt' && (
+                <div className="max-w-5xl space-y-6 animate-in fade-in duration-200">
+                  <div className="pb-3 border-b border-border-subtle">
+                    <h2 className="text-lg font-bold text-text-main">
+                      {language === 'am' ? 'የ80ሚሜ ደረሰኝ አቀማመጥ እና ህግ' : 'Thermal POS Receipt Template'}
+                    </h2>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Configure official headers, welcome greetings, return policy terms, and live layout.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* Controls (7 cols) */}
+                    <div className="lg:col-span-7 space-y-4">
+                      {/* Invoice Title */}
+                      <div>
+                        <label className="text-xs font-bold text-text-muted block mb-1.5">
+                          Official Invoice Title
+                        </label>
+                        <input
+                          type="text"
+                          value={receiptConfig.taxInvoiceTitle}
+                          onChange={(e) =>
+                            setReceiptConfig({ ...receiptConfig, taxInvoiceTitle: e.target.value })
+                          }
+                          placeholder="OFFICIAL CASH SALES INVOICE"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                        />
+                      </div>
+
+                      {/* Header Greeting */}
+                      <div>
+                        <label className="text-xs font-bold text-text-muted block mb-1.5">
+                          Header Welcome Greeting
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={receiptConfig.headerText}
+                          onChange={(e) =>
+                            setReceiptConfig({ ...receiptConfig, headerText: e.target.value })
+                          }
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-medium text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none"
+                        />
+                      </div>
+
+                      {/* Footer Policy */}
+                      <div>
+                        <label className="text-xs font-bold text-text-muted block mb-1.5">
+                          Footer Policy / Return & Exchange Terms
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={receiptConfig.footerText}
+                          onChange={(e) =>
+                            setReceiptConfig({ ...receiptConfig, footerText: e.target.value })
+                          }
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-medium text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none"
+                        />
+                      </div>
+
+                      {/* Checkbox Toggles */}
+                      <div className="p-4 rounded-2xl bg-surface-2 border border-border-subtle space-y-3">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={receiptConfig.showCashierName}
+                            onChange={(e) =>
+                              setReceiptConfig({ ...receiptConfig, showCashierName: e.target.checked })
+                            }
+                            className="w-4 h-4 rounded text-primary focus:ring-primary border-border-subtle"
+                          />
+                          <span className="text-xs font-bold text-text-main">
+                            Print Cashier Name on Slip
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={receiptConfig.showTinVat}
+                            onChange={(e) =>
+                              setReceiptConfig({ ...receiptConfig, showTinVat: e.target.checked })
+                            }
+                            className="w-4 h-4 rounded text-primary focus:ring-primary border-border-subtle"
+                          />
+                          <span className="text-xs font-bold text-text-main">
+                            Print Branch TIN & VAT Registration Number
+                          </span>
+                        </label>
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSave('receipt_config', receiptConfig, 'Receipt template')}
+                          disabled={savingKey === 'receipt_config'}
+                          className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer disabled:opacity-50"
+                        >
+                          {savingKey === 'receipt_config' ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              <span>Saving...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save size={16} />
+                              <span>Save Receipt Layout</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Live Preview (5 cols) */}
+                    <div className="lg:col-span-5 bg-surface-2 p-4 rounded-3xl border border-border-subtle space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-text-muted px-1">
+                        <span className="flex items-center gap-1.5">
+                          <Eye size={14} className="text-primary" />
+                          <span>Live 80mm ESC/POS Slip Preview</span>
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-soft text-primary font-mono">
+                          Simulated
+                        </span>
+                      </div>
+
+                      {/* Paper Simulation */}
+                      <div className="bg-card text-text-main p-4 rounded-2xl border border-border-subtle shadow-soft font-mono text-[11px] leading-relaxed space-y-2 max-h-[460px] overflow-y-auto">
+                        <div className="text-center space-y-0.5 pb-2 border-b border-dashed border-border-subtle">
+                          <div className="font-extrabold text-sm">{storeInfo.name || 'Gebeya Supermarket'}</div>
+                          {storeInfo.tradeName && <div className="text-[10px] text-text-muted">{storeInfo.tradeName}</div>}
+                          {storeInfo.address && <div className="text-[10px] text-text-muted">{storeInfo.address}</div>}
+                          {storeInfo.phone && <div className="text-[10px] text-text-muted">TEL: {storeInfo.phone}</div>}
+                          {receiptConfig.showTinVat && (
+                            <div className="text-[10px] text-text-dim">
+                              TIN: {storeInfo.tinNumber || '0082842324'} · VAT: {storeInfo.vatNumber || '9988776655'}
+                            </div>
+                          )}
+                          <div className="pt-1 text-[11px] font-bold text-primary">{receiptConfig.taxInvoiceTitle}</div>
+                        </div>
+
+                        <div className="text-[10px] space-y-0.5 pb-2 border-b border-dashed border-border-subtle text-text-muted">
+                          <div className="flex justify-between">
+                            <span>Receipt: REC-20261104-001</span>
+                            <span>{new Date().toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Branch: {storeInfo.code || 'TULU-01'}</span>
+                            {receiptConfig.showCashierName && <span>Cashier: sahle leka</span>}
+                          </div>
+                        </div>
+
+                        {/* Dummy Items */}
+                        <div className="space-y-1 py-1 border-b border-dashed border-border-subtle text-[11px]">
+                          <div className="flex justify-between">
+                            <span>1x Fresh Whole Milk 1L</span>
+                            <span className="font-bold">120.00 ETB</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>2x Banana Cavendish (1.2kg)</span>
+                            <span className="font-bold">180.00 ETB</span>
+                          </div>
+                        </div>
+
+                        {/* Totals */}
+                        <div className="space-y-1 py-1 text-xs font-bold">
+                          <div className="flex justify-between">
+                            <span>TOTAL:</span>
+                            <span className="text-sm font-extrabold text-primary">300.00 ETB</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-text-muted font-normal">
+                            <span>VAT 15% (Included):</span>
+                            <span>39.13 ETB</span>
+                          </div>
+                        </div>
+
+                        {/* Welcome & Footer */}
+                        <div className="pt-2 border-t border-dashed border-border-subtle text-center text-[10px] text-text-muted space-y-1">
+                          <div className="font-semibold">{receiptConfig.headerText}</div>
+                          <div className="whitespace-pre-line text-[9px] text-text-dim leading-snug">
+                            {receiptConfig.footerText}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              )}
 
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Cash Register Safe Drop Alert Limit (ETB)
-                  </label>
-                  <input
-                    type="number"
-                    min="1000"
-                    value={fiscalConfig.cashDrawerLimit}
-                    onChange={(e) =>
-                      setFiscalConfig({
-                        ...fiscalConfig,
-                        cashDrawerLimit: parseInt(e.target.value) || 50000,
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Prompts cashier to execute a safe drop when drawer cash exceeds this amount.
-                  </span>
+              {/* ──────── TAB 3: FISCAL & CURRENCY PARAMETERS ──────── */}
+              {activeTab === 'fiscal' && (
+                <div className="max-w-3xl space-y-6 animate-in fade-in duration-200">
+                  <div className="pb-3 border-b border-border-subtle">
+                    <h2 className="text-lg font-bold text-text-main">
+                      {language === 'am' ? 'የኢትዮጵያ የታክስ እና የገንዘብ ደንቦች' : 'Ethiopian Fiscal & Currency Settings'}
+                    </h2>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      National standard rates conforming to Ministry of Revenues directives.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Currency */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5">
+                        National Currency
+                      </label>
+                      <input
+                        type="text"
+                        disabled
+                        value="ETB (Ethiopian Birr - ብር)"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-muted cursor-not-allowed"
+                      />
+                      <span className="text-[10px] text-text-dim mt-1 block">
+                        Base transactional currency for all branches
+                      </span>
+                    </div>
+
+                    {/* Standard VAT Rate */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
+                        <span>Standard Value Added Tax (VAT)</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
+                          {(fiscalConfig.vatRate * 100).toFixed(0)}%
+                        </span>
+                      </label>
+                      <div className="relative">
+                        <Percent size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="1"
+                          value={fiscalConfig.vatRate}
+                          onChange={(e) =>
+                            setFiscalConfig({ ...fiscalConfig, vatRate: parseFloat(e.target.value) || 0.15 })
+                          }
+                          className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                        />
+                      </div>
+                      <span className="text-[10px] text-text-dim mt-1 block">
+                        Applied on standard taxable goods (e.g. 0.15 for 15%)
+                      </span>
+                    </div>
+
+                    {/* Withholding Tax */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
+                        <span>Withholding Tax (Suppliers &gt; 10k ETB)</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
+                          {(fiscalConfig.withholdingTaxRate * 100).toFixed(0)}%
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        value={fiscalConfig.withholdingTaxRate}
+                        onChange={(e) =>
+                          setFiscalConfig({
+                            ...fiscalConfig,
+                            withholdingTaxRate: parseFloat(e.target.value) || 0.02,
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                      />
+                      <span className="text-[10px] text-text-dim mt-1 block">
+                        Deducted from wholesale payments above 10,000 ETB
+                      </span>
+                    </div>
+
+                    {/* Safe Drop Alert Limit */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5">
+                        Cash Register Safe Drop Alert Limit (ETB)
+                      </label>
+                      <div className="relative">
+                        <Coins size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
+                        <input
+                          type="number"
+                          min="1000"
+                          step="1000"
+                          value={fiscalConfig.cashDrawerLimit}
+                          onChange={(e) =>
+                            setFiscalConfig({
+                              ...fiscalConfig,
+                              cashDrawerLimit: parseInt(e.target.value) || 50000,
+                            })
+                          }
+                          className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                        />
+                      </div>
+                      <span className="text-[10px] text-text-dim mt-1 block">
+                        Prompts cashier to execute a safe drop to vault when cash drawer exceeds limit
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      type="button"
+                      onClick={() => handleSave('financial_config', fiscalConfig, 'Fiscal parameters')}
+                      disabled={savingKey === 'financial_config'}
+                      className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer disabled:opacity-50"
+                    >
+                      {savingKey === 'financial_config' ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          <span>Save Fiscal Parameters</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="pt-3">
-                <button
-                  onClick={() => handleSave('financial_config', fiscalConfig)}
-                  disabled={saving}
-                  className="px-5 py-2.5 rounded-xl bg-gebeya-600 hover:bg-gebeya-700 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition active:scale-95 disabled:opacity-50"
-                >
-                  <Save size={15} />
-                  {saving ? 'Saving...' : 'Save Fiscal Parameters'}
-                </button>
-              </div>
-            </div>
-          )}
+              {/* ──────── TAB 4: SYNC & CLOUD HQ ──────── */}
+              {activeTab === 'sync' && (
+                <div className="max-w-3xl space-y-6 animate-in fade-in duration-200">
+                  <div className="pb-3 border-b border-border-subtle flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-text-main">
+                        {language === 'am' ? 'የማዕከላዊ ዋና መስሪያ ቤት ማመሳሰል' : 'Cloud HQ Hub Connectivity'}
+                      </h2>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        Branch LAN sync intervals, upstream server endpoint, and offline grace limits.
+                      </p>
+                    </div>
 
-          {/* TAB 4: SYNC & CLOUD HQ */}
-          {activeTab === 'sync' && (
-            <div className="max-w-2xl space-y-4 animate-in fade-in">
-              <h2 className="text-base font-extrabold text-slate-900 dark:text-white mb-2">
-                Sync Intervals & HQ Connectivity
-              </h2>
+                    <button
+                      type="button"
+                      onClick={handleTestPing}
+                      disabled={pingStatus === 'testing'}
+                      className="px-3.5 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main border border-border-subtle text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <Radio size={14} className={pingStatus === 'testing' ? 'animate-pulse text-warning' : 'text-primary'} />
+                      <span>{pingStatus === 'testing' ? 'Pinging HQ...' : 'Ping Test'}</span>
+                      {pingStatus === 'online' && <span className="w-2 h-2 rounded-full bg-success" />}
+                      {pingStatus === 'offline' && <span className="w-2 h-2 rounded-full bg-danger" />}
+                    </button>
+                  </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                  Central Headquarters API URL
-                </label>
-                <input
-                  type="text"
-                  value={syncConfig.hqUrl}
-                  onChange={(e) => setSyncConfig({ ...syncConfig, hqUrl: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono"
-                />
-              </div>
+                  {/* HQ Server URL */}
+                  <div>
+                    <label className="text-xs font-bold text-text-muted block mb-1.5">
+                      Central Headquarters API URL
+                    </label>
+                    <input
+                      type="text"
+                      value={syncConfig.hqUrl}
+                      onChange={(e) => setSyncConfig({ ...syncConfig, hqUrl: e.target.value })}
+                      placeholder="https://hq.gebeyaos.com/api/sync"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                    />
+                    <span className="text-[10px] text-text-dim mt-1 block">
+                      Local branch outbox automatically queues transactions locally if offline
+                    </span>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Auto-Sync Polling Interval (Seconds)
-                  </label>
-                  <input
-                    type="number"
-                    min="5"
-                    max="600"
-                    value={syncConfig.autoSyncIntervalSeconds}
-                    onChange={(e) =>
-                      setSyncConfig({
-                        ...syncConfig,
-                        autoSyncIntervalSeconds: parseInt(e.target.value) || 30,
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Auto Sync Interval */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5">
+                        Auto-Sync Polling Interval (Seconds)
+                      </label>
+                      <input
+                        type="number"
+                        min="5"
+                        max="600"
+                        value={syncConfig.autoSyncIntervalSeconds}
+                        onChange={(e) =>
+                          setSyncConfig({
+                            ...syncConfig,
+                            autoSyncIntervalSeconds: parseInt(e.target.value) || 30,
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                      />
+                      <span className="text-[10px] text-text-dim mt-1 block">
+                        Frequency of background inventory & sales batch uploads
+                      </span>
+                    </div>
+
+                    {/* Offline Grace Period */}
+                    <div>
+                      <label className="text-xs font-bold text-text-muted block mb-1.5">
+                        Offline Grace Period (Hours)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="720"
+                        value={syncConfig.offlineGracePeriodHours}
+                        onChange={(e) =>
+                          setSyncConfig({
+                            ...syncConfig,
+                            offlineGracePeriodHours: parseInt(e.target.value) || 72,
+                          })
+                        }
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                      />
+                      <span className="text-[10px] text-text-dim mt-1 block">
+                        Permits branch POS to continue selling without HQ ping
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      type="button"
+                      onClick={() => handleSave('sync_config', syncConfig, 'Sync settings')}
+                      disabled={savingKey === 'sync_config'}
+                      className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer disabled:opacity-50"
+                    >
+                      {savingKey === 'sync_config' ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          <span>Save Sync Settings</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                    Offline Grace Period (Hours)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="720"
-                    value={syncConfig.offlineGracePeriodHours}
-                    onChange={(e) =>
-                      setSyncConfig({
-                        ...syncConfig,
-                        offlineGracePeriodHours: parseInt(e.target.value) || 72,
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3">
-                <button
-                  onClick={() => handleSave('sync_config', syncConfig)}
-                  disabled={saving}
-                  className="px-5 py-2.5 rounded-xl bg-gebeya-600 hover:bg-gebeya-700 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition active:scale-95 disabled:opacity-50"
-                >
-                  <Save size={15} />
-                  {saving ? 'Saving...' : 'Save Sync Settings'}
-                </button>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
+      {/* Branch Activation Modal */}
       <BranchActivationModal
         isOpen={isActivationModalOpen}
         onClose={() => setIsActivationModalOpen(false)}

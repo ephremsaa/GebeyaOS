@@ -189,23 +189,42 @@ export class SystemService {
       settingsMap[row.key] = row.value;
     }
 
-    // Default fallbacks if not yet initialized
+    const bId = branchId || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    const branchRes = await this.db.query<any>(
+      `SELECT b.id, b.code, b.name, b.trade_name, b.tin_number, b.vat_registration_no, b.phone,
+              COALESCE(b.city, '') || CASE WHEN b.subcity IS NOT NULL THEN ', ' || b.subcity ELSE '' END as address,
+              t.name as tenant_name
+       FROM branches b
+       LEFT JOIN tenants t ON b.tenant_id = t.id
+       WHERE b.id = $1 LIMIT 1`,
+      [bId],
+    );
+    const branch = branchRes.rows[0];
+
+    // Default fallbacks prioritizing real branch details
     if (!settingsMap['store_info']) {
       settingsMap['store_info'] = {
-        name: 'Gebeya Supermarket',
-        code: 'BOLE-01',
-        tradeName: 'Gebeya Retail PLC',
-        tinNumber: '0012345678',
-        vatNumber: '9988776655',
-        phone: '+251 911 234567',
-        address: 'Bole Medhanialem, Addis Ababa, Ethiopia',
+        name: branch?.name || 'Gebeya Supermarket',
+        code: branch?.code || 'TULU-01',
+        tradeName: branch?.trade_name || branch?.tenant_name || 'Gebeya Retail PLC',
+        tinNumber: branch?.tin_number || '0082842324',
+        vatNumber: branch?.vat_registration_no || '',
+        phone: branch?.phone || '+251 911 234567',
+        address: branch?.address || 'Bole Medhanialem, Addis Ababa, Ethiopia',
         currency: 'ETB',
         vatRate: 0.15,
       };
+    } else if (branch) {
+      if (!settingsMap['store_info'].code) settingsMap['store_info'].code = branch.code;
+      if (!settingsMap['store_info'].name) settingsMap['store_info'].name = branch.name;
+      if (!settingsMap['store_info'].tinNumber && branch.tin_number) settingsMap['store_info'].tinNumber = branch.tin_number;
+      if (!settingsMap['store_info'].tradeName && branch.trade_name) settingsMap['store_info'].tradeName = branch.trade_name;
+      if (!settingsMap['store_info'].phone && branch.phone) settingsMap['store_info'].phone = branch.phone;
     }
+
     if (!settingsMap['receipt_config']) {
       settingsMap['receipt_config'] = {
-        headerText: 'እንኳን ደህና መጡ! / Welcome to Gebeya Supermarket',
+        headerText: `እንኳን ደህና መጡ! / Welcome to ${branch?.name || 'Gebeya Supermarket'}`,
         footerText: 'ዕቃዎች ከተገዙበት ቀን ጀምሮ በ3 ቀናት ውስጥ በደረሰኝ ይመለሳሉ።\nGoods exchangeable within 3 days with receipt.\nThank you for shopping with us!',
         taxInvoiceTitle: 'OFFICIAL CASH SALES INVOICE',
         showCashierName: true,
@@ -234,21 +253,58 @@ export class SystemService {
   /**
    * Saves or updates a system setting key.
    */
-  async saveSetting(dto: UpdateSystemSettingDto, userId?: string): Promise<void> {
+  async saveSetting(dto: UpdateSystemSettingDto, userId?: string, branchId?: string): Promise<void> {
+    const bId = branchId || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    const tenantRes = await this.db.query<{ tenant_id: string }>(
+      `SELECT tenant_id FROM branches WHERE id = $1 UNION SELECT id as tenant_id FROM tenants LIMIT 1`,
+      [bId],
+    );
+    const tenantId = tenantRes.rows[0]?.tenant_id || '01900000-0000-7000-8000-000000000001';
+
     await this.db.query(
-      `INSERT INTO system_settings (key, value, updated_at)
-       VALUES ($1, $2, clock_timestamp())
-       ON CONFLICT (key) DO UPDATE
+      `INSERT INTO system_settings (tenant_id, key, value, updated_at)
+       VALUES ($1, $2, $3, clock_timestamp())
+       ON CONFLICT (tenant_id, key) DO UPDATE
        SET value = EXCLUDED.value, updated_at = clock_timestamp()`,
-      [dto.key, JSON.stringify(dto.value)],
+      [tenantId, dto.key, JSON.stringify(dto.value)],
     );
 
+    // Sync live branch table if store_info changed
+    if (dto.key === 'store_info' && dto.value) {
+      try {
+        await this.db.query(
+          `UPDATE branches SET
+             name = COALESCE($1, name),
+             trade_name = COALESCE($2, trade_name),
+             tin_number = COALESCE($3, tin_number),
+             vat_registration_no = COALESCE($4, vat_registration_no),
+             phone = COALESCE($5, phone),
+             updated_at = clock_timestamp()
+           WHERE id = $6`,
+          [
+            dto.value.name || null,
+            dto.value.tradeName || null,
+            dto.value.tinNumber || null,
+            dto.value.vatNumber || null,
+            dto.value.phone || null,
+            bId,
+          ],
+        );
+      } catch (err: any) {
+        this.logger.warn(`Could not sync branch row: ${err.message}`);
+      }
+    }
+
     // Log setting change in audit log
-    await this.logAction({
-      action: 'SETTINGS_UPDATE',
-      entityName: 'system_settings',
-      details: { key: dto.key, updatedBy: userId || 'system' },
-    });
+    await this.logAction(
+      {
+        action: 'SETTINGS_UPDATE',
+        entityName: 'system_settings',
+        details: { key: dto.key, updatedBy: userId || 'system' },
+      },
+      bId,
+      userId,
+    );
   }
 
   /**

@@ -163,3 +163,4 @@ To prevent split-brain state, GebeyaOS enforces strict domain isolation:
 4. **`SettingsStore` / REST APIs:**
    - System settings (tax rates, idle timeout, receipt templates, printer endpoints) loaded on demand via `/api/system/settings`.
    - No mock data fallbacks: all components consume real REST endpoints connected to PostgreSQL.
+
