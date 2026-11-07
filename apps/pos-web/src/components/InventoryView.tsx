@@ -55,7 +55,7 @@ interface InventoryProductItem {
 }
 
 export const InventoryView: React.FC = () => {
-  const { language } = useI18n();
+  const { language, t, formatCurrency } = useI18n();
   const { hasPermission, currentUser } = useAuth();
 
   const [products, setProducts] = useState<InventoryProductItem[]>([]);
@@ -299,12 +299,10 @@ export const InventoryView: React.FC = () => {
         <div>
           <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
             <Package className="text-gebeya-600" size={24} />
-            {language === 'am' ? 'የእቃ መጋዘን እና መዝገብ' : 'Inventory & Stock Ledger'}
+            {t('inventory.title')}
           </h1>
           <p className="text-xs text-slate-500">
-            {language === 'am'
-              ? 'የእቃዎች ሚዛን፣ የባች ማብቂያ ጊዜ (FEFO)፣ እና የገባ/የወጣ እቃ መዝገብ'
-              : 'Append-only ledger balances, First-Expired First-Out (FEFO) batch tracking & write-offs.'}
+            {t('inventory.fefoDesc')}
           </p>
         </div>
 
@@ -316,7 +314,7 @@ export const InventoryView: React.FC = () => {
             title="View past bulk imports and audit log"
           >
             <History size={15} className="text-slate-500" />
-            {language === 'am' ? 'የማስመጣት ታሪክ' : 'Import History'}
+            {t('inventory.importHistory')}
           </button>
 
           {/* Primary Add Stock Button */}
@@ -326,7 +324,7 @@ export const InventoryView: React.FC = () => {
             className="px-4 py-2 rounded-xl bg-gebeya-600 hover:bg-gebeya-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <Plus size={16} />
-            {language === 'am' ? 'እቃ ጨምር (Add Stock)' : 'Add Stock'}
+            {t('inventory.addStock')}
           </button>
         </div>
       </div>
@@ -336,7 +334,7 @@ export const InventoryView: React.FC = () => {
         <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {language === 'am' ? 'ጠቅላላ እቃዎች' : 'Tracked Items'}
+              {t('inventory.trackedItems')}
             </div>
             <div className="text-lg font-black text-slate-900 dark:text-white font-mono">
               {totalCount}
@@ -357,7 +355,7 @@ export const InventoryView: React.FC = () => {
         >
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {language === 'am' ? 'ያለቀባቸው' : 'Low Stock'}
+              {t('inventory.lowStock')}
             </div>
             <div className="text-lg font-black text-rose-600 font-mono">{lowCount}</div>
           </div>
@@ -376,7 +374,7 @@ export const InventoryView: React.FC = () => {
         >
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {language === 'am' ? 'ያለቁ (ዜሮ)' : 'Out of Stock'}
+              {t('inventory.outOfStock')}
             </div>
             <div className="text-lg font-black text-slate-700 dark:text-slate-300 font-mono">
               {outCount}
@@ -397,10 +395,10 @@ export const InventoryView: React.FC = () => {
         >
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {language === 'am' ? 'FEFO ቅደም ተከተል' : 'FEFO Expiry Sort'}
+              {t('inventory.fefoSort')}
             </div>
             <div className="text-xs font-black text-amber-600 font-mono flex items-center gap-1">
-              {fefoSort ? 'EARLIEST FIRST' : 'DEFAULT'}
+              {fefoSort ? t('inventory.earliestFirst') : t('inventory.defaultSort')}
             </div>
           </div>
           <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
@@ -517,18 +515,18 @@ export const InventoryView: React.FC = () => {
           <table className="w-full text-left border-collapse text-xs">
             <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold text-[10px] sticky top-0 backdrop-blur-xs z-10 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="p-3.5">{language === 'am' ? 'እቃ እና SKU' : 'Product & SKU'}</th>
-                <th className="p-3.5">{language === 'am' ? 'ምድብ' : 'Category'}</th>
-                <th className="p-3.5 text-right">{language === 'am' ? 'ያለ እቃ መጠን' : 'On Hand (Balance)'}</th>
-                <th className="p-3.5 text-center">{language === 'am' ? 'ሁኔታ' : 'Status'}</th>
-                <th className="p-3.5 text-right">{language === 'am' ? 'የመሸጫ ዋጋ' : 'Shelf Price'}</th>
+                <th className="p-3.5">{t('inventory.productAndSku')}</th>
+                <th className="p-3.5">{t('catalog.category')}</th>
+                <th className="p-3.5 text-right">{t('inventory.onHandBalance')}</th>
+                <th className="p-3.5 text-center">{t('inventory.status')}</th>
+                <th className="p-3.5 text-right">{t('inventory.shelfPrice')}</th>
                 <th className="p-3.5 text-right">
                   <div className="inline-flex items-center gap-1 justify-end">
-                    <span>{language === 'am' ? 'የወጪ ዋጋ' : 'Unit Cost'}</span>
+                    <span>{t('inventory.unitCost')}</span>
                     {!canViewCost && <Lock size={10} className="text-slate-400" />}
                   </div>
                 </th>
-                <th className="p-3.5 text-right w-24">{language === 'am' ? 'ተግባራት' : 'Actions'}</th>
+                <th className="p-3.5 text-right w-24">{t('inventory.actions')}</th>
               </tr>
             </thead>
 
@@ -537,14 +535,14 @@ export const InventoryView: React.FC = () => {
                 <tr>
                   <td colSpan={7} className="p-12 text-center text-slate-400">
                     <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-gebeya-600" />
-                    Loading inventory ledger balances...
+                    {t('inventory.loadingBalances')}
                   </td>
                 </tr>
               ) : sortedProducts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-12 text-center text-slate-400">
                     <Package size={36} className="mx-auto mb-2 text-slate-300 dark:text-slate-700" />
-                    No inventory items match your filter criteria.
+                    {t('inventory.noItemsMatch')}
                   </td>
                 </tr>
               ) : (
