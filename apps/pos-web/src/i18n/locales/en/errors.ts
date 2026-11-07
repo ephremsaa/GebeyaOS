@@ -1,0 +1,15 @@
+export const errorsEn = {
+  SHIFT_ALREADY_OPEN: 'This register terminal already has an active open shift.',
+  SHIFT_NOT_FOUND: 'Active shift not found or has already been closed.',
+  INVALID_PIN: 'Incorrect PIN entered. Please try again.',
+  PIN_LOCKED: 'PIN is locked due to multiple failed attempts. Use manager override.',
+  INSUFFICIENT_STOCK: 'Insufficient stock available to complete transaction.',
+  TENANT_SUSPENDED: 'This supermarket account is suspended. Contact system administrator.',
+  INVALID_CREDENTIALS: 'Invalid username, phone number, or password.',
+  NETWORK_ERROR: 'Network error communicating with server. Operating in offline mode.',
+  UNAUTHORIZED: 'You do not have permission to perform this action.',
+  DUPLICATE_BARCODE: 'A product with this barcode already exists in the catalog.',
+  DRAWER_LIMIT_EXCEEDED: 'Cash in drawer exceeds safe drop threshold. Safe drop recommended.',
+  GENERIC_ERROR: 'An unexpected error occurred. Please try again.',
+  MISSING_PARAM: 'Required parameter {{param}} is missing.',
+};
