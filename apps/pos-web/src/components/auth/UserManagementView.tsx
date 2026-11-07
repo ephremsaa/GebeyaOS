@@ -693,16 +693,16 @@ export const UserManagementView: React.FC = () => {
       <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-border-subtle flex-shrink-0">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="page-title">{language === 'am' ? 'ሠራተኞች እና ሚናዎች' : 'Staff & Roles'}</h1>
+            <h1 className="page-title">{t('staff.title')}</h1>
             <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-primary-soft text-primary border border-primary/20">
-              {users.length} Total Users
+              {t('staff.totalUsersBadge', { count: users.length })}
             </span>
             <span className="px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              No Public Signup (Internal Only)
+              {t('staff.internalOnlyBadge')}
             </span>
           </div>
           <p className="page-subtitle text-xs text-text-muted mt-1">
-            Directory of employees, cashier terminal PINs, granular permission matrix, and immutable audit trail.
+            {t('staff.subtitle')}
           </p>
         </div>
 
@@ -752,10 +752,10 @@ export const UserManagementView: React.FC = () => {
             type="button"
             onClick={() => setIsAddModalOpen(true)}
             className="btn-primary flex items-center gap-1.5 py-2 px-3 text-xs shadow-sm"
-            title="Add staff member in under 1 minute"
+            title={t('staff.quickAddTooltip')}
           >
             <UserPlus size={15} />
-            <span>{t('addStaff')}</span>
+            <span>{t('staff.addStaff')}</span>
           </button>
         </div>
       </div>
@@ -785,7 +785,7 @@ export const UserManagementView: React.FC = () => {
                 <Users size={18} />
               </div>
               <div>
-                <span className="text-[11px] text-text-muted block font-medium">Total Staff</span>
+                <span className="text-[11px] text-text-muted block font-medium">{t('staff.totalStaff')}</span>
                 <span className="text-base font-bold text-text-main">{users.length}</span>
               </div>
             </div>
@@ -795,7 +795,7 @@ export const UserManagementView: React.FC = () => {
                 <Power size={18} />
               </div>
               <div>
-                <span className="text-[11px] text-text-muted block font-medium">Active Accounts</span>
+                <span className="text-[11px] text-text-muted block font-medium">{t('staff.activeAccounts')}</span>
                 <span className="text-base font-bold text-text-main">
                   {users.filter((u) => u.isActive).length}
                 </span>
@@ -807,7 +807,7 @@ export const UserManagementView: React.FC = () => {
                 <KeyRound size={18} />
               </div>
               <div>
-                <span className="text-[11px] text-text-muted block font-medium">Cashier Lanes</span>
+                <span className="text-[11px] text-text-muted block font-medium">{t('staff.cashierLanes')}</span>
                 <span className="text-base font-bold text-text-main">
                   {users.filter((u) => u.role === 'CASHIER').length}
                 </span>
@@ -819,7 +819,7 @@ export const UserManagementView: React.FC = () => {
                 <LockKeyhole size={18} />
               </div>
               <div>
-                <span className="text-[11px] text-text-muted block font-medium">Must Change Pass</span>
+                <span className="text-[11px] text-text-muted block font-medium">{t('staff.mustChangePass')}</span>
                 <span className="text-base font-bold text-text-main">
                   {users.filter((u) => u.forcePasswordChange).length}
                 </span>
@@ -834,7 +834,7 @@ export const UserManagementView: React.FC = () => {
               <input
                 type="text"
                 className="search-input text-xs"
-                placeholder="Search staff by name, @username, phone, or role..."
+                placeholder={t('staff.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -855,7 +855,7 @@ export const UserManagementView: React.FC = () => {
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
             >
-              <option value="ALL">All Roles</option>
+              <option value="ALL">{t('staff.allRoles')}</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.name.toUpperCase()}>
                   {r.name}
@@ -881,13 +881,13 @@ export const UserManagementView: React.FC = () => {
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
             >
-              <option value="ALL">All Branches</option>
+              <option value="ALL">{t('staff.allBranches')}</option>
               <option value="BOLE-01">BOLE-01 (Bole Medhanialem)</option>
               <option value="HQ-MAIN">HQ-MAIN (Corporate)</option>
             </select>
 
             <span className="text-xs text-text-muted font-mono ml-auto">
-              Showing {filteredUsers.length} of {users.length}
+              {t('staff.showingCount', { filtered: filteredUsers.length, total: users.length })}
             </span>
           </div>
 
@@ -909,7 +909,7 @@ export const UserManagementView: React.FC = () => {
                   {filteredUsers.length === 0 && (
                     <tr>
                       <td colSpan={6} className="text-center py-12 text-sm text-text-muted">
-                        No staff members match the selected filters.
+                        {t('staff.noStaffMatch')}
                       </td>
                     </tr>
                   )}
@@ -940,7 +940,7 @@ export const UserManagementView: React.FC = () => {
                                     className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
                                     title="Last Sovereign Owner of the Store"
                                   >
-                                    Sole Owner
+                                    {t('staff.soleOwner')}
                                   </span>
                                 )}
                               </span>
@@ -981,7 +981,7 @@ export const UserManagementView: React.FC = () => {
                         <td className="text-center" onClick={(e) => e.stopPropagation()}>
                           {isLocked ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300">
-                              <Lock size={10} /> Locked Out
+                              <Lock size={10} /> {t('staff.lockedOut')}
                             </span>
                           ) : (
                             <button
@@ -1002,7 +1002,7 @@ export const UserManagementView: React.FC = () => {
                               }
                             >
                               <Power size={11} />
-                              {user.isActive ? 'Active' : 'Inactive'}
+                              {user.isActive ? t('staff.active') : t('staff.inactive')}
                             </button>
                           )}
                         </td>
@@ -1016,7 +1016,7 @@ export const UserManagementView: React.FC = () => {
                             </span>
                             {user.forcePasswordChange && (
                               <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
-                                <RotateCcw size={10} /> Must change password
+                                <RotateCcw size={10} /> {t('staff.mustChangePasswordText')}
                               </span>
                             )}
                           </div>
@@ -1033,7 +1033,7 @@ export const UserManagementView: React.FC = () => {
                                 setIsResetPinModalOpen(true);
                               }}
                               className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors"
-                              title="Reset Cashier Quick PIN"
+                              title={t('staff.resetPinTooltip')}
                             >
                               <KeyRound size={15} />
                             </button>
@@ -1045,7 +1045,7 @@ export const UserManagementView: React.FC = () => {
                                 setIsResetPassModalOpen(true);
                               }}
                               className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors"
-                              title="Admin Password Reset"
+                              title={t('staff.resetPassTooltip')}
                             >
                               <Lock size={15} />
                             </button>
@@ -1053,7 +1053,7 @@ export const UserManagementView: React.FC = () => {
                               type="button"
                               onClick={() => setDrawerUser(user)}
                               className="p-1.5 rounded-lg hover:bg-primary-soft text-text-muted hover:text-primary transition-colors"
-                              title="View User Drawer"
+                              title={t('staff.viewDrawerTooltip')}
                             >
                               <ChevronRight size={16} />
                             </button>
@@ -1076,10 +1076,10 @@ export const UserManagementView: React.FC = () => {
             <div>
               <h2 className="text-sm font-bold text-text-main flex items-center gap-2">
                 <ShieldCheck size={16} className="text-primary" />
-                Granular Role Permission Matrix
+                {t('staff.matrixTitle')}
               </h2>
               <p className="text-xs text-text-muted">
-                Server-side enforced capabilities across system and custom roles. Owner role has sovereign unrestricted access.
+                {t('staff.matrixSubtitle')}
               </p>
             </div>
             <button
@@ -1110,7 +1110,7 @@ export const UserManagementView: React.FC = () => {
                             {r.name}
                           </span>
                           <span className="text-[10px] text-text-muted font-normal">
-                            Max {r.maxDiscountPercentage}% Disc
+                            {t('staff.maxDiscount', { percent: r.maxDiscountPercentage })}
                           </span>
                           {!r.isSystem && (
                             <button
@@ -1119,7 +1119,7 @@ export const UserManagementView: React.FC = () => {
                               className="text-red-500 hover:text-red-700 text-[10px] flex items-center gap-0.5"
                               title="Delete custom role"
                             >
-                              <Trash2 size={10} /> Delete
+                              <Trash2 size={10} /> {t('staff.deleteRole')}
                             </button>
                           )}
                         </div>
@@ -1199,7 +1199,7 @@ export const UserManagementView: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300">
                 <ShieldAlert size={14} />
-                Append-Only Immutable Ledger (Hash Chained)
+                {t('staff.auditBanner')}
               </span>
             </div>
 
@@ -1211,7 +1211,7 @@ export const UserManagementView: React.FC = () => {
                 className="btn-secondary text-xs flex items-center gap-1.5 py-1.5 px-2.5"
               >
                 <RefreshCw size={13} className={auditLoading ? 'animate-spin' : ''} />
-                Refresh Logs
+                {t('staff.refreshLogs')}
               </button>
             </div>
           </div>
@@ -1223,7 +1223,7 @@ export const UserManagementView: React.FC = () => {
               <input
                 type="text"
                 className="search-input text-xs"
-                placeholder="Search audit actions, users, or payload keywords..."
+                placeholder={t('staff.searchAuditPlaceholder')}
                 value={auditSearch}
                 onChange={(e) => setAuditSearch(e.target.value)}
               />
@@ -1235,7 +1235,7 @@ export const UserManagementView: React.FC = () => {
               value={auditUserFilter}
               onChange={(e) => setAuditUserFilter(e.target.value)}
             >
-              <option value="">All Staff</option>
+              <option value="">{t('staff.allStaff')}</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.fullName} (@{u.username})
@@ -1249,7 +1249,7 @@ export const UserManagementView: React.FC = () => {
               value={auditActionFilter}
               onChange={(e) => setAuditActionFilter(e.target.value)}
             >
-              <option value="">All Actions</option>
+              <option value="">{t('staff.allActions')}</option>
               <option value="LOGIN_SUCCESS">LOGIN_SUCCESS</option>
               <option value="LOGIN_FAILED">LOGIN_FAILED</option>
               <option value="USER_LOCKOUT">USER_LOCKOUT</option>
@@ -1268,7 +1268,7 @@ export const UserManagementView: React.FC = () => {
               value={auditModuleFilter}
               onChange={(e) => setAuditModuleFilter(e.target.value)}
             >
-              <option value="">All Modules</option>
+              <option value="">{t('staff.allModules')}</option>
               <option value="users">users</option>
               <option value="roles">roles</option>
               <option value="terminals">terminals</option>
@@ -1309,7 +1309,7 @@ export const UserManagementView: React.FC = () => {
                   {filteredAuditLogs.length === 0 && (
                     <tr>
                       <td colSpan={6} className="text-center py-12 text-sm text-text-muted">
-                        No audit events recorded for the selected filter parameters.
+                        {t('staff.noAuditLogs')}
                       </td>
                     </tr>
                   )}
@@ -1436,7 +1436,7 @@ export const UserManagementView: React.FC = () => {
               {/* Profile details */}
               <div className="flex flex-col gap-2">
                 <h3 className="font-bold text-text-muted uppercase text-[10px] tracking-wider">
-                  Contact &amp; Assignment
+                  {t('staff.drawerContact')}
                 </h3>
                 <div className="grid grid-cols-2 gap-2 bg-surface-2/40 p-3 rounded-xl border border-border-subtle font-mono text-[11px]">
                   <div>
@@ -1461,13 +1461,13 @@ export const UserManagementView: React.FC = () => {
               {/* Security & Terminal Access */}
               <div className="flex flex-col gap-2">
                 <h3 className="font-bold text-text-muted uppercase text-[10px] tracking-wider">
-                  Security &amp; Terminal Status
+                  {t('staff.drawerSecurity')}
                 </h3>
                 <div className="flex flex-col gap-2 bg-surface-2/40 p-3 rounded-xl border border-border-subtle">
                   <div className="flex items-center justify-between">
-                    <span className="text-text-muted">Password Encryption</span>
+                    <span className="text-text-muted">{t('staff.passwordEncryption')}</span>
                     <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                      Argon2id (Memory 64MB)
+                      {t('staff.passwordArgon')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -1481,11 +1481,11 @@ export const UserManagementView: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-text-muted">Terminal Quick PIN</span>
-                    <span className="font-mono font-bold text-text-main">Configured (4–6 Digits)</span>
+                    <span className="text-text-muted">{t('staff.terminalQuickPin')}</span>
+                    <span className="font-mono font-bold text-text-main">{t('staff.pinConfigured')}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-text-muted">Account Lockout State</span>
+                    <span className="text-text-muted">{t('staff.accountLockoutState')}</span>
                     <span className="font-bold text-emerald-600">
                       {drawerUser.lockedUntil && new Date(drawerUser.lockedUntil) > new Date()
                         ? 'Temporarily Locked'
@@ -1495,7 +1495,7 @@ export const UserManagementView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Effective Granular Permissions */}
+              {/* {t('staff.drawerPerms')} */}
               <div className="flex flex-col gap-2">
                 <h3 className="font-bold text-text-muted uppercase text-[10px] tracking-wider">
                   Effective Granular Permissions
@@ -1520,7 +1520,7 @@ export const UserManagementView: React.FC = () => {
                               : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                           }`}
                         >
-                          {isGranted ? 'Enabled' : 'Disabled'}
+                          {isGranted ? t('staff.enabled') : t('staff.disabled')}
                         </span>
                       </div>
                     );
@@ -1531,7 +1531,7 @@ export const UserManagementView: React.FC = () => {
               {/* Quick Admin Actions */}
               <div className="flex flex-col gap-2 mt-auto pt-2">
                 <h3 className="font-bold text-text-muted uppercase text-[10px] tracking-wider">
-                  Administrative Controls
+                  {t('staff.drawerAdminControls')}
                 </h3>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -1564,7 +1564,7 @@ export const UserManagementView: React.FC = () => {
                 {drawerUser.role === 'OWNER' && drawerUser.isActive && activeOwnersCount <= 1 ? (
                   <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-center gap-2">
                     <AlertTriangle size={15} className="flex-shrink-0" />
-                    <span>The last Owner of the store cannot be deactivated or demoted.</span>
+                    <span>{t('staff.lastOwnerWarning')}</span>
                   </div>
                 ) : (
                   <button
@@ -1602,7 +1602,7 @@ export const UserManagementView: React.FC = () => {
                   {t('addStaff')}
                 </h2>
                 <p className="text-xs text-text-muted">
-                  Add a store employee in under 1 minute. No public self-registration.
+                  {t('staff.addStaffModalDesc')}
                 </p>
               </div>
               <button
@@ -1618,11 +1618,11 @@ export const UserManagementView: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Full Name */}
                 <div>
-                  <label className="field-label text-xs">Full Name *</label>
+                  <label className="field-label text-xs">{t('staff.fullNameLabel')}</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Almaz Tadesse"
+                    placeholder={t('staff.fullNamePlaceholder')}
                     className="field-input mt-1"
                     value={newFullName}
                     onChange={(e) => handleFullNameChange(e.target.value)}
@@ -1631,7 +1631,7 @@ export const UserManagementView: React.FC = () => {
 
                 {/* 2. Phone */}
                 <div>
-                  <label className="field-label text-xs">Phone Number *</label>
+                  <label className="field-label text-xs">{t('staff.phoneLabel')}</label>
                   <input
                     type="text"
                     required
@@ -1644,7 +1644,7 @@ export const UserManagementView: React.FC = () => {
 
                 {/* 3. Role */}
                 <div>
-                  <label className="field-label text-xs">Store Role *</label>
+                  <label className="field-label text-xs">{t('staff.roleLabel')}</label>
                   <select
                     className="field-select mt-1"
                     value={newRole}
@@ -1660,7 +1660,7 @@ export const UserManagementView: React.FC = () => {
 
                 {/* 4. Branch */}
                 <div>
-                  <label className="field-label text-xs">Assigned Branch *</label>
+                  <label className="field-label text-xs">{t('staff.branchLabel')}</label>
                   <select
                     className="field-select mt-1"
                     value={newBranchCode}
@@ -1673,7 +1673,7 @@ export const UserManagementView: React.FC = () => {
 
                 {/* 5. Terminal Quick PIN (4-6 digits) */}
                 <div>
-                  <label className="field-label text-xs">POS Terminal PIN (4–6 Digits) *</label>
+                  <label className="field-label text-xs">{t('staff.pinLabel')}</label>
                   <input
                     type="password"
                     required
@@ -1687,7 +1687,7 @@ export const UserManagementView: React.FC = () => {
 
                 {/* Username */}
                 <div>
-                  <label className="field-label text-xs">Username (Auto-derived)</label>
+                  <label className="field-label text-xs">{t('staff.usernameLabel')}</label>
                   <input
                     type="text"
                     required
@@ -1700,7 +1700,7 @@ export const UserManagementView: React.FC = () => {
 
                 {/* Email (Optional) */}
                 <div>
-                  <label className="field-label text-xs">Email (Optional)</label>
+                  <label className="field-label text-xs">{t('staff.emailLabel')}</label>
                   <input
                     type="email"
                     placeholder="almaz@gebeyaos.et"
@@ -1712,7 +1712,7 @@ export const UserManagementView: React.FC = () => {
 
                 {/* Initial Temporary Password */}
                 <div>
-                  <label className="field-label text-xs">Temporary Password *</label>
+                  <label className="field-label text-xs">{t('staff.tempPassLabel')}</label>
                   <input
                     type="text"
                     required
@@ -1734,7 +1734,7 @@ export const UserManagementView: React.FC = () => {
                   className="rounded text-primary focus:ring-primary"
                 />
                 <label htmlFor="forcePass" className="text-xs text-text-main cursor-pointer">
-                  <strong>Force password change on first login</strong> (Recommended for security)
+                  <strong>{t('staff.forcePassLabel')}</strong>
                 </label>
               </div>
 
@@ -1767,12 +1767,12 @@ export const UserManagementView: React.FC = () => {
               {t('resetPassword')}
             </h2>
             <p className="text-xs text-text-muted mb-4">
-              Set a temporary password for <strong>{selectedUserForModal.fullName}</strong>.
+              {t('staff.resetPassDesc', { name: selectedUserForModal.fullName })}
             </p>
 
             <form onSubmit={handleAdminResetPassword} className="flex flex-col gap-3">
               <div>
-                <label className="field-label">New Temporary Password (min 8 chars)</label>
+                <label className="field-label">{t('staff.newTempPassLabel')}</label>
                 <input
                   type="text"
                   required
@@ -1784,7 +1784,7 @@ export const UserManagementView: React.FC = () => {
               </div>
 
               <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-[11px] border border-amber-300">
-                Staff member will be forced to change this password immediately upon their next login.
+                {t('staff.resetPassNotice')}
               </div>
 
               <div className="flex gap-2.5 mt-2">
@@ -1816,12 +1816,12 @@ export const UserManagementView: React.FC = () => {
               {t('resetPin')}
             </h2>
             <p className="text-xs text-text-muted mb-4">
-              Assign a new 4–6 digit terminal unlock PIN for <strong>{selectedUserForModal.fullName}</strong>.
+              {t('staff.resetPinDesc', { name: selectedUserForModal.fullName })}
             </p>
 
             <form onSubmit={handleAdminResetPin} className="flex flex-col gap-3">
               <div>
-                <label className="field-label">Terminal Quick PIN (4-6 digits)</label>
+                <label className="field-label">{t('staff.quickPinInputLabel')}</label>
                 <input
                   type="password"
                   required
@@ -1872,11 +1872,11 @@ export const UserManagementView: React.FC = () => {
 
             <form onSubmit={handleCreateCustomRole} className="flex flex-col gap-3 mt-4">
               <div>
-                <label className="field-label text-xs">Role Name *</label>
+                <label className="field-label text-xs">{t('staff.roleNameLabel')}</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. SHIFT_SUPERVISOR"
+                  placeholder={t('staff.roleNamePlaceholder')}
                   className="field-input mt-1 font-mono uppercase"
                   value={customRoleName}
                   onChange={(e) => setCustomRoleName(e.target.value)}
@@ -1884,10 +1884,10 @@ export const UserManagementView: React.FC = () => {
               </div>
 
               <div>
-                <label className="field-label text-xs">Description</label>
+                <label className="field-label text-xs">{t('staff.descLabel')}</label>
                 <input
                   type="text"
-                  placeholder="e.g. Can perform shift close and cashier overrides"
+                  placeholder={t('staff.descPlaceholder')}
                   className="field-input mt-1"
                   value={customRoleDesc}
                   onChange={(e) => setCustomRoleDesc(e.target.value)}
@@ -1895,7 +1895,7 @@ export const UserManagementView: React.FC = () => {
               </div>
 
               <div>
-                <label className="field-label text-xs">Max Discount Percentage (%)</label>
+                <label className="field-label text-xs">{t('staff.maxDiscountLabel')}</label>
                 <input
                   type="number"
                   min={0}
@@ -1907,7 +1907,7 @@ export const UserManagementView: React.FC = () => {
               </div>
 
               <div>
-                <label className="field-label text-xs mb-1.5 block">Initial Permissions</label>
+                <label className="field-label text-xs mb-1.5 block">{t('staff.initialPermsLabel')}</label>
                 <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5 p-2 bg-surface-2/40 rounded-xl border border-border-subtle">
                   {GRANULAR_PERMISSIONS_LIST.map((p) => {
                     const isChecked = customRolePerms.includes(p.key);
@@ -1959,7 +1959,7 @@ export const UserManagementView: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
               <h2 className="modal-title flex items-center gap-2 text-sm">
                 <History size={16} className="text-primary" />
-                Audit Trail Event Details
+                {t('staff.auditDetailTitle')}
               </h2>
               <button
                 type="button"
@@ -1973,21 +1973,21 @@ export const UserManagementView: React.FC = () => {
             <div className="flex flex-col gap-2 mt-4 text-xs font-mono">
               <div className="grid grid-cols-2 gap-2 bg-surface-2/40 p-2.5 rounded-xl border border-border-subtle">
                 <div>
-                  <span className="text-[10px] text-text-muted block">Action</span>
+                  <span className="text-[10px] text-text-muted block">{t('staff.actionLabel')}</span>
                   <span className="font-bold text-text-main">{selectedAuditLog.action}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-text-muted block">Module</span>
+                  <span className="text-[10px] text-text-muted block">{t('staff.moduleLabel')}</span>
                   <span className="font-bold text-text-main">{selectedAuditLog.entity_name}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-text-muted block">Actor</span>
+                  <span className="text-[10px] text-text-muted block">{t('staff.actorLabel')}</span>
                   <span className="font-bold text-text-main">
                     {selectedAuditLog.user_name || selectedAuditLog.username || 'System'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-text-muted block">Timestamp</span>
+                  <span className="text-[10px] text-text-muted block">{t('staff.timestampLabel')}</span>
                   <span className="font-bold text-text-main">
                     {new Date(selectedAuditLog.created_at).toLocaleString()}
                   </span>
@@ -1996,7 +1996,7 @@ export const UserManagementView: React.FC = () => {
 
               <div>
                 <span className="text-text-muted text-[11px] font-sans font-semibold block mb-1">
-                  Immutable Event Payload:
+                  {t('staff.immutablePayloadLabel')}
                 </span>
                 <pre className="p-3 rounded-xl bg-slate-900 text-slate-100 text-[11px] overflow-auto max-h-56">
                   {JSON.stringify(selectedAuditLog.details || {}, null, 2)}
