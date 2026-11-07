@@ -387,7 +387,7 @@ export const ProductCatalogView: React.FC = () => {
             className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <FolderPlus size={15} className="text-gebeya-600" />
-            {language === 'am' ? 'ምድቦች' : 'Categories'}
+            {t('catalog.categories')}
           </button>
 
           <button
@@ -403,7 +403,7 @@ export const ProductCatalogView: React.FC = () => {
             className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <Download size={15} className="text-slate-600" />
-            {language === 'am' ? 'ማውጣት (Export)' : 'Export CSV'}
+            {t('catalog.exportCsv')}
           </button>
 
           <button
@@ -411,7 +411,7 @@ export const ProductCatalogView: React.FC = () => {
             className="px-4 py-2 rounded-xl bg-gebeya-600 hover:bg-gebeya-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <Plus size={16} />
-            {language === 'am' ? 'አዲስ እቃ መዝግብ (30s)' : '+ Add Product (30s)'}
+            {t('catalog.addProductQuick')}
           </button>
         </div>
       </div>
@@ -421,7 +421,7 @@ export const ProductCatalogView: React.FC = () => {
         <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {language === 'am' ? 'ጠቅላላ እቃዎች' : 'Total Catalog'}
+              {t('catalog.totalCatalog')}
             </div>
             <div className="text-lg font-black text-slate-900 dark:text-white font-mono">
               {totalCount}
@@ -435,7 +435,7 @@ export const ProductCatalogView: React.FC = () => {
         <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {language === 'am' ? 'ንቁ እቃዎች' : 'Active Products'}
+              {t('catalog.activeProducts')}
             </div>
             <div className="text-lg font-black text-emerald-600 font-mono">
               {activeCount}
@@ -456,7 +456,7 @@ export const ProductCatalogView: React.FC = () => {
         >
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {language === 'am' ? 'ያለቀባቸው እቃዎች' : 'Low Stock Alerts'}
+              {t('catalog.lowStockAlerts')}
             </div>
             <div className="text-lg font-black text-rose-600 font-mono">
               {lowStockCount}
@@ -492,11 +492,7 @@ export const ProductCatalogView: React.FC = () => {
           <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
           <input
             type="text"
-            placeholder={
-              language === 'am'
-                ? 'በስም፣ ባርኮድ ወይም SKU ፈልግ...'
-                : 'Search by product name, barcode, or SKU...'
-            }
+            placeholder={t('catalog.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-9 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-gebeya-500 font-medium"
@@ -519,7 +515,7 @@ export const ProductCatalogView: React.FC = () => {
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-gebeya-500"
           >
-            <option value="">{language === 'am' ? 'ሁሉም ምድቦች' : 'All Categories'}</option>
+            <option value="">{t('catalog.allCategories')}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name_en} {c.name_am ? `(${c.name_am})` : ''}
@@ -571,7 +567,7 @@ export const ProductCatalogView: React.FC = () => {
             }`}
           >
             <AlertTriangle size={13} />
-            Low Stock
+            {t('catalog.lowStock')}
           </button>
 
           {/* Refresh */}
@@ -592,7 +588,7 @@ export const ProductCatalogView: React.FC = () => {
               {selectedIds.length}
             </span>
             <span className="text-xs font-bold text-slate-200">
-              {selectedIds.length} product(s) selected
+              {t('catalog.selectedProducts', { count: selectedIds.length })}
             </span>
           </div>
 
@@ -654,7 +650,7 @@ export const ProductCatalogView: React.FC = () => {
               className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950 text-rose-400 text-xs font-bold flex items-center gap-1.5 transition"
             >
               <Archive size={14} />
-              Archive Selected
+              {t('catalog.archiveSelected')}
             </button>
 
             <button
@@ -662,7 +658,7 @@ export const ProductCatalogView: React.FC = () => {
               className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold flex items-center gap-1.5 transition text-slate-300"
             >
               <Download size={14} />
-              Export Selected
+              {t('catalog.exportCsv')}
             </button>
 
             <button
@@ -712,14 +708,14 @@ export const ProductCatalogView: React.FC = () => {
                 <tr>
                   <td colSpan={10} className="p-12 text-center text-slate-400">
                     <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-gebeya-600" />
-                    Loading product catalog...
+                    {t('catalog.loadingCatalog') || 'Loading product catalog...'}
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="p-12 text-center text-slate-400">
                     <Package size={36} className="mx-auto mb-2 text-slate-300 dark:text-slate-700" />
-                    No products found matching your search and filter criteria.
+                    {t('catalog.noProductsFoundDesc')}
                   </td>
                 </tr>
               ) : (

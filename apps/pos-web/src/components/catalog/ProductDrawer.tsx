@@ -65,7 +65,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
   onSaved,
   onOpenCategoryManager,
 }) => {
-  const { language } = useI18n();
+  const { language, t, formatCurrency } = useI18n();
   const { hasPermission, currentUser } = useAuth();
   const isEdit = Boolean(product?.id);
 
@@ -245,7 +245,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
     setFormSuccess(null);
 
     if (!nameEn.trim()) {
-      setFormError('Please enter a product name in English.');
+      setFormError(t('catalog.englishNameRequired'));
       return;
     }
     if (!sku.trim()) {
@@ -399,9 +399,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
               </div>
               <div>
                 <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  {isEdit
-                    ? (language === 'am' ? 'እቃ አሻሽል' : 'Edit Product')
-                    : (language === 'am' ? 'አዲስ እቃ መዝግብ (ፈጣን 30s)' : 'Add Product (< 30s)')}
+                  {isEdit ? t('catalog.editProduct') : t('catalog.addProductQuick')}
                 </h2>
                 <p className="text-xs text-slate-500">
                   {isEdit ? `SKU: ${product?.sku}` : 'Scan or type barcode, enter name, price, and save.'}
@@ -465,7 +463,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                 <input
                   ref={barcodeInputRef}
                   type="text"
-                  placeholder="Scan or type barcode (e.g. 6281006560027)..."
+                  placeholder={t('catalog.barcodePlaceholder')}
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
                   className={`w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border font-mono text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 ${
