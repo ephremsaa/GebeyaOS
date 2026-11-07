@@ -27,7 +27,7 @@ import { useAuth } from '../auth/AuthContext';
 import { BranchActivationModal } from './settings/BranchActivationModal';
 
 export const SettingsView: React.FC = () => {
-  const { language } = useI18n();
+  const { t, language, calendar, setCalendar } = useI18n();
   const { currentUser } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'store' | 'receipt' | 'fiscal' | 'sync'>('store');
@@ -41,7 +41,7 @@ export const SettingsView: React.FC = () => {
   // Active user / branch context
   const branchId = currentUser?.branchId || localStorage.getItem('gebeyaos_branch_id') || '01a19309-1d43-7444-b260-5b2ffac3e40c';
   const userId = currentUser?.id || '';
-  const token = sessionStorage.getItem('gebeyaos_token') || localStorage.getItem('gebeyaos_token');
+  const token = localStorage.getItem('gebeyaos_access_token') || sessionStorage.getItem('gebeyaos_token') || localStorage.getItem('gebeyaos_token');
 
   // Form states
   const [storeInfo, setStoreInfo] = useState({
@@ -219,12 +219,10 @@ export const SettingsView: React.FC = () => {
           </div>
           <div>
             <h1 className="text-xl font-extrabold text-text-main flex items-center gap-2 tracking-tight">
-              {language === 'am' ? 'የስርዓት እና የቅርንጫፍ ቅንብሮች' : 'System & Branch Settings'}
+              {t('settings.title')}
             </h1>
             <p className="text-xs text-text-muted">
-              {language === 'am'
-                ? 'የሱቅ መረጃ፣ የደረሰኝ አቀማመጥ፣ የቫት (VAT) ተመን እና የማመሳሰል ጊዜ'
-                : 'Configure branch identification, receipt layout, tax parameters, and HQ sync intervals.'}
+              {t('settings.subtitle')}
             </p>
           </div>
         </div>
@@ -248,7 +246,7 @@ export const SettingsView: React.FC = () => {
           {isDirty && !successToast && !errorToast && (
             <div className="px-3 py-1 rounded-xl bg-warning/15 border border-warning/30 text-warning text-xs font-bold flex items-center gap-1.5 animate-pulse">
               <span className="w-2 h-2 rounded-full bg-warning" />
-              <span>Unsaved changes</span>
+              <span>{t('settings.unsavedChanges')}</span>
             </div>
           )}
         </div>
@@ -271,9 +269,9 @@ export const SettingsView: React.FC = () => {
             >
               <Building2 size={17} className={activeTab === 'store' ? 'text-white' : 'text-primary'} />
               <div className="flex flex-col min-w-0">
-                <span className="truncate">{language === 'am' ? 'የቅርንጫፍ መረጃ' : 'Branch Details'}</span>
+                <span className="truncate">{t('settings.tabBranch')}</span>
                 <span className={`text-[10px] font-normal truncate ${activeTab === 'store' ? 'text-white/80' : 'text-text-dim'}`}>
-                  Store & TIN / VAT
+                  {t('settings.storeBrandNameDesc')}
                 </span>
               </div>
             </button>
@@ -290,9 +288,9 @@ export const SettingsView: React.FC = () => {
             >
               <Receipt size={17} className={activeTab === 'receipt' ? 'text-white' : 'text-primary'} />
               <div className="flex flex-col min-w-0">
-                <span className="truncate">{language === 'am' ? 'የደረሰኝ አቀማመጥ' : 'Receipt Layout'}</span>
+                <span className="truncate">{t('settings.tabReceipt')}</span>
                 <span className={`text-[10px] font-normal truncate ${activeTab === 'receipt' ? 'text-white/80' : 'text-text-dim'}`}>
-                  80mm thermal slip
+                  {t('settings.receiptLayoutDesc')}
                 </span>
               </div>
             </button>
@@ -309,9 +307,9 @@ export const SettingsView: React.FC = () => {
             >
               <DollarSign size={17} className={activeTab === 'fiscal' ? 'text-white' : 'text-primary'} />
               <div className="flex flex-col min-w-0">
-                <span className="truncate">{language === 'am' ? 'የቫት እና የገንዘብ ተመን' : 'Fiscal & Currency'}</span>
+                <span className="truncate">{t('settings.tabFiscal')}</span>
                 <span className={`text-[10px] font-normal truncate ${activeTab === 'fiscal' ? 'text-white/80' : 'text-text-dim'}`}>
-                  15% VAT & safe drop
+                  {t('settings.fiscalDesc')}
                 </span>
               </div>
             </button>
@@ -328,9 +326,9 @@ export const SettingsView: React.FC = () => {
             >
               <RefreshCw size={17} className={activeTab === 'sync' ? 'text-white' : 'text-primary'} />
               <div className="flex flex-col min-w-0">
-                <span className="truncate">{language === 'am' ? 'የማመሳሰል ክፍተቶች' : 'Sync & Cloud HQ'}</span>
+                <span className="truncate">{t('settings.tabSync')}</span>
                 <span className={`text-[10px] font-normal truncate ${activeTab === 'sync' ? 'text-white/80' : 'text-text-dim'}`}>
-                  Hub & intervals
+                  {t('settings.syncDesc')}
                 </span>
               </div>
             </button>
@@ -345,7 +343,7 @@ export const SettingsView: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 <Key size={15} className="text-primary group-hover:rotate-45 transition-transform" />
-                <span>Activation Codes</span>
+                <span>{t('settings.activationCodes')}</span>
               </div>
               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
                 LAN
@@ -359,7 +357,7 @@ export const SettingsView: React.FC = () => {
           {loading ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 py-16 text-text-muted">
               <Loader2 size={32} className="animate-spin text-primary" />
-              <p className="text-xs font-medium">Loading store configuration...</p>
+              <p className="text-xs font-medium">{t('settings.loadingConfig')}</p>
             </div>
           ) : (
             <>
@@ -369,10 +367,10 @@ export const SettingsView: React.FC = () => {
                   <div className="pb-3 border-b border-border-subtle flex items-center justify-between">
                     <div>
                       <h2 className="text-lg font-bold text-text-main">
-                        {language === 'am' ? 'የቅርንጫፍ መለያ እና የታክስ መረጃ' : 'Branch & Store Identification'}
+                        {t('settings.branchStoreIdent')}
                       </h2>
                       <p className="text-xs text-text-muted mt-0.5">
-                        These official details print on receipts, fiscal journals, and goods received notes.
+                        {t('settings.branchStoreIdentDesc')}
                       </p>
                     </div>
                   </div>
@@ -381,7 +379,7 @@ export const SettingsView: React.FC = () => {
                     {/* Store Brand Name */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        Store Brand Name
+                        {t('settings.storeName')}
                       </label>
                       <input
                         type="text"
@@ -395,8 +393,8 @@ export const SettingsView: React.FC = () => {
                     {/* Branch Code */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
-                        <span>Branch Identifier Code</span>
-                        <span className="text-[10px] font-normal text-text-dim">Assigned by HQ</span>
+                        <span>{t('settings.branchCode')}</span>
+                        <span className="text-[10px] font-normal text-text-dim">{t('settings.assignedByHq')}</span>
                       </label>
                       <input
                         type="text"
@@ -410,7 +408,7 @@ export const SettingsView: React.FC = () => {
                     {/* Registered Trade Name */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        Registered Trade Name (Legal Entity)
+                        {t('settings.tradeName')}
                       </label>
                       <input
                         type="text"
@@ -424,8 +422,8 @@ export const SettingsView: React.FC = () => {
                     {/* TIN Number */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
-                        <span>TIN (Taxpayer Identification No.)</span>
-                        <span className="text-[10px] font-normal text-text-dim">10 digits</span>
+                        <span>{t('settings.tinNumber')}</span>
+                        <span className="text-[10px] font-normal text-text-dim">{t('settings.tenDigits')}</span>
                       </label>
                       <input
                         type="text"
@@ -440,7 +438,7 @@ export const SettingsView: React.FC = () => {
                     {/* VAT Number */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        VAT Registration Number
+                        {t('settings.vatNumber')}
                       </label>
                       <input
                         type="text"
@@ -454,7 +452,7 @@ export const SettingsView: React.FC = () => {
                     {/* Store Phone */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        Store Phone Number
+                        {t('settings.phone')}
                       </label>
                       <div className="relative">
                         <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
@@ -472,7 +470,7 @@ export const SettingsView: React.FC = () => {
                   {/* Physical Address */}
                   <div>
                     <label className="text-xs font-bold text-text-muted block mb-1.5">
-                      Physical Store Address
+                      {t('settings.address')}
                     </label>
                     <div className="relative">
                       <MapPin size={16} className="absolute left-3.5 top-3 text-text-dim" />
@@ -497,12 +495,12 @@ export const SettingsView: React.FC = () => {
                       {savingKey === 'store_info' ? (
                         <>
                           <Loader2 size={16} className="animate-spin" />
-                          <span>Saving...</span>
+                          <span>{t('settings.saving')}</span>
                         </>
                       ) : (
                         <>
                           <Save size={16} />
-                          <span>Save Branch Details</span>
+                          <span>{t('settings.saveBranchDetails')}</span>
                         </>
                       )}
                     </button>
@@ -524,10 +522,10 @@ export const SettingsView: React.FC = () => {
                 <div className="max-w-5xl space-y-6 animate-in fade-in duration-200">
                   <div className="pb-3 border-b border-border-subtle">
                     <h2 className="text-lg font-bold text-text-main">
-                      {language === 'am' ? 'የ80ሚሜ ደረሰኝ አቀማመጥ እና ህግ' : 'Thermal POS Receipt Template'}
+                      {t('settings.thermalReceiptTemplate')}
                     </h2>
                     <p className="text-xs text-text-muted mt-0.5">
-                      Configure official headers, welcome greetings, return policy terms, and live layout.
+                      {t('settings.thermalReceiptDesc')}
                     </p>
                   </div>
 
@@ -537,7 +535,7 @@ export const SettingsView: React.FC = () => {
                       {/* Invoice Title */}
                       <div>
                         <label className="text-xs font-bold text-text-muted block mb-1.5">
-                          Official Invoice Title
+                          {t('settings.officialInvoiceTitle')}
                         </label>
                         <input
                           type="text"
@@ -553,7 +551,7 @@ export const SettingsView: React.FC = () => {
                       {/* Header Greeting */}
                       <div>
                         <label className="text-xs font-bold text-text-muted block mb-1.5">
-                          Header Welcome Greeting
+                          {t('settings.headerGreeting')}
                         </label>
                         <textarea
                           rows={2}
@@ -568,7 +566,7 @@ export const SettingsView: React.FC = () => {
                       {/* Footer Policy */}
                       <div>
                         <label className="text-xs font-bold text-text-muted block mb-1.5">
-                          Footer Policy / Return & Exchange Terms
+                          {t('settings.footerPolicy')}
                         </label>
                         <textarea
                           rows={3}
@@ -592,7 +590,7 @@ export const SettingsView: React.FC = () => {
                             className="w-4 h-4 rounded text-primary focus:ring-primary border-border-subtle"
                           />
                           <span className="text-xs font-bold text-text-main">
-                            Print Cashier Name on Slip
+                            {t('settings.printCashierName')}
                           </span>
                         </label>
 
@@ -606,7 +604,7 @@ export const SettingsView: React.FC = () => {
                             className="w-4 h-4 rounded text-primary focus:ring-primary border-border-subtle"
                           />
                           <span className="text-xs font-bold text-text-main">
-                            Print Branch TIN & VAT Registration Number
+                            {t('settings.printTinVat')}
                           </span>
                         </label>
                       </div>
@@ -626,7 +624,7 @@ export const SettingsView: React.FC = () => {
                           ) : (
                             <>
                               <Save size={16} />
-                              <span>Save Receipt Layout</span>
+                              <span>{t('settings.saveReceiptLayout')}</span>
                             </>
                           )}
                         </button>
@@ -638,10 +636,10 @@ export const SettingsView: React.FC = () => {
                       <div className="flex items-center justify-between text-xs font-bold text-text-muted px-1">
                         <span className="flex items-center gap-1.5">
                           <Eye size={14} className="text-primary" />
-                          <span>Live 80mm ESC/POS Slip Preview</span>
+                          <span>{t('settings.liveSlipPreview')}</span>
                         </span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-soft text-primary font-mono">
-                          Simulated
+                          {t('settings.simulated')}
                         </span>
                       </div>
 
@@ -713,10 +711,10 @@ export const SettingsView: React.FC = () => {
                 <div className="max-w-3xl space-y-6 animate-in fade-in duration-200">
                   <div className="pb-3 border-b border-border-subtle">
                     <h2 className="text-lg font-bold text-text-main">
-                      {language === 'am' ? 'የኢትዮጵያ የታክስ እና የገንዘብ ደንቦች' : 'Ethiopian Fiscal & Currency Settings'}
+                      {t('settings.ethiopianFiscalSettings')}
                     </h2>
                     <p className="text-xs text-text-muted mt-0.5">
-                      National standard rates conforming to Ministry of Revenues directives.
+                      {t('settings.ethiopianFiscalDesc')}
                     </p>
                   </div>
 
@@ -724,7 +722,7 @@ export const SettingsView: React.FC = () => {
                     {/* Currency */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        National Currency
+                        {t('settings.nationalCurrency')}
                       </label>
                       <input
                         type="text"
@@ -733,14 +731,14 @@ export const SettingsView: React.FC = () => {
                         className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-muted cursor-not-allowed"
                       />
                       <span className="text-[10px] text-text-dim mt-1 block">
-                        Base transactional currency for all branches
+                        {t('settings.nationalCurrencyDesc')}
                       </span>
                     </div>
 
                     {/* Standard VAT Rate */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
-                        <span>Standard Value Added Tax (VAT)</span>
+                        <span>{t('settings.vatRateLabel')}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
                           {(fiscalConfig.vatRate * 100).toFixed(0)}%
                         </span>
@@ -760,14 +758,14 @@ export const SettingsView: React.FC = () => {
                         />
                       </div>
                       <span className="text-[10px] text-text-dim mt-1 block">
-                        Applied on standard taxable goods (e.g. 0.15 for 15%)
+                        {t('settings.vatRateDesc')}
                       </span>
                     </div>
 
                     {/* Withholding Tax */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
-                        <span>Withholding Tax (Suppliers &gt; 10k ETB)</span>
+                        <span>{t('settings.withholdingTaxLabel')}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
                           {(fiscalConfig.withholdingTaxRate * 100).toFixed(0)}%
                         </span>
@@ -787,14 +785,14 @@ export const SettingsView: React.FC = () => {
                         className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                       />
                       <span className="text-[10px] text-text-dim mt-1 block">
-                        Deducted from wholesale payments above 10,000 ETB
+                        {t('settings.withholdingTaxDesc')}
                       </span>
                     </div>
 
                     {/* Safe Drop Alert Limit */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        Cash Register Safe Drop Alert Limit (ETB)
+                        {t('settings.safeDropAlertLimit')}
                       </label>
                       <div className="relative">
                         <Coins size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
@@ -813,10 +811,75 @@ export const SettingsView: React.FC = () => {
                         />
                       </div>
                       <span className="text-[10px] text-text-dim mt-1 block">
-                        Prompts cashier to execute a safe drop to vault when cash drawer exceeds limit
+                        {t('settings.safeDropDesc')}
                       </span>
                     </div>
                   </div>
+
+
+                    {/* Calendar System Preference */}
+                    <div className="sm:col-span-2 p-4 rounded-2xl bg-surface-2 dark:bg-[#162032] border border-border-subtle dark:border-[#334155] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-text-main dark:text-[#F8FAFC] block">
+                            {t('settings.calendarPreference')}
+                          </label>
+                          <p className="text-[11px] text-text-muted dark:text-[#94A3B8] mt-0.5">
+                            {t('settings.calendarHelp')}
+                          </p>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary dark:text-[#10B981] border border-primary/20">
+                          {calendar === 'ethiopic' ? t('settings.calendarEthiopian') : t('settings.calendarGregorian')}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        <label
+                          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                            calendar === 'gregorian'
+                              ? 'bg-primary/10 border-primary text-primary dark:text-[#34D399]'
+                              : 'bg-input dark:bg-[#162032] border-border-subtle dark:border-[#334155] text-text-muted hover:border-text-dim'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="calendarPreference"
+                            value="gregorian"
+                            checked={calendar === 'gregorian'}
+                            onChange={() => setCalendar('gregorian')}
+                            className="text-primary focus:ring-primary"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-text-main dark:text-[#F8FAFC]">
+                              {t('settings.calendarGregorian')}
+                            </span>
+                            <span className="text-[10px] text-text-dim">e.g. Nov 7, 2026 (Africa/Addis_Ababa)</span>
+                          </div>
+                        </label>
+
+                        <label
+                          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                            calendar === 'ethiopic'
+                              ? 'bg-primary/10 border-primary text-primary dark:text-[#34D399]'
+                              : 'bg-input dark:bg-[#162032] border-border-subtle dark:border-[#334155] text-text-muted hover:border-text-dim'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="calendarPreference"
+                            value="ethiopic"
+                            checked={calendar === 'ethiopic'}
+                            onChange={() => setCalendar('ethiopic')}
+                            className="text-primary focus:ring-primary"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-text-main dark:text-[#F8FAFC]">
+                              {t('settings.calendarEthiopian')}
+                            </span>
+                            <span className="text-[10px] text-text-dim">ለምሳሌ፡ ጥቅምት 28/2019 ዓ.ም (አዲስ አበባ)</span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
 
                   <div className="pt-4">
                     <button
@@ -833,7 +896,7 @@ export const SettingsView: React.FC = () => {
                       ) : (
                         <>
                           <Save size={16} />
-                          <span>Save Fiscal Parameters</span>
+                          <span>{t('settings.saveFiscalParams')}</span>
                         </>
                       )}
                     </button>
@@ -847,10 +910,10 @@ export const SettingsView: React.FC = () => {
                   <div className="pb-3 border-b border-border-subtle flex items-center justify-between">
                     <div>
                       <h2 className="text-lg font-bold text-text-main">
-                        {language === 'am' ? 'የማዕከላዊ ዋና መስሪያ ቤት ማመሳሰል' : 'Cloud HQ Hub Connectivity'}
+                        {t('settings.cloudHqConnectivity')}
                       </h2>
                       <p className="text-xs text-text-muted mt-0.5">
-                        Branch LAN sync intervals, upstream server endpoint, and offline grace limits.
+                        {t('settings.cloudHqDesc')}
                       </p>
                     </div>
 
@@ -861,7 +924,7 @@ export const SettingsView: React.FC = () => {
                       className="px-3.5 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main border border-border-subtle text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                     >
                       <Radio size={14} className={pingStatus === 'testing' ? 'animate-pulse text-warning' : 'text-primary'} />
-                      <span>{pingStatus === 'testing' ? 'Pinging HQ...' : 'Ping Test'}</span>
+                      <span>{pingStatus === 'testing' ? t('settings.pingingHq') : t('settings.pingHq')}</span>
                       {pingStatus === 'online' && <span className="w-2 h-2 rounded-full bg-success" />}
                       {pingStatus === 'offline' && <span className="w-2 h-2 rounded-full bg-danger" />}
                     </button>
@@ -870,7 +933,7 @@ export const SettingsView: React.FC = () => {
                   {/* HQ Server URL */}
                   <div>
                     <label className="text-xs font-bold text-text-muted block mb-1.5">
-                      Central Headquarters API URL
+                      {t('settings.centralHqApiUrl')}
                     </label>
                     <input
                       type="text"
@@ -880,7 +943,7 @@ export const SettingsView: React.FC = () => {
                       className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                     />
                     <span className="text-[10px] text-text-dim mt-1 block">
-                      Local branch outbox automatically queues transactions locally if offline
+                      {t('settings.centralHqApiUrlDesc')}
                     </span>
                   </div>
 
@@ -888,7 +951,7 @@ export const SettingsView: React.FC = () => {
                     {/* Auto Sync Interval */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        Auto-Sync Polling Interval (Seconds)
+                        {t('settings.autoSyncPollingInterval')}
                       </label>
                       <input
                         type="number"
@@ -904,14 +967,14 @@ export const SettingsView: React.FC = () => {
                         className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                       />
                       <span className="text-[10px] text-text-dim mt-1 block">
-                        Frequency of background inventory & sales batch uploads
+                        {t('settings.autoSyncPollingDesc')}
                       </span>
                     </div>
 
                     {/* Offline Grace Period */}
                     <div>
                       <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        Offline Grace Period (Hours)
+                        {t('settings.offlineGracePeriod')}
                       </label>
                       <input
                         type="number"
@@ -927,7 +990,7 @@ export const SettingsView: React.FC = () => {
                         className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                       />
                       <span className="text-[10px] text-text-dim mt-1 block">
-                        Permits branch POS to continue selling without HQ ping
+                        {t('settings.offlineGraceDesc')}
                       </span>
                     </div>
                   </div>
@@ -947,7 +1010,7 @@ export const SettingsView: React.FC = () => {
                       ) : (
                         <>
                           <Save size={16} />
-                          <span>Save Sync Settings</span>
+                          <span>{t('settings.saveSyncSettings')}</span>
                         </>
                       )}
                     </button>

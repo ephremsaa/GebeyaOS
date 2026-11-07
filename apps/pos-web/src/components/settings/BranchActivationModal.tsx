@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useI18n } from '../../i18n/I18nContext';
 import {
   Store,
   Key,
@@ -21,6 +22,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'generate' | 'activate'>('generate');
   const [branchName, setBranchName] = useState('');
   const [expiresInHours, setExpiresInHours] = useState(72);
@@ -37,7 +39,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activationSuccess, setActivationSuccess] = useState<any | null>(null);
 
-  const token = sessionStorage.getItem('gebeyaos_token') || localStorage.getItem('gebeyaos_token');
+  const token = localStorage.getItem('gebeyaos_access_token') || sessionStorage.getItem('gebeyaos_token') || localStorage.getItem('gebeyaos_token');
 
   const loadCodes = async () => {
     if (!token) return;
@@ -136,8 +138,8 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
               <Store size={20} />
             </div>
             <div>
-              <h3 className="font-bold text-base text-text-main">Branch Server Activation</h3>
-              <p className="text-[11px] text-text-muted">Single-use activation codes for remote store branches</p>
+              <h3 className="font-bold text-base text-text-main">{t('settings.modalTitle')}</h3>
+              <p className="text-[11px] text-text-muted">{t('settings.modalSubtitle')}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-main p-1 rounded-lg transition-colors">
@@ -153,7 +155,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
               activeTab === 'generate' ? 'bg-surface text-primary shadow-xs font-bold' : 'text-text-muted hover:text-text-main'
             }`}
           >
-            Generate Activation Code (HQ Owner)
+            {t('settings.tabGenerate')}
           </button>
           <button
             onClick={() => setActiveTab('activate')}
@@ -161,7 +163,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
               activeTab === 'activate' ? 'bg-surface text-primary shadow-xs font-bold' : 'text-text-muted hover:text-text-main'
             }`}
           >
-            Register Branch LAN Server
+            {t('settings.tabActivate')}
           </button>
         </div>
 
@@ -180,7 +182,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
                   <Key size={20} />
                 </div>
                 <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                  One-Time Branch Activation Code:
+                  {t('settings.activationCodeLabel')}
                 </div>
                 <div className="font-mono text-2xl font-bold tracking-widest text-primary bg-surface py-3 rounded-xl border border-border-subtle select-all">
                   {generatedCodeResult.code}
@@ -193,20 +195,20 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
                     onClick={() => copyCode(generatedCodeResult.code)}
                     className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold flex items-center gap-1.5 shadow-sm transition-colors"
                   >
-                    {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy Code'}
+                    {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? t('settings.copied') : t('settings.copyCode')}
                   </button>
                   <button
                     onClick={() => setGeneratedCodeResult(null)}
                     className="px-4 py-2 rounded-xl bg-surface-2 border border-border-subtle text-text-main hover:bg-surface font-semibold transition-colors"
                   >
-                    Done
+                    {t('settings.close')}
                   </button>
                 </div>
               </div>
             ) : (
               <form onSubmit={handleGenerate} className="space-y-4">
                 <div>
-                  <label className="block font-semibold text-text-muted mb-1">New Branch Name</label>
+                  <label className="block font-semibold text-text-muted mb-1">{t('settings.branchNameLabel')}</label>
                   <input
                     type="text"
                     required
@@ -218,7 +220,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-text-muted mb-1">Code Expiration</label>
+                  <label className="block font-semibold text-text-muted mb-1">{t('settings.validityHours')}</label>
                   <select
                     value={expiresInHours}
                     onChange={(e) => setExpiresInHours(parseInt(e.target.value, 10))}
@@ -236,7 +238,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
                   className="w-full py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold flex items-center justify-center gap-2 shadow-md disabled:opacity-50 transition-colors"
                 >
                   {isLoading ? <RefreshCw size={14} className="animate-spin" /> : <Key size={14} />}
-                  Generate Activation Code
+                  {t('settings.generateCodeBtn')}
                 </button>
               </form>
             )}
@@ -245,7 +247,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
             {codesList.length > 0 && (
               <div className="pt-2">
                 <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2">
-                  Recent Activation Codes
+                  {t('settings.activeGeneratedCodes')}
                 </div>
                 <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 font-mono text-[11px]">
                   {codesList.map((c) => (
@@ -290,7 +292,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
                 <div className="w-12 h-12 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
                   <CheckCircle2 size={24} />
                 </div>
-                <h4 className="font-bold text-text-main text-base">Branch Server Activated!</h4>
+                <h4 className="font-bold text-text-main text-base">{t('settings.branchActivatedSuccess')}</h4>
                 <p className="text-text-muted text-xs">
                   This branch server is now connected to <strong className="text-text-main">{activationSuccess.tenantName}</strong> as branch{' '}
                   <strong className="text-primary font-mono">{activationSuccess.branchCode} ({activationSuccess.branchName})</strong>.
@@ -302,14 +304,14 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
                   }}
                   className="px-6 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold transition-colors"
                 >
-                  Close & Start Operations
+                  {t('settings.close')}
                 </button>
               </div>
             ) : (
               <form onSubmit={handleActivate} className="space-y-4">
                 <div>
                   <label className="block font-semibold text-text-muted mb-1">
-                    8-Character Activation Code
+                    {t('settings.enterActivationCode')}
                   </label>
                   <input
                     type="text"
@@ -324,7 +326,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
 
                 <div>
                   <label className="block font-semibold text-text-muted mb-1">
-                    Branch Code Identifier (Optional)
+                    {t('settings.branchCodeOptional')}
                   </label>
                   <input
                     type="text"
@@ -346,7 +348,7 @@ export const BranchActivationModal: React.FC<BranchActivationModalProps> = ({
                   className="w-full py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold flex items-center justify-center gap-2 shadow-md disabled:opacity-50 transition-colors"
                 >
                   {isActivating ? <RefreshCw size={14} className="animate-spin" /> : <Server size={14} />}
-                  Activate Branch Server
+                  {t('settings.activateBranchBtn')}
                 </button>
               </form>
             )}
