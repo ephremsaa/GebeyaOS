@@ -10,7 +10,7 @@ interface TerminalPairModalProps {
 
 export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, onClose }) => {
   const { terminalConfig, pairTerminal, currentUser, assignedBranches } = useAuth();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   const [terminalCode, setTerminalCode] = useState(terminalConfig?.terminalCode || 'POS-01');
   const [terminalName, setTerminalName] = useState(terminalConfig?.terminalName || 'Express Lane 1');
@@ -44,7 +44,7 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
     if (res.success && res.terminal) {
       setSuccessResult(res.terminal);
     } else {
-      setError(res.error || 'Failed to pair terminal');
+      setError(res.error || (language === 'am' ? 'ተርሚናሉን ማገናኘት አልተቻለም' : 'Failed to pair terminal'));
     }
   };
 
@@ -61,8 +61,8 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
               <Terminal size={20} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-text-main">{t('pairTerminalTitle')}</h2>
-              <p className="text-[11px] text-text-muted">{t('pairTerminalDesc')}</p>
+              <h2 className="text-base font-bold text-text-main">{t('auth.terminalPairTitle')}</h2>
+              <p className="text-[11px] text-text-muted">{t('auth.terminalPairDesc')}</p>
             </div>
           </div>
           <button
@@ -75,7 +75,7 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
         </div>
 
         {error && (
-          <div className="p-3 rounded-2xl bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-2xl bg-danger/10 text-danger border border-danger/20 text-xs flex items-center gap-2">
             <AlertTriangle size={15} className="shrink-0" />
             <span>{error}</span>
           </div>
@@ -86,28 +86,31 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex flex-col gap-2">
               <div className="flex items-center gap-2 font-bold text-sm">
                 <CheckCircle2 size={18} />
-                <span>Terminal Paired Successfully!</span>
+                <span>{language === 'am' ? 'ተርሚናሉ በተሳካ ሁኔታ ተገናኝቷል!' : 'Terminal Paired Successfully!'}</span>
               </div>
               <p className="text-[11px] leading-relaxed">
-                This physical POS device is now securely paired with branch register{' '}
-                <strong>{successResult.terminalCode}</strong> ({successResult.terminalName}).
+                {language === 'am'
+                  ? `ይህ የመሸጫ መሳሪያ ከቅርንጫፍ መመዝገቢያ ${successResult.terminalCode} (${successResult.terminalName}) ጋር ተገናኝቷል።`
+                  : `This physical POS device is now securely paired with branch register ${successResult.terminalCode} (${successResult.terminalName}).`}
               </p>
             </div>
 
             <div className="p-3 rounded-2xl bg-surface-2 border border-border-subtle text-xs flex flex-col gap-2">
               <div>
-                <span className="text-text-muted">Terminal ID:</span>
+                <span className="text-text-muted">{language === 'am' ? 'የተርሚናል መለያ፡' : 'Terminal ID:'}</span>
                 <p className="font-mono text-text-main">{successResult.terminalId}</p>
               </div>
               <div>
-                <span className="text-text-muted">Device Token (Hashed at HQ):</span>
+                <span className="text-text-muted">{language === 'am' ? 'የመሳሪያ ደህንነት ቶከን፡' : 'Device Token:'}</span>
                 <p className="font-mono text-[11px] text-primary truncate">
                   {successResult.deviceToken}
                 </p>
               </div>
               <div>
-                <span className="text-text-muted">Auto-Lock Inactivity:</span>
-                <p className="font-bold text-text-main">{successResult.autoLockMinutes} minutes</p>
+                <span className="text-text-muted">{t('auth.autoLockMinutesLabel')}</span>
+                <p className="font-bold text-text-main">
+                  {successResult.autoLockMinutes} {language === 'am' ? 'ደቂቃዎች' : 'minutes'}
+                </p>
               </div>
             </div>
 
@@ -116,14 +119,14 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
               onClick={onClose}
               className="btn-primary w-full py-2.5 rounded-2xl font-bold text-xs"
             >
-              Done
+              {t('common.done')}
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
               <label className="block text-xs font-semibold text-text-main mb-1">
-                {t('terminalCodeLabel')}
+                {t('auth.terminalCodeLabel')}
               </label>
               <input
                 type="text"
@@ -137,7 +140,7 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
 
             <div>
               <label className="block text-xs font-semibold text-text-main mb-1">
-                {t('terminalNameLabel')}
+                {t('auth.terminalNameLabel')}
               </label>
               <input
                 type="text"
@@ -152,7 +155,7 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
             {assignedBranches.length > 1 && (
               <div>
                 <label className="block text-xs font-semibold text-text-main mb-1">
-                  Branch Assignment
+                  {t('common.branch')}
                 </label>
                 <select
                   value={branchId}
@@ -170,17 +173,17 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
 
             <div>
               <label className="block text-xs font-semibold text-text-main mb-1">
-                {t('autoLockMinutesLabel')}
+                {t('auth.autoLockMinutesLabel')}
               </label>
               <select
                 value={autoLockMinutes}
                 onChange={(e) => setAutoLockMinutes(parseInt(e.target.value, 10))}
                 className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs text-text-main focus:outline-hidden focus:border-primary"
               >
-                <option value={1}>1 Minute (Strict Security)</option>
-                <option value={3}>3 Minutes (Standard Retail)</option>
-                <option value={5}>5 Minutes (Busy Store)</option>
-                <option value={10}>10 Minutes (Extended)</option>
+                <option value={1}>{language === 'am' ? '1 ደቂቃ (ከፍተኛ ጥበቃ)' : '1 Minute (Strict Security)'}</option>
+                <option value={3}>{language === 'am' ? '3 ደቂቃዎች (መደበኛ)' : '3 Minutes (Standard Retail)'}</option>
+                <option value={5}>{language === 'am' ? '5 ደቂቃዎች (ስራ የሚበዛበት)' : '5 Minutes (Busy Store)'}</option>
+                <option value={10}>{language === 'am' ? '10 ደቂቃዎች' : '10 Minutes (Extended)'}</option>
               </select>
             </div>
 
@@ -189,7 +192,11 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
               disabled={isLoading || !terminalCode.trim()}
               className="btn-primary w-full py-3 rounded-2xl font-bold text-xs uppercase tracking-wider mt-1"
             >
-              {isLoading ? 'Pairing Terminal...' : t('pairTerminalAction')}
+              {isLoading
+                ? language === 'am'
+                  ? 'ተርሚናል በማገናኘት ላይ...'
+                  : 'Pairing Terminal...'
+                : t('auth.pairTerminalAction')}
             </button>
           </form>
         )}
@@ -197,4 +204,3 @@ export const TerminalPairModal: React.FC<TerminalPairModalProps> = ({ isOpen, on
     </div>
   );
 };
-

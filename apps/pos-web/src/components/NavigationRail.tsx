@@ -8,8 +8,6 @@ import {
   RefreshCw,
   Users,
   Settings,
-  HardDrive,
-  ShieldCheck,
   Tag,
   ClipboardList,
 } from 'lucide-react';
@@ -41,20 +39,20 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   activeTab,
   onTabChange,
 }) => {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const { hasPermission, hasRole } = useAuth();
 
   // Primary POS tabs on top
   const primaryTabs = [
     {
       id: 'checkout' as NavTabId,
-      label: t('posTab'),
+      label: t('common.posTab'),
       icon: <ShoppingCart size={22} strokeWidth={1.75} />,
       allowed: hasPermission('pos:sale:create') || hasRole('CASHIER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'shifts' as NavTabId,
-      label: t('shiftTab'),
+      label: t('common.shiftTab'),
       icon: <Clock size={22} strokeWidth={1.75} />,
       allowed: hasPermission('pos:shift:open') || hasPermission('pos:shift:close') || hasRole('CASHIER', 'BRANCH_MANAGER', 'OWNER'),
     },
@@ -64,49 +62,49 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   const secondaryTabs = [
     {
       id: 'inventory' as NavTabId,
-      label: t('inventoryTab'),
+      label: t('common.inventoryTab'),
       icon: <Package size={22} strokeWidth={1.75} />,
       allowed: hasPermission('inventory:stock:view') || hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'purchasing' as NavTabId,
-      label: t('purchasingTab'),
+      label: t('common.purchasingTab'),
       icon: <Truck size={22} strokeWidth={1.75} />,
       allowed: hasPermission('purchasing:grn:receive') || hasPermission('purchasing:po:create') || hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'reports' as NavTabId,
-      label: t('reportsTab'),
+      label: t('common.reportsTab'),
       icon: <BarChart3 size={22} strokeWidth={1.75} />,
       allowed: hasPermission('reports:branch:view') || hasRole('ACCOUNTANT', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'sync' as NavTabId,
-      label: t('syncTab'),
+      label: t('common.syncTab'),
       icon: <RefreshCw size={22} strokeWidth={1.75} />,
       allowed: hasRole('HQ_ADMIN', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'catalog' as NavTabId,
-      label: language === 'am' ? 'ካታሎግ' : 'Catalog',
+      label: t('common.catalogTab'),
       icon: <Tag size={20} strokeWidth={1.75} />,
       allowed: hasPermission('catalog:cost:view') || hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'stocktake' as NavTabId,
-      label: language === 'am' ? 'ቆጠራ' : 'Stocktake',
+      label: t('common.stocktakeTab'),
       icon: <ClipboardList size={20} strokeWidth={1.75} />,
       allowed: hasPermission('inventory:stocktake:execute') || hasRole('CASHIER', 'STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'users' as NavTabId,
-      label: t('usersTab'),
+      label: t('common.usersTab'),
       icon: <Users size={20} strokeWidth={1.75} />,
       allowed: hasPermission('admin:users:manage') || hasRole('BRANCH_MANAGER', 'OWNER'),
     },
     {
       id: 'settings' as NavTabId,
-      label: language === 'am' ? 'ቅንብሮች' : 'Settings',
+      label: t('common.settingsTab'),
       icon: <Settings size={20} strokeWidth={1.75} />,
       allowed: hasRole('BRANCH_MANAGER', 'OWNER'),
     },
@@ -116,7 +114,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   const allowedSecondary = secondaryTabs.filter((t) => t.allowed);
 
   return (
-    <nav className="w-[84px] min-w-[84px] bg-sidebar border-r border-border-subtle flex flex-col items-center py-3.5 justify-between flex-shrink-0 select-none z-20 overflow-y-auto no-scrollbar">
+    <nav className="w-[88px] min-w-[88px] bg-sidebar border-r border-border-subtle flex flex-col items-center py-3.5 justify-between flex-shrink-0 select-none z-20 overflow-y-auto no-scrollbar">
       <div className="flex flex-col gap-1 w-full px-2">
         {/* Top: Checkout & Shift */}
         {allowedPrimary.map((item) => {

@@ -1,22 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Store,
-  Globe,
+  Search,
+  Bell,
   Moon,
   Sun,
-  LogOut,
+  Globe,
+  Store,
   Wifi,
   Lock,
+  KeyRound,
+  LogOut,
+  Shield,
   RotateCcw,
   CheckCircle2,
-  KeyRound,
-  Shield,
-  Search,
   Terminal,
 } from 'lucide-react';
-import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
-import { StatusDot, Modal, Button, Input } from './ui';
+import { useI18n } from '../i18n/I18nContext';
+import { Button, Modal, Input } from './ui';
 import { UserProfileModal } from './auth/UserProfileModal';
 import { TerminalPairModal } from './auth/TerminalPairModal';
 
@@ -31,30 +32,33 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenNotifications,
   unreadNotificationsCount = 0,
 }) => {
-  const { language, setLanguage, t, isDarkMode, toggleDarkMode, setUserThemePreference } = useI18n();
   const { currentUser, logout, lockSession, switchCashier, updateUserPassword, updateUserPin } = useAuth();
+  const { t, language, setLanguage, isDarkMode, toggleDarkMode } = useI18n();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isTerminalPairModalOpen, setIsTerminalPairModalOpen] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isTerminalPairModalOpen, setIsTerminalPairModalOpen] = useState(false);
 
-  // Password change state
+  // Password modal state
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [passError, setPassError] = useState<string | null>(null);
 
-  // PIN change state
+  // PIN modal state
   const [newPin, setNewPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
 
+  // Toast / feedback message
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Close dropdown on click outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
     };
@@ -68,7 +72,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     e.preventDefault();
     setPassError(null);
     if (newPass.length < 8) {
-      setPassError('New password must be at least 8 characters long.');
+      setPassError(language === 'am' ? 'የይለፍ ቃል ቢያንስ 8 ፊደላት መሆን አለበት።' : 'New password must be at least 8 characters long.');
       return;
     }
     const res = await updateUserPassword(currentPass, newPass);
@@ -76,10 +80,10 @@ export const TopBar: React.FC<TopBarProps> = ({
       setIsPassModalOpen(false);
       setCurrentPass('');
       setNewPass('');
-      setSuccessMsg('Password updated successfully.');
+      setSuccessMsg(t('auth.passwordChangedSuccess'));
       setTimeout(() => setSuccessMsg(null), 3000);
     } else {
-      setPassError(res.error || 'Failed to update password');
+      setPassError(res.error || (language === 'am' ? 'የይለፍ ቃል መቀየር አልተቻለም' : 'Failed to update password'));
     }
   };
 
@@ -87,46 +91,67 @@ export const TopBar: React.FC<TopBarProps> = ({
     e.preventDefault();
     setPinError(null);
     if (newPin.length < 4 || newPin.length > 6) {
-      setPinError('PIN must be 4 to 6 digits.');
+      setPinError(language === 'am' ? 'ፒን ከ4 እስከ 6 አሃዝ መሆን አለበት።' : 'PIN must be 4 to 6 digits.');
       return;
     }
     const res = await updateUserPin(newPin);
     if (res.success) {
       setIsPinModalOpen(false);
       setNewPin('');
-      setSuccessMsg('Cashier PIN updated successfully.');
+      setSuccessMsg(t('auth.pinChangedSuccess'));
       setTimeout(() => setSuccessMsg(null), 3000);
     } else {
-      setPinError(res.error || 'Failed to update PIN');
+      setPinError(res.error || (language === 'am' ? 'ፒን መቀየር አልተቻለም' : 'Failed to update PIN'));
     }
   };
 
   const handleToggleTheme = () => {
-    const nextDark = !isDarkMode;
+    toggleDarkMode();
     if (currentUser?.id) {
-      setUserThemePreference(currentUser.id, nextDark);
-    } else {
-      toggleDarkMode();
+      const newTheme = !isDarkMode ? 'dark' : 'light';
+      localStorage.setItem(`gebeya_theme_${currentUser.id}`, newTheme);
     }
   };
 
-  const cashierName = currentUser?.fullName || 'Cashier';
-  const roleName = currentUser?.role || 'CASHIER';
+  const cashierName = currentUser?.fullName || t('common.cashier');
+
+  const getTranslatedRole = (role?: string) => {
+    switch (role) {
+      case 'STORE_OWNER':
+      case 'OWNER':
+        return t('staff.roleStoreOwner');
+      case 'BRANCH_MANAGER':
+        return t('staff.roleBranchManager');
+      case 'CASHIER':
+        return t('staff.roleCashier');
+      case 'STOREKEEPER':
+        return t('staff.roleStorekeeper');
+      default:
+        return role || t('staff.roleCashier');
+    }
+  };
 
   return (
     <header className="h-14 px-5 bg-surface border-b border-border-subtle flex items-center justify-between flex-shrink-0 relative z-30 select-none">
-      {/* Left: Logo, Wordmark, thin divider, Branch Pill */}
-      <div className="flex items-center gap-3">
+      {/* Left: Product Logo, Brand, Store Badge, and Branch Pill */}
+      <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-soft flex-shrink-0">
           <Store size={18} strokeWidth={1.75} />
         </div>
-        <span className="font-semibold text-lg tracking-tight text-text-main">
-          {currentUser?.tenantName || t('appName')}
-        </span>
+        <div className="flex items-baseline gap-2">
+          <span className="font-bold text-lg tracking-tight text-text-main">
+            {t('common.appName')}
+          </span>
+          {currentUser?.tenantName && (
+            <span className="hidden md:inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md bg-surface-2 text-text-muted border border-border-subtle">
+              {currentUser.tenantName.trim()}
+            </span>
+          )}
+        </div>
         <div className="h-4 w-px bg-border-subtle mx-1 hidden sm:block" />
         <div className="hidden sm:flex items-center gap-2 text-[13px] font-medium px-3 py-1 rounded-full bg-surface-2 text-text-muted border border-border-subtle">
           <span className="w-2 h-2 rounded-full bg-primary" />
-          <span>{currentUser?.branchName || t('branchName')}</span>
+          <span>{currentUser?.branchName || t('common.branchName')}</span>
         </div>
       </div>
 
@@ -143,26 +168,44 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           type="button"
           onClick={onOpenCommandPalette}
-          className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-2 hover:bg-border-subtle border border-border-subtle text-text-muted hover:text-text-main text-xs font-medium transition-all cursor-pointer w-64 justify-between shadow-soft"
+          className="hidden md:flex items-center justify-between w-80 max-w-sm px-3.5 py-1.5 rounded-xl bg-surface-2 hover:bg-border-subtle text-text-muted text-xs border border-border-subtle transition-all duration-fast cursor-pointer group shadow-soft"
+          aria-label={t('common.commandPalette')}
         >
-          <span className="flex items-center gap-2 truncate">
-            <Search size={14} className="text-primary" />
-            <span>{language === 'am' ? 'እቃ፣ ትዕዛዝ ፈልግ...' : 'Search items, actions...'}</span>
-          </span>
-          <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-surface rounded border border-border-subtle text-text-dim">
+          <div className="flex items-center gap-2 text-text-dim group-hover:text-text-muted">
+            <Search size={14} strokeWidth={1.75} />
+            <span className="text-[13px]">{t('common.searchPlaceholder')}</span>
+          </div>
+          <kbd className="px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-[10px] font-mono text-text-dim">
             Ctrl+K
           </kbd>
         </button>
       )}
 
-      {/* Right: Quick Controls, Sync Status Dot, User Avatar Menu */}
-      <div className="flex items-center gap-2.5">
-        {/* Quick Language Toggle */}
-        <div className="flex items-center bg-surface-2 rounded-full p-0.5 border border-border-subtle">
+      {/* Right Controls: Notifications, Language, Theme, Status & User Menu */}
+      <div className="flex items-center gap-2">
+        {/* Notifications Icon Button */}
+        {onOpenNotifications && (
+          <button
+            type="button"
+            onClick={onOpenNotifications}
+            className="relative w-8 h-8 rounded-full bg-surface-2 hover:bg-border-subtle border border-border-subtle flex items-center justify-center text-text-muted hover:text-text-main transition-colors cursor-pointer shadow-soft"
+            aria-label="Notifications"
+          >
+            <Bell size={16} strokeWidth={1.75} />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-surface">
+                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Language Switcher Pill */}
+        <div className="flex items-center bg-surface-2 p-0.5 rounded-full border border-border-subtle shadow-soft">
           <button
             type="button"
             onClick={() => setLanguage('en')}
-            className={`px-2 py-0.5 text-xs font-bold rounded-full transition-all ${
+            className={`px-2 py-0.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
               language === 'en' ? 'bg-primary text-white shadow-soft' : 'text-text-muted hover:text-text-main'
             }`}
           >
@@ -171,7 +214,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             type="button"
             onClick={() => setLanguage('am')}
-            className={`px-2 py-0.5 text-xs font-bold rounded-full transition-all ${
+            className={`px-2 py-0.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
               language === 'am' ? 'bg-primary text-white shadow-soft' : 'text-text-muted hover:text-text-main'
             }`}
           >
@@ -183,7 +226,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           type="button"
           onClick={handleToggleTheme}
-          title={isDarkMode ? 'Switch to Light Mode (Emerald Professional)' : 'Switch to Dark Mode (Midnight Emerald)'}
+          title={isDarkMode ? t('common.lightMode') : t('common.darkMode')}
           className="w-8 h-8 rounded-full bg-surface-2 hover:bg-border-subtle border border-border-subtle flex items-center justify-center text-text-muted hover:text-primary transition-all cursor-pointer shadow-soft active:scale-95"
         >
           {isDarkMode ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-slate-600" />}
@@ -195,7 +238,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
           </span>
-          <span className="text-[12px] font-medium">{t('online')}</span>
+          <span className="text-[12px] font-medium">{t('common.online')}</span>
         </div>
 
         {/* User Avatar Menu Trigger */}
@@ -232,7 +275,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                     </div>
                   </div>
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary-soft text-primary">
-                    {roleName}
+                    {getTranslatedRole(currentUser?.role)}
                   </span>
                 </div>
 
@@ -241,7 +284,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 <div className="flex items-center justify-between text-xs text-text-muted">
                   <span className="flex items-center gap-1.5 text-primary font-medium">
                     <Wifi size={13} strokeWidth={1.75} />
-                    {t('online')}
+                    {t('common.online')}
                   </span>
                   <span className="font-mono text-[11px] text-text-dim">Branch LAN</span>
                 </div>
@@ -258,7 +301,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   }}
                   leftIcon={<RotateCcw size={13} strokeWidth={1.75} className="text-primary" />}
                 >
-                  {t('switchCashier')}
+                  {t('auth.switchCashier')}
                 </Button>
 
                 <Button
@@ -270,7 +313,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   }}
                   leftIcon={<Lock size={13} strokeWidth={1.75} className="text-warning" />}
                 >
-                  {t('lockTerminal')}
+                  {t('auth.lockTerminal')}
                 </Button>
               </div>
 
@@ -285,7 +328,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                 >
                   <Shield size={14} strokeWidth={1.75} className="text-primary" />
-                  {t('profileModalTitle')}
+                  {t('auth.profileModalTitle')}
                 </button>
                 <button
                   type="button"
@@ -296,7 +339,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                 >
                   <Lock size={14} strokeWidth={1.75} className="text-text-dim" />
-                  {t('changePassword')}
+                  {t('auth.changePassword')}
                 </button>
                 <button
                   type="button"
@@ -307,7 +350,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                 >
                   <KeyRound size={14} strokeWidth={1.75} className="text-text-dim" />
-                  {t('changePin')}
+                  {t('auth.changePin')}
                 </button>
                 {(currentUser?.role === 'OWNER' || currentUser?.role === 'BRANCH_MANAGER') && (
                   <button
@@ -319,7 +362,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                   >
                     <Terminal size={14} strokeWidth={1.75} className="text-primary" />
-                    {t('pairTerminalTitle')}
+                    {t('auth.terminalPairTitle')}
                   </button>
                 )}
               </div>
@@ -328,7 +371,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               <div className="flex items-center justify-between px-2 py-1 text-xs">
                 <span className="flex items-center gap-2 text-text-muted">
                   <Globe size={14} strokeWidth={1.75} />
-                  {t('language')}
+                  {t('common.language')}
                 </span>
                 <div className="flex bg-surface-2 p-0.5 rounded-lg border border-border-subtle">
                   <button
@@ -360,14 +403,14 @@ export const TopBar: React.FC<TopBarProps> = ({
               <div className="flex items-center justify-between px-2 py-1 text-xs">
                 <span className="flex items-center gap-2 text-text-muted">
                   {isDarkMode ? <Moon size={14} strokeWidth={1.75} /> : <Sun size={14} strokeWidth={1.75} />}
-                  {t('theme')}
+                  {t('common.theme')}
                 </span>
                 <button
                   type="button"
                   onClick={handleToggleTheme}
                   className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface-2 hover:bg-surface text-text-main transition-colors border border-border-subtle cursor-pointer shadow-soft"
                 >
-                  {isDarkMode ? t('darkMode') : t('lightMode')}
+                  {isDarkMode ? t('common.darkMode') : t('common.lightMode')}
                 </button>
               </div>
 
@@ -383,7 +426,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold text-danger hover:bg-danger-soft transition-colors text-left cursor-pointer"
               >
                 <LogOut size={14} strokeWidth={1.75} />
-                {t('logout')}
+                {t('common.logout')}
               </button>
             </div>
           )}
@@ -395,7 +438,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <Modal
           isOpen={isPassModalOpen}
           onClose={() => setIsPassModalOpen(false)}
-          title={t('changePassword')}
+          title={t('auth.changePassword')}
           maxWidth="sm"
         >
           {passError && (
@@ -405,14 +448,14 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
           <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
             <Input
-              label={t('currentPassword')}
+              label={t('auth.currentPassword')}
               type="password"
               required
               value={currentPass}
               onChange={(e) => setCurrentPass(e.target.value)}
             />
             <Input
-              label={`${t('newPassword')} (min 8 chars)`}
+              label={`${t('auth.newPassword')} (min 8 chars)`}
               type="password"
               required
               minLength={8}
@@ -426,10 +469,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                 fullWidth
                 onClick={() => setIsPassModalOpen(false)}
               >
-                {t('cancel')}
+                {t('common.cancel')}
               </Button>
               <Button type="submit" variant="primary" fullWidth>
-                {t('saveChanges')}
+                {t('common.saveChanges')}
               </Button>
             </div>
           </form>
@@ -441,7 +484,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <Modal
           isOpen={isPinModalOpen}
           onClose={() => setIsPinModalOpen(false)}
-          title={t('changePin')}
+          title={t('auth.changePin')}
           maxWidth="sm"
         >
           {pinError && (
@@ -451,7 +494,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
           <form onSubmit={handleChangePin} className="flex flex-col gap-3">
             <Input
-              label={`${t('newPin')} (4-6 digits)`}
+              label={`${t('auth.newPin')} (4-6 digits)`}
               type="password"
               required
               maxLength={6}
@@ -466,10 +509,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                 fullWidth
                 onClick={() => setIsPinModalOpen(false)}
               >
-                {t('cancel')}
+                {t('common.cancel')}
               </Button>
               <Button type="submit" variant="primary" fullWidth>
-                {t('saveChanges')}
+                {t('common.saveChanges')}
               </Button>
             </div>
           </form>

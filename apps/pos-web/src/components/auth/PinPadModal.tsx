@@ -38,7 +38,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
     terminalConfig,
     isLoading,
   } = useAuth();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   // Cashier list & selection
   const [cashiers, setCashiers] = useState<CashierSummary[]>([]);
@@ -101,127 +101,140 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
       if (typeof window !== 'undefined' && 'vibrate' in navigator) {
         navigator.vibrate(pattern);
       }
-    } catch {}
+    } catch {
+      // Vibration not supported or allowed
+    }
   };
 
   const handleDigit = (digit: string) => {
-    if (pin.length < 6) {
-      triggerHaptic([40]);
-      const next = pin + digit;
-      setPin(next);
-      setError(null);
+    if (pin.length >= 6) return;
+    triggerHaptic([30]);
+    setError(null);
+    const newPin = pin + digit;
+    setPin(newPin);
+
+    // Auto submit if reached 4 digits and user only has 4 digit PIN
+    if (newPin.length === 4 && selectedCashier) {
+      // Optional: don't auto submit to allow 6 digits, but provide visual indicator
     }
   };
 
   const handleBackspace = () => {
-    triggerHaptic([30]);
-    setPin((prev) => prev.slice(0, -1));
+    triggerHaptic([20]);
     setError(null);
+    setPin((prev) => prev.slice(0, -1));
   };
 
   const handleClear = () => {
-    triggerHaptic([30]);
-    setPin('');
+    triggerHaptic([40]);
     setError(null);
+    setPin('');
   };
 
   const handleSubmit = async () => {
     if (pin.length < 4) {
-      setError('PIN must be 4 to 6 digits');
-      triggerHaptic([100, 50, 100]);
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 500);
+      setError(language === 'am' ? 'እባክዎ ቢያንስ የ4-አሃዝ ፒን ያስገቡ' : 'Please enter at least a 4-digit PIN');
+      triggerHaptic([80, 50, 80]);
       return;
     }
 
-    setError(null);
-    const targetUserId = selectedCashier?.id;
-    const action = isLockScreen ? unlockSession : pinLogin;
-    const res = await action(pin, targetUserId);
+    if (!selectedCashier && !isLockScreen) {
+      setError(language === 'am' ? 'እባክዎ ገንዘብ ተቀባይ ይምረጡ' : 'Please select a cashier');
+      return;
+    }
 
-    if (!res.success) {
-      setError(res.error || 'Invalid Cashier PIN');
-      triggerHaptic([150, 50, 150]);
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 500);
-      setPin('');
-      if (res.remainingSeconds) {
-        setRemainingLockSeconds(res.remainingSeconds);
+    try {
+      if (isLockScreen) {
+        // Unlock existing terminal session
+        const res = await unlockSession(pin);
+        if (!res.success) {
+          triggerHaptic([100, 50, 100, 50, 100]);
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 500);
+          setPin('');
+          if (res.remainingSeconds) {
+            setRemainingLockSeconds(res.remainingSeconds);
+            setError(t('auth.pinLockedWarning'));
+          } else if ((res as any).remainingTries !== undefined) {
+            setError(t('auth.wrongPinRemaining', { remaining: (res as any).remainingTries }));
+          } else {
+            setError(res.error || (language === 'am' ? 'የተሳሳተ ፒን' : 'Incorrect PIN'));
+          }
+        }
+      } else {
+        // Login as selected cashier
+        const res = await pinLogin(selectedCashier!.id, pin);
+        if (res.success) {
+          triggerHaptic([50]);
+          if (onClose) onClose();
+        } else {
+          triggerHaptic([100, 50, 100, 50, 100]);
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 500);
+          setPin('');
+          if (res.remainingSeconds) {
+            setRemainingLockSeconds(res.remainingSeconds);
+            setError(t('auth.pinLockedWarning'));
+          } else if ((res as any).remainingTries !== undefined) {
+            setError(t('auth.wrongPinRemaining', { remaining: (res as any).remainingTries }));
+          } else {
+            setError(res.error || (language === 'am' ? 'የተሳሳተ ፒን' : 'Incorrect PIN'));
+          }
+        }
       }
-    } else {
-      triggerHaptic([80]);
-      if (onClose) onClose();
+    } catch {
+      setError(language === 'am' ? 'የመረብ ግንኙነት ችግር' : 'Network communication error');
     }
   };
-
-  // Physical keyboard handling
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key >= '0' && e.key <= '9') {
-        handleDigit(e.key);
-      } else if (e.key === 'Backspace') {
-        handleBackspace();
-      } else if (e.key === 'Enter') {
-        handleSubmit();
-      } else if (e.key === 'Escape' && !isLockScreen && onClose) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, pin, selectedCashier, isLockScreen]);
 
   if (!isOpen) return null;
 
   return (
     <div
-      data-testid="pinpad-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md select-none animate-in fade-in duration-150"
-      style={{ background: 'rgba(15, 23, 42, 0.85)' }}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 select-none ${
+        isLockScreen
+          ? 'bg-page/95 backdrop-blur-md'
+          : 'bg-black/60 backdrop-blur-xs'
+      }`}
     >
-      <div className="w-full max-w-4xl bg-surface border border-border-subtle rounded-3xl shadow-modal overflow-hidden flex flex-col md:flex-row max-h-[92vh]">
-        {/* LEFT COLUMN: Cashier Roster & Terminal Info */}
-        <div className="w-full md:w-80 bg-surface-2 border-b md:border-b-0 md:border-r border-border-subtle p-5 flex flex-col gap-4">
+      <div className="w-full max-w-2xl bg-surface border border-border-subtle rounded-3xl shadow-modal overflow-hidden flex flex-col md:flex-row">
+        {/* LEFT COLUMN: Cashier Avatar Selection (Hidden on pure lock screen if user already bound) */}
+        <div
+          className={`w-full md:w-72 bg-surface-2 p-5 border-b md:border-b-0 md:border-r border-border-subtle flex flex-col gap-3 ${
+            isLockScreen && currentUser ? 'hidden md:flex' : ''
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-primary-soft text-primary flex items-center justify-center">
-                <Store size={18} />
-              </div>
-              <div>
-                <h3 className="text-xs font-bold text-text-main">
-                  {terminalConfig?.terminalName || 'POS Terminal'}
-                </h3>
-                <span className="text-[10px] font-mono text-text-muted">
-                  Lane: {terminalConfig?.terminalCode || 'POS-01'}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted">
+              {t('cashierAvatarSelect')}
+            </h3>
+            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Offline Ready</span>
-            </div>
+              {t('common.offline')}
+            </span>
           </div>
 
-          {/* Search Cashiers */}
+          {/* Cashier Search */}
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim"
+            />
             <input
               type="text"
               placeholder={t('searchCashier')}
               value={cashierSearch}
               onChange={(e) => setCashierSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-surface border border-border-subtle text-xs text-text-main focus:outline-hidden focus:border-primary"
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-surface border border-border-subtle text-xs text-text-main focus:outline-hidden focus:border-primary"
             />
           </div>
 
-          {/* Cashier Avatar Tiles */}
-          <div className="flex-1 overflow-y-auto flex flex-col gap-2 max-h-72 md:max-h-96 pr-1">
-            <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-              {t('cashierAvatarSelect')}
-            </span>
-
+          {/* Cashiers List */}
+          <div className="flex-1 overflow-y-auto max-h-64 md:max-h-80 flex flex-col gap-1.5 pr-1">
             {filteredCashiers.length === 0 ? (
-              <p className="text-xs text-text-muted py-4 text-center">No cashiers found</p>
+              <div className="text-center py-6 text-xs text-text-dim">
+                {language === 'am' ? 'ምንም ገንዘብ ተቀባይ አልተገኘም' : 'No cashiers found'}
+              </div>
             ) : (
               filteredCashiers.map((cashier) => {
                 const isSelected = selectedCashier?.id === cashier.id;
@@ -272,8 +285,8 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
                         {cashier.role}
                       </span>
                       {cashier.isLocked && (
-                        <span className="text-[10px] font-bold text-red-500 flex items-center gap-1">
-                          <Lock size={10} /> Locked
+                        <span className="text-[10px] font-bold text-danger flex items-center gap-1">
+                          <Lock size={10} /> {language === 'am' ? 'የታገደ' : 'Locked'}
                         </span>
                       )}
                     </div>
@@ -284,7 +297,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Touch Number Pad (64px Keys) & PIN Dots */}
+        {/* RIGHT COLUMN: Touch Number Pad & PIN Dots */}
         <div className="flex-1 p-6 md:p-8 flex flex-col items-center justify-center gap-5">
           {/* Active Cashier Display */}
           <div className="flex flex-col items-center text-center gap-1">
@@ -292,11 +305,15 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
               <KeyRound size={26} />
             </div>
             <h2 className="text-lg font-black text-text-main mt-1">
-              {isLockScreen ? t('lockTerminal') : t('pinLogin')}
+              {isLockScreen ? t('auth.terminalLocked') : t('auth.pinLogin')}
             </h2>
             <p className="text-xs text-text-muted">
               {selectedCashier
-                ? `Signing in as ${selectedCashier.fullName}`
+                ? language === 'am'
+                  ? `በ${selectedCashier.fullName} ስም እየገቡ ነው`
+                  : `Signing in as ${selectedCashier.fullName}`
+                : language === 'am'
+                ? 'ገንዘብ ተቀባይ ይምረጡና የ4-6 አሃዝ ፒንዎን ያስገቡ'
                 : 'Select a cashier and enter 4-6 digit PIN'}
             </p>
           </div>
@@ -324,7 +341,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
 
           {/* Error / Lockout Banner */}
           {error && (
-            <div className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 px-4 py-2 rounded-2xl border border-red-500/20 flex items-center gap-2 max-w-sm text-center">
+            <div className="text-xs font-bold text-danger bg-danger/10 px-4 py-2 rounded-2xl border border-danger/20 flex items-center gap-2 max-w-sm text-center">
               <ShieldAlert size={15} className="shrink-0" />
               <span>{error}</span>
             </div>
@@ -334,8 +351,9 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
             <div className="text-xs font-mono font-bold text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20 flex items-center gap-1.5">
               <Clock size={14} />
               <span>
-                Lockout remaining: {Math.floor(remainingLockSeconds / 60)}m{' '}
-                {remainingLockSeconds % 60}s
+                {language === 'am'
+                  ? `የመቆለፊያ ቀሪ ጊዜ፡ ${Math.floor(remainingLockSeconds / 60)}ደ ${remainingLockSeconds % 60}ሰ`
+                  : `Lockout remaining: ${Math.floor(remainingLockSeconds / 60)}m ${remainingLockSeconds % 60}s`}
               </span>
             </div>
           )}
@@ -359,7 +377,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
               onClick={handleClear}
               className="h-16 w-full rounded-2xl bg-surface-2 hover:bg-border-subtle text-text-muted hover:text-text-main text-xs font-bold transition-all active:scale-95 flex items-center justify-center uppercase tracking-wider border border-border-subtle cursor-pointer"
             >
-              Clear
+              {t('common.clear')}
             </button>
 
             {/* 0 */}
@@ -375,6 +393,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
             <button
               type="button"
               onClick={handleBackspace}
+              aria-label={t('common.delete')}
               className="h-16 w-full rounded-2xl bg-surface-2 hover:bg-border-subtle text-text-muted hover:text-text-main text-lg font-bold transition-all active:scale-95 flex items-center justify-center border border-border-subtle cursor-pointer"
             >
               <Delete size={22} />
@@ -386,9 +405,15 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={pin.length < 4 || isLoading}
-            className="btn-primary w-full max-w-[280px] py-3.5 text-sm font-bold rounded-2xl justify-center shadow-md shadow-primary/25 disabled:opacity-50 active:scale-98 cursor-pointer"
+            className="btn-primary w-full max-w-[280px] py-3.5 text-sm font-bold rounded-2xl justify-center shadow-md disabled:opacity-50 active:scale-98 cursor-pointer"
           >
-            {isLoading ? 'Verifying PIN...' : 'Enter PIN (Submit)'}
+            {isLoading
+              ? language === 'am'
+                ? 'ፒን በማረጋገጥ ላይ...'
+                : 'Verifying PIN...'
+              : language === 'am'
+              ? 'ግባ (አረጋግጥ)'
+              : 'Enter PIN (Submit)'}
           </button>
 
           {/* Bottom Bar: Switch to Password / Cancel */}
@@ -400,7 +425,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
                 className="font-semibold text-primary hover:underline flex items-center gap-1.5 cursor-pointer"
               >
                 <LogIn size={13} />
-                <span>{t('backOfficeLogin')}</span>
+                <span>{t('auth.backOfficeLogin')}</span>
               </button>
             )}
 
@@ -410,7 +435,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
                 onClick={onClose}
                 className="text-text-muted hover:text-text-main font-semibold cursor-pointer"
               >
-                {t('cancel')}
+                {t('common.cancel')}
               </button>
             )}
           </div>

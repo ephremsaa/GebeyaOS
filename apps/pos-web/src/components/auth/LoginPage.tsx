@@ -480,7 +480,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
               disabled={isLoading}
               className="btn-primary w-full py-3 text-sm font-bold rounded-2xl mt-1 justify-center shadow-soft active:scale-98 transition-all flex items-center gap-2"
             >
-              {isLoading ? 'Verifying...' : requires2FA ? t('totpVerifyAction') : t('loginAction')}
+              {isLoading ? (language === 'am' ? 'በማረጋገጥ ላይ...' : 'Verifying...') : requires2FA ? t('totpVerifyAction') : t('loginAction')}
             </button>
           </form>
         )}
@@ -491,9 +491,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
               <Key size={16} className="shrink-0 mt-0.5 text-amber-500" />
               <div>
-                <strong>Password Change Required</strong>
+                <strong>{t('auth.forcePasswordChangePrompt')}</strong>
                 <p className="text-[11px] mt-0.5 text-amber-700/80 dark:text-amber-400/80">
-                  You are logging in with a temporary password. Please set a new personal password to continue.
+                  {language === 'am' ? 'በጊዜያዊ የይለፍ ቃል እየገቡ ስለሆነ ከመቀጠልዎ በፊት አዲስ የይለፍ ቃል ያዘጋጁ።' : 'You are logging in with a temporary password. Please set a new personal password to continue.'}
                 </p>
               </div>
             </div>
@@ -503,15 +503,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                New Password
-              </label>
+              <label className="block text-xs font-semibold text-text-muted mb-1">{t('auth.newPassword')}</label>
               <input
                 type="password"
                 required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 10 characters"
+                placeholder={t('passwordMin10Chars')}
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm focus:outline-hidden focus:border-gebeya-500 font-mono"
               />
               {newPassword.length > 0 && (
@@ -534,15 +532,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Confirm New Password
-              </label>
+              <label className="block text-xs font-semibold text-text-muted mb-1">{t('auth.confirmPassword')}</label>
               <input
                 type="password"
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat new password"
+                placeholder={t('auth.confirmPassword')}
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm focus:outline-hidden focus:border-gebeya-500 font-mono"
               />
             </div>
@@ -552,7 +548,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
               disabled={!newPassStrength.isValid}
               className="btn-primary w-full py-3 rounded-2xl font-bold text-sm"
             >
-              Set New Password & Continue
+              {t('auth.resetPasswordAction')}
             </button>
           </form>
         )}
@@ -605,9 +601,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
           <>
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-border-subtle" />
-              <span className="text-[11px] font-semibold text-text-dim uppercase tracking-wider">
-                or
-              </span>
+              <span className="text-[11px] font-semibold text-text-dim uppercase tracking-wider">{language === 'am' ? 'ወይም' : 'or'}</span>
               <div className="flex-1 h-px bg-border-subtle" />
             </div>
 
@@ -643,7 +637,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             className="text-[11px] text-text-dim hover:text-primary transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
           >
             <ShieldAlert size={13} className="text-primary" />
-            Platform HQ
+            {language === 'am' ? 'የስርዓት አስተዳዳሪ HQ' : 'Platform HQ'}
           </button>
         </div>
       </div>
@@ -716,7 +710,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
 
                 <div>
                   <label className="block text-xs font-semibold text-text-muted mb-1">
-                    New Password (min 10 chars)
+                    {t('auth.newPassword')} (min 10 chars)
                   </label>
                   <input
                     type="password"

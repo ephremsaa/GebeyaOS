@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n/I18nContext';
 
 export const SessionExpiredDialog: React.FC = () => {
   const { isSessionExpired, currentUser, reauthenticate, logout } = useAuth();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,7 +23,7 @@ export const SessionExpiredDialog: React.FC = () => {
     setIsSubmitting(false);
 
     if (!res.success) {
-      setError(res.error || 'Failed to authenticate. Please check your password.');
+      setError(res.error || (language === 'am' ? 'ማረጋገጥ አልተቻለም። እባክዎ የይለፍ ቃልዎን ያረጋግጡ።' : 'Failed to authenticate. Please check your password.'));
     } else {
       setPassword('');
     }
@@ -37,19 +37,19 @@ export const SessionExpiredDialog: React.FC = () => {
             <Lock size={24} />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-text-main">{t('sessionExpiredTitle')}</h2>
+            <h2 className="text-lg font-bold text-text-main">{t('auth.sessionExpiredTitle')}</h2>
             <p className="text-xs text-text-muted">
-              @{currentUser?.username || 'user'} • {currentUser?.fullName || 'Cashier'}
+              @{currentUser?.username || 'user'} • {currentUser?.fullName || t('common.cashier')}
             </p>
           </div>
         </div>
 
         <p className="text-xs text-text-muted leading-relaxed">
-          {t('sessionExpiredDesc')}
+          {t('auth.sessionExpiredDesc')}
         </p>
 
         {error && (
-          <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-2xl bg-danger/10 border border-danger/20 text-danger text-xs flex items-center gap-2">
             <AlertCircle size={16} className="shrink-0" />
             <span>{error}</span>
           </div>
@@ -58,7 +58,7 @@ export const SessionExpiredDialog: React.FC = () => {
         <form onSubmit={handleUnlock} className="flex flex-col gap-4">
           <div>
             <label className="block text-xs font-semibold text-text-main mb-1.5">
-              {t('password')}
+              {t('auth.password')}
             </label>
             <div className="relative">
               <input
@@ -85,20 +85,19 @@ export const SessionExpiredDialog: React.FC = () => {
             disabled={isSubmitting || !password.trim()}
             className="btn-primary w-full py-3 rounded-2xl font-bold text-sm shadow-md"
           >
-            {isSubmitting ? 'Verifying...' : t('unlockSession')}
+            {isSubmitting ? (language === 'am' ? 'በማረጋገጥ ላይ...' : 'Verifying...') : t('auth.unlockSession')}
           </button>
 
           <button
             type="button"
             onClick={logout}
-            className="text-xs text-text-muted hover:text-red-500 flex items-center justify-center gap-1.5 pt-1 cursor-pointer transition-colors"
+            className="text-xs text-text-muted hover:text-danger flex items-center justify-center gap-1.5 pt-1 cursor-pointer transition-colors"
           >
             <LogOut size={13} />
-            <span>Log out completely</span>
+            <span>{language === 'am' ? 'ሙሉ በሙሉ ውጣ' : 'Log out completely'}</span>
           </button>
         </form>
       </div>
     </div>
   );
 };
-
