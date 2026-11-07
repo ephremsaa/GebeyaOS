@@ -32,7 +32,7 @@ export const HeldBasketsDrawer: React.FC<HeldBasketsDrawerProps> = ({
         {baskets.length === 0 ? (
           <EmptyState
             title={t('noHeldBaskets')}
-            subtitle="Hold a customer cart anytime with F6 to serve another shopper"
+            subtitle={t('checkout.noHeldBasketsSubtitle')}
           />
         ) : (
           baskets.map((basket) => {
@@ -51,7 +51,7 @@ export const HeldBasketsDrawer: React.FC<HeldBasketsDrawerProps> = ({
                   <div>
                     <h4 className="font-semibold text-text-main text-[15px] flex items-center gap-2">
                       <PauseCircle size={16} className="text-warning" />
-                      {basket.customerIdentifier || 'Held Customer Cart'}
+                      {basket.customerIdentifier || t('checkout.heldCustomerCart')}
                     </h4>
                     <div className="flex items-center gap-3 text-xs text-text-muted mt-1">
                       <span className="flex items-center gap-1">

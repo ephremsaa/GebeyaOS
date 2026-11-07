@@ -256,7 +256,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </span>
               {isSplitMode && (
                 <span className="text-xs text-primary font-semibold">
-                  Split Paid: {formatCurrency(recordedSplitTotal)} / Total: {formatCurrency(totalAmount)}
+                  {t('checkout.splitPaidProgress', { paid: formatCurrency(recordedSplitTotal), total: formatCurrency(totalAmount) })}
                 </span>
               )}
             </div>
@@ -308,14 +308,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 className="text-xs font-medium text-text-muted hover:text-primary flex items-center gap-1.5 cursor-pointer"
               >
                 <Split size={14} strokeWidth={1.75} />
-                <span>{isSplitMode ? 'Cancel Split Payment' : t('splitPayment')}</span>
+                <span>{isSplitMode ? t('checkout.cancelSplitPayment') : t('checkout.splitPayment')}</span>
               </button>
             </div>
 
             {isSplitMode && splitPayments.length > 0 && (
               <div className="bg-surface-2 rounded-xl p-3 border border-border-subtle flex flex-col gap-2">
                 <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
-                  Recorded Tenders ({splitPayments.length})
+                  {t('checkout.recordedTenders', { count: splitPayments.length })}
                 </span>
                 <div className="flex flex-col gap-1.5 max-h-28 overflow-y-auto">
                   {splitPayments.map((p, idx) => (
@@ -401,7 +401,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   leftIcon={<Plus size={16} />}
                   onClick={handleAddSplitTender}
                 >
-                  Add Cash Tender ({formatCurrency(Math.min(tenderedAmount, currentTarget))})
+                  {t('checkout.addCashTender', { amount: formatCurrency(Math.min(tenderedAmount, currentTarget)) })}
                 </Button>
               )}
             </div>
@@ -411,8 +411,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <div className="p-4 rounded-xl bg-info-soft/40 border border-info/20 flex items-center gap-3">
                 <ShieldCheck size={24} strokeWidth={1.75} className="text-info flex-shrink-0" />
                 <div className="text-[13px] text-text-muted">
-                  <span className="font-semibold block text-text-main mb-0.5">Offline-Ready Verification</span>
-                  Enter SMS confirmation code or payment transaction reference.
+                  <span className="font-semibold block text-text-main mb-0.5">{t('checkout.offlineVerification')}</span>
+                  {t('checkout.offlineVerificationDesc')}
                 </div>
               </div>
 
@@ -431,7 +431,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   leftIcon={<Plus size={16} />}
                   onClick={handleAddSplitTender}
                 >
-                  Add {selectedMethod} Tender ({formatCurrency(currentTarget)})
+                  {t('checkout.addMethodTender', { method: selectedMethod, amount: formatCurrency(currentTarget) })}
                 </Button>
               )}
             </div>
@@ -449,7 +449,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <Loader2 size={18} className="animate-spin" />
-                <span>Processing Transaction...</span>
+                <span>{t('checkout.processingTransaction')}</span>
               </span>
             ) : (
               <span>

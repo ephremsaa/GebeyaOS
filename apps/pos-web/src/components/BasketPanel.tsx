@@ -301,7 +301,7 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
                 )}
               </div>
               <span className="tabular-nums font-mono font-medium text-primary text-right">
-                {totalDiscounts > 0 ? `-${formatCurrency(totalDiscounts)}` : '0.00 ETB'}
+                {totalDiscounts > 0 ? `-${formatCurrency(totalDiscounts)}` : formatCurrency(0)}
               </span>
             </div>
           )}

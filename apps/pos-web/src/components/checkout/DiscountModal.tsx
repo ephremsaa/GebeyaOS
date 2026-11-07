@@ -26,7 +26,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
   const { t, formatCurrency } = useI18n();
   const [mode, setMode] = useState<'PERCENT' | 'FIXED'>('PERCENT');
   const [valueStr, setValueStr] = useState<string>('5');
-  const [reason, setReason] = useState<string>('Customer Loyalty / Promotion');
+  const [reason, setReason] = useState<string>('');
   const [managerPin, setManagerPin] = useState<string>('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -51,7 +51,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
 
     if (requiresManagerPin) {
       if (!managerPin.trim()) {
-        setAuthError('Manager PIN is required for discounts exceeding your cashier limit');
+        setAuthError(t('checkout.managerPinRequiredDiscount'));
         return;
       }
 
@@ -64,14 +64,14 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
         });
 
         if (!res.authorized) {
-          setAuthError(res.message || 'Invalid Manager PIN');
+          setAuthError(res.message || t('checkout.invalidManagerPin'));
           return;
         }
 
         onApplyDiscount(computedDiscountAmount, reason, res.authorizedBy);
         onClose();
       } catch (err: any) {
-        setAuthError(err.message || 'Verification failed');
+        setAuthError(err.message || t('checkout.verificationFailed'));
       } finally {
         setIsVerifying(false);
       }
@@ -113,7 +113,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
         {/* Amount Input */}
         <div>
           <label className="block text-sm font-semibold text-text-main mb-1.5">
-            {mode === 'PERCENT' ? 'Discount Percentage (%)' : 'Discount Amount (ETB)'}
+            {mode === 'PERCENT' ? t('checkout.discountPercentage') : t('checkout.discountAmount')}
           </label>
           <div className="relative">
             <input
@@ -128,16 +128,16 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
               autoFocus
             />
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted font-mono font-medium">
-              {mode === 'PERCENT' ? '%' : 'ETB'}
+              {mode === 'PERCENT' ? '%' : t('common.currencySymbol')}
             </span>
           </div>
 
           <div className="flex justify-between items-center text-xs text-text-muted mt-2">
             <span>
-              Calculated Discount: <strong className="text-text-main font-mono">{formatCurrency(computedDiscountAmount)}</strong>
+              {t('checkout.calculatedDiscount')}: <strong className="text-text-main font-mono">{formatCurrency(computedDiscountAmount)}</strong>
             </span>
             <span>
-              Net Total: <strong className="text-text-main font-mono">{formatCurrency(grossAmount - computedDiscountAmount)}</strong>
+              {t('checkout.netTotal')}: <strong className="text-text-main font-mono">{formatCurrency(grossAmount - computedDiscountAmount)}</strong>
             </span>
           </div>
         </div>
@@ -152,7 +152,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl border border-border-subtle bg-surface text-text-main text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-fast"
-            placeholder="e.g., Manager promotional markdown"
+            placeholder={t('checkout.discountPlaceholder')}
           />
         </div>
 
@@ -166,7 +166,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
                   {t('managerPinRequiredTitle')}
                 </h5>
                 <p className="text-xs text-text-muted mt-0.5">
-                  Cashier limit is {maxUnattendedPercent}%. Applying {effectivePercent.toFixed(1)}% requires supervisor PIN.
+                  {t('checkout.supervisorPinNotice', { limit: maxUnattendedPercent, current: effectivePercent.toFixed(1) })}
                 </p>
               </div>
             </div>
@@ -195,7 +195,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
             onClick={handleApply}
             disabled={isVerifying || computedDiscountAmount <= 0}
           >
-            {isVerifying ? 'Verifying...' : t('confirm')}
+            {isVerifying ? t('checkout.verifying') : t('common.confirm')}
           </Button>
         </div>
       </div>

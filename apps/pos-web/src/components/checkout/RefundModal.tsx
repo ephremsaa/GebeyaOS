@@ -46,7 +46,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({
       });
       setSelectedItems(initSelection);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Receipt not found');
+      setErrorMsg(err.message || t('checkout.receiptNotFound'));
       setOriginalSale(null);
     } finally {
       setIsSearching(false);
@@ -56,7 +56,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({
   const handleProcessRefund = async () => {
     if (!originalSale) return;
     if (!managerPin.trim()) {
-      setErrorMsg('Manager PIN is mandatory for processing refunds');
+      setErrorMsg(t('checkout.managerPinRequired'));
       return;
     }
 
@@ -69,7 +69,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({
       }));
 
     if (itemsToRefund.length === 0) {
-      setErrorMsg('Please select at least one item to refund');
+      setErrorMsg(t('checkout.selectItemToRefund'));
       return;
     }
 
@@ -83,7 +83,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({
         actionRequired: 'REFUND_AUTH',
       });
       if (!auth.authorized) {
-        setErrorMsg(auth.message || 'Invalid Manager PIN');
+        setErrorMsg(auth.message || t('checkout.invalidManagerPin'));
         return;
       }
 
@@ -98,7 +98,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({
 
       setCompletedRefundNo(res.refundNumber);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Refund processing failed');
+      setErrorMsg(err.message || t('checkout.refundFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -118,10 +118,10 @@ export const RefundModal: React.FC<RefundModalProps> = ({
               <CheckCircle2 size={36} strokeWidth={2} />
             </div>
             <h3 className="text-xl font-bold text-text-main">
-              Refund Processed Successfully
+              {t('checkout.refundSuccess')}
             </h3>
             <p className="text-sm text-text-muted mt-1 font-mono">
-              Credit Note: <strong>{completedRefundNo}</strong>
+              {t('checkout.creditNote')}: <strong>{completedRefundNo}</strong>
             </p>
             <div className="mt-6">
               <Button variant="primary" onClick={onClose}>
@@ -172,12 +172,12 @@ export const RefundModal: React.FC<RefundModalProps> = ({
                           {item.itemNameSnapshot}
                         </span>
                         <span className="text-xs text-text-muted">
-                          Original: {item.quantity} × {formatCurrency(item.unitPrice)}
+                          {t('checkout.originalLabel')}: {item.quantity} × {formatCurrency(item.unitPrice)}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-text-muted">Return:</span>
+                        <span className="text-xs text-text-muted">{t('checkout.returnLabel')}:</span>
                         <input
                           type="number"
                           min="0"
@@ -247,7 +247,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({
                     disabled={isSubmitting || !managerPin.trim()}
                   >
                     <RotateCcw size={16} className="mr-1.5" />
-                    {isSubmitting ? 'Processing...' : t('processRefund')}
+                    {isSubmitting ? t('common.loading') : t('checkout.processRefund')}
                   </Button>
                 </div>
               </div>

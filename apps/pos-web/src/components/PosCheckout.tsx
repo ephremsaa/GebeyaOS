@@ -611,7 +611,7 @@ export const PosCheckout: React.FC = () => {
           {isLoadingCatalog && catalog.length === 0 ? (
             <div className="h-full flex items-center justify-center text-text-muted">
               <RefreshCw size={28} className="animate-spin text-primary mr-2" />
-              <span>Loading store catalog...</span>
+              <span>{t('checkout.loadingCatalog')}</span>
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="h-full flex items-center justify-center">

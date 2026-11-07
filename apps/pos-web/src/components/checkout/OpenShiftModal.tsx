@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LockKeyhole, Banknote, Sparkles } from 'lucide-react';
+import { LockKeyhole, Banknote, Sparkles, AlertTriangle } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { Modal, Button, Input } from '../ui';
 
@@ -16,11 +16,12 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
   cashierName,
   terminalCode,
 }) => {
-  const { t, formatCurrency } = useI18n();
+  const { t, formatCurrency, language } = useI18n();
   const [floatStr, setFloatStr] = useState<string>('1000');
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showZeroConfirmation, setShowZeroConfirmation] = useState(false);
 
   const presets = [500, 1000, 2000, 5000];
 
@@ -28,7 +29,12 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
     e?.preventDefault();
     const amount = parseFloat(floatStr);
     if (isNaN(amount) || amount < 0) {
-      setErrorMsg('Please enter a valid non-negative float amount');
+      setErrorMsg(language === 'am' ? 'እባክዎ ትክክለኛ ያልተቀነሰ የመነሻ ገንዘብ ያስገቡ' : 'Please enter a valid non-negative float amount');
+      return;
+    }
+
+    if (amount === 0 && !showZeroConfirmation) {
+      setShowZeroConfirmation(true);
       return;
     }
 
@@ -36,8 +42,9 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
       setIsSubmitting(true);
       setErrorMsg(null);
       await onOpenShift(amount, notes || undefined);
+      setShowZeroConfirmation(false);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to open shift');
+      setErrorMsg(err.message || (language === 'am' ? 'ፈረቃ መክፈት አልተቻለም' : 'Failed to open shift'));
     } finally {
       setIsSubmitting(false);
     }
@@ -47,7 +54,7 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={() => {}} // Cannot close without opening a shift
-      title={t('openShiftRequiredTitle')}
+      title={t('shift.openShiftRequiredTitle')}
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-2">
@@ -60,7 +67,7 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
               {terminalCode} · {cashierName}
             </h4>
             <p className="text-sm text-text-muted mt-0.5 leading-relaxed">
-              {t('openShiftRequiredDesc')}
+              {t('shift.openShiftRequiredDesc')}
             </p>
           </div>
         </div>
@@ -71,22 +78,53 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
           </div>
         )}
 
+        {/* Explicit confirmation warning for 0.00 float */}
+        {showZeroConfirmation && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col gap-2">
+            <div className="flex items-center gap-2 font-bold text-sm text-amber-700 dark:text-amber-400">
+              <AlertTriangle size={18} className="shrink-0" />
+              <span>{t('shift.confirmZeroFloatTitle')}</span>
+            </div>
+            <p className="text-xs text-text-muted leading-relaxed">
+              {t('shift.confirmZeroFloatDesc')}
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setShowZeroConfirmation(false)}
+                className="px-3 py-1.5 rounded-lg border border-border-subtle bg-surface text-xs font-semibold text-text-muted hover:text-text-main cursor-pointer"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold cursor-pointer shadow-soft"
+              >
+                {t('shift.confirmZeroFloatAction')}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-semibold text-text-main mb-2">
-            {t('openingCashFloatLabel')}
+            {t('shift.openingCashFloatLabel')}
           </label>
           <div className="relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted font-mono font-medium">
-              ETB
+              {t('common.currencySymbol')}
             </span>
             <input
               type="number"
               step="any"
               min="0"
               value={floatStr}
-              onChange={(e) => setFloatStr(e.target.value)}
+              onChange={(e) => {
+                setFloatStr(e.target.value);
+                setShowZeroConfirmation(false);
+              }}
               className="w-full pl-14 pr-4 py-3 rounded-xl border border-border-subtle bg-surface text-text-main font-mono text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-fast"
-              placeholder={t('openingCashFloatPlaceholder')}
+              placeholder={t('shift.openingCashFloatPlaceholder')}
               autoFocus
             />
           </div>
@@ -97,7 +135,10 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
               <button
                 key={preset}
                 type="button"
-                onClick={() => setFloatStr(preset.toString())}
+                onClick={() => {
+                  setFloatStr(preset.toString());
+                  setShowZeroConfirmation(false);
+                }}
                 className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all duration-fast cursor-pointer ${
                   parseFloat(floatStr) === preset
                     ? 'bg-primary text-white border-primary shadow-soft'
@@ -112,14 +153,14 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
 
         <div>
           <label className="block text-sm font-semibold text-text-main mb-2">
-            Shift Notes (Optional)
+            {t('common.notes')} ({t('common.optional')})
           </label>
           <input
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl border border-border-subtle bg-surface text-text-main text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-fast"
-            placeholder="e.g., Morning opening register"
+            placeholder={language === 'am' ? 'ለምሳሌ፡ የጥዋት መክፈቻ ካዝና' : 'e.g., Morning register float'}
           />
         </div>
 
@@ -131,7 +172,11 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
             className="w-full justify-center min-h-[50px] text-base font-semibold"
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Opening Shift...' : t('openShiftAction')}
+            {isSubmitting
+              ? language === 'am'
+                ? 'ፈረቃ በመክፈት ላይ...'
+                : 'Opening Shift...'
+              : t('shift.openShiftAction')}
           </Button>
         </div>
       </form>

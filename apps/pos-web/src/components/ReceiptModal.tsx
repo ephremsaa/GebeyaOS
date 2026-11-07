@@ -55,7 +55,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     <Modal
       isOpen={true}
       onClose={onClose}
-      title={reprintedText ? `DUPLICATE REPRINT: ${receiptNumber}` : `${t('receiptNo')}: ${receiptNumber}`}
+      title={reprintedText ? `${t('checkout.duplicateCopy')}: ${receiptNumber}` : `${t('checkout.receiptNo')}: ${receiptNumber}`}
       maxWidth="md"
     >
       <div className="flex flex-col gap-4">
@@ -74,7 +74,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             leftIcon={copied ? <Check size={16} /> : <Copy size={16} />}
             onClick={handleCopy}
           >
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('common.copied') : t('common.copy')}
           </Button>
 
           <Button
@@ -93,7 +93,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               leftIcon={<RotateCcw size={16} />}
               onClick={() => setIsReprintPromptOpen(true)}
             >
-              Audited Reprint
+              {t('checkout.auditedReprint')}
             </Button>
           )}
         </div>
@@ -103,16 +103,16 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           <div className="p-4 rounded-xl bg-surface border border-warning/30 flex flex-col gap-3 shadow-soft">
             <div className="flex items-center gap-2 text-warning font-semibold text-sm">
               <FileText size={16} />
-              <span>Audited Duplicate Reprint Record</span>
+              <span>{t('checkout.auditedDuplicateRecord')}</span>
             </div>
             <p className="text-xs text-text-muted">
-              By Ethiopian commercial regulation, reprints must include a clear reason logged to the audit journal.
+              {t('checkout.reprintRegulationNotice')}
             </p>
             <Input
-              label="Reprint Reason"
+              label={t('checkout.reprintReason')}
               value={reprintReason}
               onChange={(e) => setReprintReason(e.target.value)}
-              placeholder="e.g. Printer paper jammed or customer copy request"
+              placeholder={t('checkout.reprintPlaceholder')}
             />
             <div className="flex justify-end gap-2 mt-1">
               <Button
@@ -120,7 +120,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 size="sm"
                 onClick={() => setIsReprintPromptOpen(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="primary"
@@ -128,7 +128,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 onClick={handleExecuteReprint}
                 disabled={!reprintReason.trim() || isSubmittingReprint}
               >
-                {isSubmittingReprint ? 'Logging...' : 'Confirm Reprint'}
+                {isSubmittingReprint ? t('checkout.logging') : t('checkout.confirmReprint')}
               </Button>
             </div>
           </div>
