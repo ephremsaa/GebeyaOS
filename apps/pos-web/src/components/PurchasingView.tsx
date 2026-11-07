@@ -137,7 +137,7 @@ export interface SupplierPayableItem {
 
 export const PurchasingView: React.FC = () => {
   const { currentUser } = useAuth();
-  const { language } = useI18n();
+  const { language, t, formatCurrency } = useI18n();
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'orders' | 'grn' | 'suppliers' | 'payables'>('orders');
@@ -1217,7 +1217,7 @@ export const PurchasingView: React.FC = () => {
             }`}
           >
             <Users size={14} />
-            {language === 'am' ? 'አቅራቢዎች' : 'Suppliers'} ({suppliers.length})
+            {t('purchasing.tabSuppliers', { count: suppliers.length })}
           </button>
           <button
             onClick={() => { setActiveTab('payables'); setStatusFilter('ALL'); }}
@@ -1228,7 +1228,7 @@ export const PurchasingView: React.FC = () => {
             }`}
           >
             <Landmark size={14} />
-            <span>Payables Aging ({payables.length})</span>
+            <span>{t('purchasing.tabPayables', { count: payables.length })}</span>
           </button>
         </div>
 
@@ -1296,14 +1296,14 @@ export const PurchasingView: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/40">
-                    <th className="py-3 px-4">PO Number</th>
-                    <th className="py-3 px-4">Supplier</th>
-                    <th className="py-3 px-4 text-center">Items</th>
-                    <th className="py-3 px-4 text-right">Subtotal</th>
-                    <th className="py-3 px-4 text-right">Grand Total</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                    <th className="py-3 px-4 text-center">Expected Delivery</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                    <th className="py-3 px-4">{t('purchasing.poNumber')}</th>
+                    <th className="py-3 px-4">{t('purchasing.supplier')}</th>
+                    <th className="py-3 px-4 text-center">{t('purchasing.items')}</th>
+                    <th className="py-3 px-4 text-right">{t('purchasing.subtotal')}</th>
+                    <th className="py-3 px-4 text-right">{t('purchasing.grandTotal')}</th>
+                    <th className="py-3 px-4 text-center">{t('purchasing.status')}</th>
+                    <th className="py-3 px-4 text-center">{t('purchasing.expectedDelivery')}</th>
+                    <th className="py-3 px-4 text-right">{t('purchasing.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -1356,7 +1356,7 @@ export const PurchasingView: React.FC = () => {
                                 title="Approve with Manager PIN"
                               >
                                 <ShieldCheck size={13} />
-                                <span>Approve</span>
+                                <span>{t('purchasing.approveAction')}</span>
                               </button>
                             )}
 
@@ -1368,7 +1368,7 @@ export const PurchasingView: React.FC = () => {
                                 title="Send PO to Supplier"
                               >
                                 <Send size={13} />
-                                <span>Send</span>
+                                <span>{t('purchasing.send')}</span>
                               </button>
                             )}
 
@@ -1380,7 +1380,7 @@ export const PurchasingView: React.FC = () => {
                                 title="Receive goods against this PO"
                               >
                                 <Truck size={13} />
-                                <span>Receive</span>
+                                <span>{t('purchasing.receiveAction')}</span>
                               </button>
                             )}
 
@@ -1400,8 +1400,8 @@ export const PurchasingView: React.FC = () => {
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-slate-400">
                         <FileText className="mx-auto mb-2 text-slate-300 dark:text-slate-600" size={32} />
-                        <p className="font-semibold text-sm">No purchase orders yet</p>
-                        <p className="text-xs text-slate-400 mt-1">Create your first purchase order to order stock from suppliers</p>
+                        <p className="font-semibold text-sm">{t('purchasing.noPOsYet')}</p>
+                        <p className="text-xs text-slate-400 mt-1">{t('purchasing.noPOsDesc')}</p>
                         <button
                           onClick={() => setIsPoModalOpen(true)}
                           className="mt-3 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs inline-flex items-center gap-1"
@@ -1424,14 +1424,14 @@ export const PurchasingView: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-800/40">
-                    <th className="py-3 px-4">GRN Number</th>
+                    <th className="py-3 px-4">{t('purchasing.grnNumber')}</th>
                     <th className="py-3 px-4">Supplier</th>
-                    <th className="py-3 px-4">Invoice / Waybill #</th>
+                    <th className="py-3 px-4">{t('purchasing.invoiceWaybill')}</th>
                     <th className="py-3 px-4 text-center">Items</th>
-                    <th className="py-3 px-4 text-right">Landed Cost</th>
-                    <th className="py-3 px-4 text-right">Total Cost</th>
+                    <th className="py-3 px-4 text-right">{t('purchasing.landedCost')}</th>
+                    <th className="py-3 px-4 text-right">{t('purchasing.totalCost')}</th>
                     <th className="py-3 px-4 text-right">Withholding (2%)</th>
-                    <th className="py-3 px-4 text-right">Net Payable</th>
+                    <th className="py-3 px-4 text-right">{t('purchasing.netPayable')}</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1472,7 +1472,7 @@ export const PurchasingView: React.FC = () => {
                             title="Return defective/rejected items to supplier"
                           >
                             <RotateCcw size={13} />
-                            <span>Return</span>
+                            <span>{t('purchasing.returnAction')}</span>
                           </button>
                           <button
                             onClick={() => setInspectDoc({ type: 'GRN', data: grn })}
@@ -1489,8 +1489,8 @@ export const PurchasingView: React.FC = () => {
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-slate-400">
                         <Truck className="mx-auto mb-2 text-slate-300 dark:text-slate-600" size={32} />
-                        <p className="font-semibold text-sm">No goods received notes yet</p>
-                        <p className="text-xs text-slate-400 mt-1">Receive deliveries from purchase orders or record direct receiving</p>
+                        <p className="font-semibold text-sm">{t('purchasing.noGRNsYet')}</p>
+                        <p className="text-xs text-slate-400 mt-1">{t('purchasing.noGRNsDesc')}</p>
                         <button
                           onClick={openDirectGrn}
                           className="mt-3 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs inline-flex items-center gap-1"
