@@ -25,6 +25,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useI18n } from '../i18n/I18nContext';
 
 interface OutboxItem {
   id: string;
@@ -67,6 +68,7 @@ interface ConflictItem {
 
 export const SyncMonitor: React.FC = () => {
   const { currentUser } = useAuth();
+  const { t } = useI18n();
   const isManager = currentUser?.role === 'OWNER' || currentUser?.role === 'HQ_ADMIN' || currentUser?.role === 'BRANCH_MANAGER';
 
   // Top level views: 'simple' (default cashier/staff card) vs 'advanced' (managers)
@@ -76,7 +78,7 @@ export const SyncMonitor: React.FC = () => {
   // Sync state
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string>('Never synced');
+  const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [catalogVersion, setCatalogVersion] = useState<string>('-');
   const [clockDriftSeconds, setClockDriftSeconds] = useState<number>(0);
   const [selectedPayload, setSelectedPayload] = useState<{ title: string; data: Record<string, any> } | null>(null);
@@ -165,7 +167,7 @@ export const SyncMonitor: React.FC = () => {
 
     setTimeout(() => {
       setIsSyncing(false);
-      setLastSyncTime('Just now');
+      setLastSyncTime(t('sync.justNow'));
       // Mark pending items as acknowledged in demo state
       setOutboxEvents((prev) =>
         prev.map((e) => (e.status === 'PENDING' ? { ...e, status: 'ACKNOWLEDGED' } : e)),
@@ -212,7 +214,7 @@ export const SyncMonitor: React.FC = () => {
     }
     setTimeout(() => {
       setIsSyncing(false);
-      alert('Master catalog successfully pulled from Central HQ. Master prices and barcodes updated locally.');
+      alert(t('sync.initialPullAlert'));
     }, 1500);
   };
 
@@ -257,7 +259,7 @@ export const SyncMonitor: React.FC = () => {
               onClick={() => setActiveView('advanced')}
             >
               <Sliders size={13} />
-              <span>Advanced (Managers)</span>
+              <span>{t('sync.advancedManagers')}</span>
               {failedEvents.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
               )}
@@ -274,7 +276,7 @@ export const SyncMonitor: React.FC = () => {
             }`}
           >
             {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-            <span>{isOnline ? 'Online Link' : 'Offline Mode'}</span>
+            <span>{isOnline ? t('sync.onlineLink') : t('sync.offlineMode')}</span>
           </button>
         </div>
       </div>
@@ -318,7 +320,7 @@ export const SyncMonitor: React.FC = () => {
 
             {/* Status Header */}
             <h2 className="text-2xl font-bold tracking-tight mb-2" style={{ color: 'var(--text-main)' }}>
-              {isOnline ? 'Connected to Central HQ' : 'Operating in Standalone Offline Mode'}
+              {isOnline ? t('sync.connectedHQ') : t('sync.operatingOffline')}
             </h2>
 
             {/* Reassuring Subtitle in Calm, Non-Technical Language */}
@@ -333,30 +335,30 @@ export const SyncMonitor: React.FC = () => {
               <div className="p-3 rounded-xl border" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
                 <div className="text-xs text-zinc-400 flex items-center justify-center gap-1.5 mb-1">
                   <Radio size={13} style={{ color: 'var(--primary)' }} />
-                  <span>Connection</span>
+                  <span>{t('sync.connection')}</span>
                 </div>
                 <div className="text-base font-bold" style={{ color: isOnline ? 'var(--primary)' : 'var(--warning)' }}>
-                  {isOnline ? 'Active Online' : 'Local Offline'}
+                  {isOnline ? t('sync.activeOnline') : t('sync.localOffline')}
                 </div>
               </div>
 
               <div className="p-3 rounded-xl border" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
                 <div className="text-xs text-zinc-400 flex items-center justify-center gap-1.5 mb-1">
                   <Clock size={13} style={{ color: 'var(--primary)' }} />
-                  <span>Last Synced</span>
+                  <span>{t('sync.lastSynced')}</span>
                 </div>
                 <div className="text-base font-bold" style={{ color: 'var(--text-main)' }}>
-                  {lastSyncTime}
+                  {lastSyncTime || t('sync.neverSynced')}
                 </div>
               </div>
 
               <div className="p-3 rounded-xl border" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
                 <div className="text-xs text-zinc-400 flex items-center justify-center gap-1.5 mb-1">
                   <CloudUpload size={13} style={{ color: 'var(--primary)' }} />
-                  <span>Items Waiting</span>
+                  <span>{t('sync.itemsWaiting')}</span>
                 </div>
                 <div className="text-base font-bold tabular" style={{ color: waitingItemsCount > 0 ? 'var(--warning)' : 'var(--primary)' }}>
-                  {waitingItemsCount === 0 ? '0 (Up to date)' : `${waitingItemsCount} items ready`}
+                  {waitingItemsCount === 0 ? t('sync.upToDate') : t('sync.itemsReady', { count: waitingItemsCount })}
                 </div>
               </div>
             </div>
@@ -374,12 +376,12 @@ export const SyncMonitor: React.FC = () => {
                 }}
               >
                 <RefreshCw size={17} className={isSyncing ? 'animate-spin' : ''} />
-                <span>{isSyncing ? 'Synchronizing with HQ...' : 'Sync Now'}</span>
+                <span>{isSyncing ? t('sync.synchronizing') : t('sync.syncNow')}</span>
               </button>
 
               <div className="text-xs text-zinc-400 flex items-center gap-1.5">
                 <CheckCircle2 size={13} className="text-emerald-500" />
-                <span>Automated sync operates continuously in the background every 60 seconds</span>
+                <span>{t('sync.autoSyncCadenceDesc')}</span>
               </div>
             </div>
           </div>
@@ -413,7 +415,7 @@ export const SyncMonitor: React.FC = () => {
               onClick={() => setAdvancedTab('outbox')}
             >
               <CloudUpload size={14} />
-              <span>Outbox Table (Branch → HQ)</span>
+              <span>{t('sync.outboxTab')}</span>
               <span className="badge-neutral text-[10px]">{outboxEvents.length}</span>
             </button>
 
@@ -426,7 +428,7 @@ export const SyncMonitor: React.FC = () => {
               onClick={() => setAdvancedTab('inbox')}
             >
               <CloudDownload size={14} />
-              <span>Inbox Table (HQ → Branch)</span>
+              <span>{t('sync.inboxTab')}</span>
               <span className="badge-neutral text-[10px]">{inboxEvents.length}</span>
             </button>
 
@@ -439,7 +441,7 @@ export const SyncMonitor: React.FC = () => {
               onClick={() => setAdvancedTab('conflicts')}
             >
               <ShieldCheck size={14} />
-              <span>Authority &amp; Conflicts</span>
+              <span>{t('sync.authorityConflictsTab')}</span>
               <span className="badge-neutral text-[10px]">{conflictLogs.length}</span>
             </button>
 
@@ -452,7 +454,7 @@ export const SyncMonitor: React.FC = () => {
               onClick={() => setAdvancedTab('failed')}
             >
               <AlertTriangle size={14} />
-              <span>Dead-Letter &amp; Failed Events</span>
+              <span>{t('sync.deadLetterFailedTab')}</span>
               {failedEvents.length > 0 && (
                 <span className="badge-danger text-[10px]">{failedEvents.length}</span>
               )}
@@ -467,7 +469,7 @@ export const SyncMonitor: React.FC = () => {
               onClick={() => setAdvancedTab('catalog')}
             >
               <Layers size={14} />
-              <span>Initial Pull &amp; Clock Skew</span>
+              <span>{t('sync.initialPullTab')}</span>
             </button>
           </div>
 
@@ -478,14 +480,14 @@ export const SyncMonitor: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                     <CloudUpload size={16} style={{ color: 'var(--primary)' }} />
-                    Outbox Event Log (sync_outbox)
+                    {t('sync.outboxTitle')}
                   </h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Strictly monotonic sequence order. Each event assigned unique deterministic idempotency key.
+                    {t('sync.outboxDesc')}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-400">Total: {outboxEvents.length} events</span>
+                  <span className="text-xs text-zinc-400">{t('sync.totalEvents', { count: outboxEvents.length })}</span>
                 </div>
               </div>
 
@@ -493,14 +495,14 @@ export const SyncMonitor: React.FC = () => {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Seq #</th>
-                      <th>Event Type</th>
-                      <th>Aggregate ID</th>
-                      <th>Idempotency Key</th>
-                      <th>Status</th>
-                      <th className="text-center">Retries</th>
-                      <th>Created At</th>
-                      <th className="text-right">Actions</th>
+                      <th>{t('sync.seqNo')}</th>
+                      <th>{t('sync.eventType')}</th>
+                      <th>{t('sync.aggregateId')}</th>
+                      <th>{t('sync.idempotencyKey')}</th>
+                      <th>{t('sync.status')}</th>
+                      <th className="text-center">{t('sync.retries')}</th>
+                      <th>{t('sync.createdAt')}</th>
+                      <th className="text-right">{t('sync.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -520,19 +522,19 @@ export const SyncMonitor: React.FC = () => {
                         <td>
                           {evt.status === 'ACKNOWLEDGED' ? (
                             <span className="badge-success text-[10px] flex items-center gap-1 w-fit">
-                              <CheckCircle2 size={10} /> Delivered
+                              <CheckCircle2 size={10} /> {t('sync.delivered')}
                             </span>
                           ) : evt.status === 'IN_FLIGHT' ? (
                             <span className="badge-warning text-[10px] flex items-center gap-1 w-fit">
-                              <RefreshCw size={10} className="animate-spin" /> In Flight
+                              <RefreshCw size={10} className="animate-spin" /> {t('sync.inFlight')}
                             </span>
                           ) : evt.status === 'FAILED' ? (
                             <span className="badge-danger text-[10px] flex items-center gap-1 w-fit">
-                              <AlertCircle size={10} /> Failed
+                              <AlertCircle size={10} /> {t('sync.failed')}
                             </span>
                           ) : (
                             <span className="badge-neutral text-[10px] flex items-center gap-1 w-fit">
-                              <Clock size={10} /> Pending
+                              <Clock size={10} /> {t('sync.pending')}
                             </span>
                           )}
                         </td>
@@ -574,13 +576,13 @@ export const SyncMonitor: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                     <CloudDownload size={16} style={{ color: 'var(--info)' }} />
-                    Inbox Catalog Queue (sync_inbox)
+                    {t('sync.inboxTitle')}
                   </h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Master products, base pricing, categories, and roles received and applied from Central HQ.
+                    {t('sync.inboxDesc')}
                   </p>
                 </div>
-                <span className="badge-neutral text-xs">Catalog {catalogVersion} Active</span>
+                <span className="badge-neutral text-xs">{t('sync.catalogActive', { version: catalogVersion })}</span>
               </div>
 
               <div className="overflow-x-auto">
@@ -588,11 +590,11 @@ export const SyncMonitor: React.FC = () => {
                   <thead>
                     <tr>
                       <th>Seq #</th>
-                      <th>Entity Type</th>
-                      <th>Entity ID</th>
-                      <th>Operation</th>
+                      <th>{t('sync.entityType')}</th>
+                      <th>{t('sync.entityId')}</th>
+                      <th>{t('sync.operation')}</th>
                       <th>Status</th>
-                      <th>Applied At</th>
+                      <th>{t('sync.appliedAt')}</th>
                       <th className="text-right">Actions</th>
                     </tr>
                   </thead>
@@ -607,7 +609,7 @@ export const SyncMonitor: React.FC = () => {
                         </td>
                         <td>
                           <span className="badge-success text-[10px] flex items-center gap-1 w-fit">
-                            <CheckCircle2 size={10} /> Processed
+                            <CheckCircle2 size={10} /> {t('sync.processed')}
                           </span>
                         </td>
                         <td className="text-xs text-zinc-400 whitespace-nowrap">
@@ -642,7 +644,7 @@ export const SyncMonitor: React.FC = () => {
                 <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
                   <div className="flex items-center gap-2 font-bold text-xs text-amber-400 uppercase tracking-wider mb-2">
                     <ShieldCheck size={16} />
-                    Central HQ Sole Authority (HQ Wins)
+                    {t('sync.hqSoleAuthority')}
                   </div>
                   <ul className="text-xs text-zinc-300 space-y-1.5 list-disc list-inside">
                     <li>Master Catalog &amp; Global Product Directory</li>
@@ -655,7 +657,7 @@ export const SyncMonitor: React.FC = () => {
                 <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
                   <div className="flex items-center gap-2 font-bold text-xs text-emerald-400 uppercase tracking-wider mb-2">
                     <ShieldCheck size={16} />
-                    Store Branch Sole Authority (Branch Wins)
+                    {t('sync.branchSoleAuthority')}
                   </div>
                   <ul className="text-xs text-zinc-300 space-y-1.5 list-disc list-inside">
                     <li>Completed POS Sales, Cash Disbursements &amp; Refunds</li>
@@ -670,19 +672,19 @@ export const SyncMonitor: React.FC = () => {
               <div className="glass-panel p-5 rounded-xl border border-[var(--border-subtle)]">
                 <h3 className="font-bold text-sm mb-3 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                   <ShieldCheck size={16} style={{ color: 'var(--primary)' }} />
-                  Conflict Resolution Logs (sync_conflict_logs)
+                  {t('sync.conflictLogTitle')}
                 </h3>
 
                 <div className="overflow-x-auto">
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Entity</th>
-                        <th>Conflict Type</th>
-                        <th>Local Branch Value</th>
-                        <th>HQ Cloud Value</th>
-                        <th className="text-center">Resolution Rule</th>
-                        <th>Resolved At</th>
+                        <th>{t('sync.entity')}</th>
+                        <th>{t('sync.conflictType')}</th>
+                        <th>{t('sync.localBranchValue')}</th>
+                        <th>{t('sync.hqCloudValue')}</th>
+                        <th className="text-center">{t('sync.resolutionRule')}</th>
+                        <th>{t('sync.resolvedAt')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -729,10 +731,10 @@ export const SyncMonitor: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--danger)' }}>
                     <AlertTriangle size={16} />
-                    Dead-Letter Queue &amp; Failed Events
+                    {t('sync.deadLetterTitle')}
                   </h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Events that exceeded exponential backoff retries. Can be inspected and manually re-queued.
+                    {t('sync.deadLetterDesc')}
                   </p>
                 </div>
                 {failedEvents.length > 0 && (
@@ -741,7 +743,7 @@ export const SyncMonitor: React.FC = () => {
                     onClick={handleRetryAllFailed}
                   >
                     <RotateCcw size={13} />
-                    <span>Retry All Failed ({failedEvents.length})</span>
+                    <span>{t('sync.retryAllFailed', { count: failedEvents.length })}</span>
                   </button>
                 )}
               </div>
@@ -750,10 +752,10 @@ export const SyncMonitor: React.FC = () => {
                 <div className="p-8 text-center border rounded-xl" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
                   <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
                   <div className="font-bold text-sm" style={{ color: 'var(--text-main)' }}>
-                    Zero Failed Events in Outbox
+                    {t('sync.zeroFailedEvents')}
                   </div>
                   <div className="text-xs text-zinc-400 mt-1">
-                    All transactional events have been successfully delivered to Central HQ.
+                    {t('sync.allDelivered')}
                   </div>
                 </div>
               ) : (
@@ -764,7 +766,7 @@ export const SyncMonitor: React.FC = () => {
                         <th>Seq #</th>
                         <th>Event Type</th>
                         <th>Aggregate ID</th>
-                        <th>Error Description</th>
+                        <th>{t('sync.errorDescription')}</th>
                         <th className="text-center">Retries</th>
                         <th>Created At</th>
                         <th className="text-right">Action</th>
@@ -791,7 +793,7 @@ export const SyncMonitor: React.FC = () => {
                               onClick={() => handleRetryEvent(evt.id)}
                             >
                               <RotateCcw size={12} />
-                              <span>Retry</span>
+                              <span>{t('sync.retry')}</span>
                             </button>
                           </td>
                         </tr>
@@ -811,14 +813,14 @@ export const SyncMonitor: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-sm mb-2 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                     <Layers size={16} style={{ color: 'var(--primary)' }} />
-                    New Branch Initial Catalog Provisioning
+                    {t('sync.initialPullTitle')}
                   </h3>
                   <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-                    Downloads the master snapshot of all 5,000+ items, categories, barcodes, and master selling prices when setting up a fresh store branch.
+                    {t('sync.initialPullDesc')}
                   </p>
 
                   <div className="p-3 rounded-lg border mb-4 text-xs font-mono" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
-                    <div className="text-zinc-500 text-[10px]">CURRENT LOCAL CATALOG VERSION:</div>
+                    <div className="text-zinc-500 text-[10px]">{t('sync.currentLocalCatalogVersion')}</div>
                     <div className="text-base font-bold text-emerald-400 mt-0.5">{catalogVersion}</div>
                   </div>
                 </div>
@@ -829,7 +831,7 @@ export const SyncMonitor: React.FC = () => {
                   disabled={isSyncing}
                 >
                   <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-                  <span>Force Full Initial Catalog Pull</span>
+                  <span>{t('sync.forceInitialPull')}</span>
                 </button>
               </div>
 
@@ -838,33 +840,33 @@ export const SyncMonitor: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-sm mb-2 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                     <Clock size={16} style={{ color: 'var(--info)' }} />
-                    Clock Skew &amp; Sequence Ordering Integrity
+                    {t('sync.clockSkewTitle')}
                   </h3>
                   <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-                    All event ordering relies strictly on server-assigned monotonic sequence numbers (<code>sequence_no</code>) rather than device clock time.
+                    {t('sync.clockSkewDesc')}
                   </p>
 
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between p-2 rounded border" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
-                      <span className="text-zinc-400">Measured Clock Drift:</span>
-                      <span className="font-mono font-bold text-emerald-400">+{clockDriftSeconds}s (Optimal: &lt; 300s)</span>
+                      <span className="text-zinc-400">{t('sync.measuredClockDrift')}</span>
+                      <span className="font-mono font-bold text-emerald-400">{t('sync.driftOptimal', { seconds: clockDriftSeconds })}</span>
                     </div>
 
                     <div className="flex justify-between p-2 rounded border" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
-                      <span className="text-zinc-400">Ordering Mode:</span>
-                      <span className="font-mono font-bold text-zinc-200">Strict Sequence (BIGSERIAL)</span>
+                      <span className="text-zinc-400">{t('sync.orderingMode')}</span>
+                      <span className="font-mono font-bold text-zinc-200">{t('sync.strictSequence')}</span>
                     </div>
 
                     <div className="flex justify-between p-2 rounded border" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
-                      <span className="text-zinc-400">Transport Encryption:</span>
-                      <span className="font-mono font-bold text-sky-400">TLS 1.3 / AES-256-GCM</span>
+                      <span className="text-zinc-400">{t('sync.transportEncryption')}</span>
+                      <span className="font-mono font-bold text-sky-400">{t('sync.transportTls')}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 p-2.5 rounded-lg border text-[11px] text-zinc-400 flex items-center gap-2" style={{ background: 'rgba(37, 99, 235, 0.08)', borderColor: 'rgba(37, 99, 235, 0.2)' }}>
                   <ShieldCheck size={15} className="text-sky-400 shrink-0" />
-                  <span>Device time shifts will never cause out-of-order sales or ledger corruption.</span>
+                  <span>{t('sync.clockDriftGuarantee')}</span>
                 </div>
               </div>
             </div>
