@@ -70,7 +70,7 @@ interface StockTakeItemDetail {
 }
 
 export const StockTakeView: React.FC = () => {
-  const { language } = useI18n();
+  const { language, t, formatCurrency } = useI18n();
   const { currentUser } = useAuth();
 
   // Sessions state
@@ -523,7 +523,7 @@ export const StockTakeView: React.FC = () => {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
             <ClipboardList className="text-emerald-600" size={26} />
-            {language === 'am' ? 'የክምችት ቆጠራ እና ማስተካከያ' : 'Stocktake & Physical Cycle Count'}
+            {t('stocktake.title')}
           </h1>
           <p className="text-xs text-slate-500">
             {language === 'am'
@@ -539,7 +539,7 @@ export const StockTakeView: React.FC = () => {
                 onClick={() => setActiveSession(null)}
                 className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-xs"
               >
-                &larr; {language === 'am' ? 'ወደ ዝርዝር ተመለስ' : 'All Sessions'}
+                &larr; {t('stocktake.backToList')}
               </button>
 
               <button
@@ -547,7 +547,7 @@ export const StockTakeView: React.FC = () => {
                 className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-100 transition shadow-xs"
               >
                 <FileSpreadsheet size={15} />
-                {language === 'am' ? 'የብክነት ሪፖርት' : 'Shrinkage Report'}
+                {t('stocktake.shrinkageReport')}
               </button>
             </div>
           ) : (
@@ -556,7 +556,7 @@ export const StockTakeView: React.FC = () => {
               className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-2 shadow-md transition active:scale-95"
             >
               <Plus size={16} />
-              {language === 'am' ? 'አዲስ ቆጠራ ጀምር' : 'Start Count Session'}
+              {t('stocktake.startCountSession')}
             </button>
           )}
         </div>
@@ -619,7 +619,7 @@ export const StockTakeView: React.FC = () => {
                       disabled={savingCounts}
                       className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold transition active:scale-95"
                     >
-                      {savingCounts ? 'Saving...' : 'Save Draft'}
+                      {savingCounts ? t('stocktake.saving') : t('stocktake.saveDraft')}
                     </button>
 
                     <button
@@ -627,7 +627,7 @@ export const StockTakeView: React.FC = () => {
                       className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-md transition active:scale-95"
                     >
                       <CheckCircle2 size={16} />
-                      {language === 'am' ? 'አስማማ እና ቆልፍ' : 'Approve & Reconcile'}
+                      {t('stocktake.approveAndReconcile')}
                     </button>
                   </>
                 ) : (
@@ -636,7 +636,7 @@ export const StockTakeView: React.FC = () => {
                     className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition"
                   >
                     <FileSpreadsheet size={15} />
-                    View Final Variance Report
+                    {t('stocktake.viewFinalReport')}
                   </button>
                 )}
               </div>
@@ -657,7 +657,7 @@ export const StockTakeView: React.FC = () => {
                         onClick={() => setShowManagerPinModal(true)}
                         className="ml-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
                       >
-                        Reveal Expected (Manager PIN)
+                        {t('stocktake.revealExpectedPrompt')}
                       </button>
                     </>
                   ) : (
@@ -670,7 +670,7 @@ export const StockTakeView: React.FC = () => {
                         onClick={() => setBlindCountMode(true)}
                         className="ml-2 text-[10px] font-bold text-slate-400 hover:underline"
                       >
-                        Enable Blind Mode
+                        {t('stocktake.enableBlindMode')}
                       </button>
                     </>
                   )}
@@ -679,7 +679,7 @@ export const StockTakeView: React.FC = () => {
                 {/* Multiple Counters Staff Picker */}
                 <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
                   <Users size={13} className="text-slate-400" />
-                  <span className="text-[11px] text-slate-400">Current Staff:</span>
+                  <span className="text-[11px] text-slate-400">{t('stocktake.currentStaff')}</span>
                   <select
                     value={currentCounterName}
                     onChange={(e) => setCurrentCounterName(e.target.value)}
@@ -694,14 +694,14 @@ export const StockTakeView: React.FC = () => {
 
                 {/* Merge Strategy */}
                 <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-[11px] text-slate-400">Count Mode:</span>
+                  <span className="text-[11px] text-slate-400">{t('stocktake.countMode')}</span>
                   <select
                     value={mergeStrategy}
                     onChange={(e) => setMergeStrategy(e.target.value as any)}
                     className="bg-transparent font-bold text-slate-700 dark:text-slate-200 text-[11px] focus:outline-hidden"
                   >
-                    <option value="OVERWRITE">Overwrite Count (=)</option>
-                    <option value="MERGE_SUM">Merge & Accumulate (+)</option>
+                    <option value="OVERWRITE">{t('stocktake.overwriteMode')}</option>
+                    <option value="MERGE_SUM">{t('stocktake.mergeSumMode')}</option>
                   </select>
                 </div>
               </div>
@@ -709,7 +709,7 @@ export const StockTakeView: React.FC = () => {
               {/* Progress Counters */}
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">Audited Progress</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">{t('stocktake.auditedProgress')}</div>
                   <div className="font-mono font-black text-slate-900 dark:text-white">
                     {totalCountedCount} / {activeSession.items.length} ({Math.round((totalCountedCount / (activeSession.items.length || 1)) * 100)}%)
                   </div>
@@ -718,7 +718,7 @@ export const StockTakeView: React.FC = () => {
                 {!blindCountMode && (
                   <>
                     <div className="text-right">
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">Net Variance Units</div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">{t('stocktake.netVarianceUnits')}</div>
                       <div
                         className={`font-mono font-black ${
                           netVarianceUnits < 0 ? 'text-rose-600' : 'text-slate-900 dark:text-white'
@@ -729,7 +729,7 @@ export const StockTakeView: React.FC = () => {
                     </div>
 
                     <div className="text-right">
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">Total Shrinkage</div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">{t('stocktake.totalShrinkage')}</div>
                       <div className="font-mono font-black text-rose-600">
                         {totalEstimatedShrinkage.toFixed(2)} ETB
                       </div>
