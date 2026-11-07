@@ -164,7 +164,9 @@ export const ShiftManagement: React.FC = () => {
     loadShiftData(true);
   }, [loadShiftData]);
 
-  // Update live elapsed time every minute
+  // Update live elapsed time and hours every minute
+  const [elapsedHours, setElapsedHours] = useState<number>(0);
+
   useEffect(() => {
     if (!currentShift?.openedAt) return;
     const updateElapsed = () => {
@@ -174,6 +176,7 @@ export const ShiftManagement: React.FC = () => {
       const hours = Math.floor(diffMins / 60);
       const mins = diffMins % 60;
       setElapsedTime(`${hours}h ${mins}m`);
+      setElapsedHours(hours);
     };
 
     updateElapsed();
@@ -390,23 +393,23 @@ export const ShiftManagement: React.FC = () => {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="page-title text-2xl font-black text-text-main">
-              {t('shiftTab')} · Cashier Shift
+              {t('shift.shiftTab')} · {t('shift.cashierShift')}
             </h1>
             {currentShift ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Shift #{currentShift.shiftNumber}: OPEN ({elapsedTime})
+                {t('shift.shiftStatusOpen', { shiftNumber: currentShift.shiftNumber, elapsed: elapsedTime })}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-danger/10 text-danger border border-danger/30">
                 <span className="w-2 h-2 rounded-full bg-danger" />
-                Shift: CLOSED
+                {t('shift.shiftStatusClosed')}
               </span>
             )}
           </div>
           <p className="page-subtitle text-xs text-text-muted mt-1">
-            Terminal: <span className="font-bold text-text-main">{terminalCode}</span> · Branch:{' '}
-            <span className="font-semibold">{branchName}</span> · Cashier:{' '}
+            {t('shift.terminal')}: <span className="font-bold text-text-main">{terminalCode}</span> · {t('shift.branch')}:{' '}
+            <span className="font-semibold">{branchName}</span> · {t('shift.cashier')}:{' '}
             <span className="font-bold text-primary">{cashierName}</span> ({userRole})
           </p>
         </div>
@@ -417,25 +420,45 @@ export const ShiftManagement: React.FC = () => {
             type="button"
             onClick={() => loadShiftData(false)}
             disabled={isRefreshing}
-            className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5"
+            className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5 cursor-pointer"
             title="Refresh shift totals"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-            <span>Sync Live</span>
+            <span>{t('shift.syncLive')}</span>
           </button>
 
           {!currentShift && (
             <button
               type="button"
               onClick={() => setIsOpenShiftModalOpen(true)}
-              className="btn-primary text-xs px-4 py-2 font-bold flex items-center gap-1.5"
+              className="btn-primary text-xs px-4 py-2 font-bold flex items-center gap-1.5 cursor-pointer"
             >
               <Coins size={14} />
-              <span>Open Guided Shift</span>
+              <span>{t('shift.openGuidedShift')}</span>
             </button>
           )}
         </div>
       </div>
+
+      {/* Prominent >24h Overdue Shift Warning Banner */}
+      {currentShift && elapsedHours >= 24 && (
+        <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4 text-amber-800 dark:text-amber-300 animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="shrink-0 text-amber-600 dark:text-amber-400" />
+            <span className="text-sm font-semibold">
+              {t('shift.shiftOpenWarning24h', { hours: elapsedHours })}
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={startCloseShiftFlow}
+            className="shrink-0"
+          >
+            {t('shift.closeShiftPrompt')}
+          </Button>
+        </div>
+      )}
 
       {/* Global Status Banner if any */}
       {statusMsg && (
@@ -476,37 +499,39 @@ export const ShiftManagement: React.FC = () => {
                   </div>
                   <div>
                     <h2 className="font-extrabold text-base text-text-main">
-                      Interim Shift Reading (X-Report)
+                      {t('shift.xReportTitle')}
                     </h2>
                     <p className="text-xs text-text-muted">
-                      Shift #{currentShift.shiftNumber} · Monitored real-time register balance
+                      {t('shift.interimReadingDesc', { shiftNumber: currentShift.shiftNumber })}
                     </p>
                   </div>
                 </div>
                 <Badge variant="neutral" size="sm">
-                  Live Snapshot
+                  {t('shift.liveSnapshot')}
                 </Badge>
               </div>
 
               {/* Breakdown Rows */}
               <div className="divide-y divide-border-subtle text-sm">
                 <div className="flex justify-between items-center py-2.5">
-                  <span className="text-text-muted">Opening Cash Float</span>
+                  <span className="text-text-muted">{t('shift.openingFloat')}</span>
                   <span className="font-bold tabular-nums text-text-main">
                     ETB {fmt(xReport.opening_float)}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center py-2.5 font-bold">
-                  <span className="text-text-main">Gross Sales Total ({xReport.total_sales_count} sales)</span>
+                  <span className="text-text-main">
+                    {t('shift.grossSalesTotal', { count: xReport.total_sales_count ?? (xReport as any).totalSalesCount ?? 0 })}
+                  </span>
                   <span className="tabular-nums text-text-main">
-                    ETB {fmt(xReport.gross_sales_amount)}
+                    {formatCurrency(xReport.gross_sales_amount)}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center py-2 pl-4 text-xs">
                   <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
-                    • Cash Sales (Net of change)
+                    • {t('shift.cashSales')}
                   </span>
                   <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
                     + ETB {fmt(xReport.cash_sales_amount)}
@@ -515,7 +540,7 @@ export const ShiftManagement: React.FC = () => {
 
                 <div className="flex justify-between items-center py-2 pl-4 text-xs">
                   <span className="text-text-muted flex items-center gap-1.5">
-                    • Telebirr SuperApp Payments
+                    • {t('shift.telebirrSales')}
                   </span>
                   <span className="font-bold tabular-nums text-text-main">
                     ETB {fmt(xReport.telebirr_sales_amount)}
@@ -524,7 +549,7 @@ export const ShiftManagement: React.FC = () => {
 
                 <div className="flex justify-between items-center py-2 pl-4 text-xs">
                   <span className="text-text-muted flex items-center gap-1.5">
-                    • CBE Birr Mobile Banking
+                    • {t('shift.cbeBirrSales')}
                   </span>
                   <span className="font-bold tabular-nums text-text-main">
                     ETB {fmt(xReport.cbe_birr_sales_amount)}
@@ -533,7 +558,7 @@ export const ShiftManagement: React.FC = () => {
 
                 <div className="flex justify-between items-center py-2 pl-4 text-xs">
                   <span className="text-text-muted flex items-center gap-1.5">
-                    • Card POS Terminal
+                    • {t('shift.cardSales')}
                   </span>
                   <span className="font-bold tabular-nums text-text-main">
                     ETB {fmt(xReport.card_sales_amount)}
@@ -542,7 +567,7 @@ export const ShiftManagement: React.FC = () => {
 
                 <div className="flex justify-between items-center py-2.5">
                   <span className="text-danger flex items-center gap-1">
-                    Customer Refunds Given
+                    {t('shift.refundsGiven')}
                   </span>
                   <span className="font-bold tabular-nums text-danger">
                     − ETB {fmt(xReport.total_refunds)}
@@ -551,7 +576,7 @@ export const ShiftManagement: React.FC = () => {
 
                 <div className="flex justify-between items-center py-2.5">
                   <span className="text-amber-600 dark:text-amber-400">
-                    Safe Drops Transferred to Vault
+                    {t('shift.safeDropsTransferred')}
                   </span>
                   <span className="font-bold tabular-nums text-amber-600 dark:text-amber-400">
                     − ETB {fmt(xReport.total_cash_drops)}
@@ -560,7 +585,7 @@ export const ShiftManagement: React.FC = () => {
 
                 {xReport.total_petty_cash_out > 0 && (
                   <div className="flex justify-between items-center py-2.5">
-                    <span className="text-danger">Petty Cash Disbursed</span>
+                    <span className="text-danger">{t('shift.pettyCashDisbursed')}</span>
                     <span className="font-bold tabular-nums text-danger">
                       − ETB {fmt(xReport.total_petty_cash_out)}
                     </span>
@@ -574,19 +599,19 @@ export const ShiftManagement: React.FC = () => {
               <div className="flex justify-between items-center">
                 <div>
                   <span className="text-xs uppercase tracking-wider font-extrabold text-text-muted">
-                    Expected Cash in Drawer
+                    {t('shift.expectedCash')}
                   </span>
                   <p className="text-[11px] text-text-dim mt-0.5">
                     {xReport.is_blind_close
-                      ? 'Blind Close Policy: System total hidden from Cashier role until physical count is submitted'
-                      : 'Live mathematical balance: float + net cash sales - safe drops - refunds'}
+                      ? t('shift.blindClosePolicy')
+                      : t('shift.liveMathematicalBalance')}
                   </p>
                 </div>
 
                 {xReport.is_blind_close ? (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-primary/10 text-primary border border-primary/20">
                     <Lock size={14} />
-                    <span>Protected (Blind Close)</span>
+                    <span>{t('shift.protectedBlindClose')}</span>
                   </span>
                 ) : (
                   <span className="text-xl font-black tabular-nums text-primary">
@@ -608,7 +633,7 @@ export const ShiftManagement: React.FC = () => {
                 }}
               >
                 <ArrowDownCircle size={18} />
-                <span>Safe Drop</span>
+                <span>{t('shift.safeDrop')}</span>
               </button>
 
               <button
@@ -617,7 +642,7 @@ export const ShiftManagement: React.FC = () => {
                 onClick={startCloseShiftFlow}
               >
                 <Lock size={18} />
-                <span>Close Shift (Guided)</span>
+                <span>{t('shift.closeShiftGuided')}</span>
               </button>
             </div>
           </div>
@@ -632,10 +657,10 @@ export const ShiftManagement: React.FC = () => {
                   </div>
                   <div>
                     <h2 className="font-extrabold text-base text-text-main">
-                      Shift Cash Drops ({cashDrops.length})
+                      {t('shift.shiftCashDrops', { count: cashDrops.length })}
                     </h2>
                     <p className="text-xs text-text-muted">
-                      Mid-shift safe transfers and vault drops
+                      {t('shift.midShiftTransfers')}
                     </p>
                   </div>
                 </div>
@@ -645,7 +670,7 @@ export const ShiftManagement: React.FC = () => {
                   className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Plus size={13} />
-                  <span>New Drop</span>
+                  <span>{t('shift.newDrop')}</span>
                 </button>
               </div>
 
@@ -653,10 +678,10 @@ export const ShiftManagement: React.FC = () => {
                 <div className="flex flex-col items-center justify-center py-16 text-center text-text-muted">
                   <Coins size={36} className="text-text-dim mb-3 opacity-50" />
                   <p className="text-sm font-semibold text-text-main">
-                    No safe drops recorded yet this shift
+                    {t('shift.noDropsYet')}
                   </p>
                   <p className="text-xs text-text-dim max-w-xs mt-1">
-                    When cash in the drawer exceeds security limits, perform a safe drop to transfer excess funds to the back office safe.
+                    {t('shift.noDropsDesc')}
                   </p>
                 </div>
               ) : (
@@ -672,7 +697,7 @@ export const ShiftManagement: React.FC = () => {
                           {d.amount >= 2000 && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                               <ShieldCheck size={10} />
-                              Authorized
+                              {t('shift.authorized')}
                             </span>
                           )}
                         </div>
@@ -715,10 +740,10 @@ export const ShiftManagement: React.FC = () => {
             <Coins size={32} />
           </div>
           <h2 className="text-xl font-extrabold text-text-main">
-            No Active Cashier Shift on {terminalCode}
+            {t('shift.noActiveShift', { terminal: terminalCode })}
           </h2>
           <p className="text-sm text-text-muted mt-2 max-w-md mx-auto">
-            Opening a register shift requires counting and recording the physical opening cash float in the drawer. Each terminal permits only one open shift at a time.
+            {t('shift.noActiveShiftDesc')}
           </p>
 
           <div className="mt-8">
@@ -728,7 +753,7 @@ export const ShiftManagement: React.FC = () => {
               onClick={() => setIsOpenShiftModalOpen(true)}
             >
               <Sparkles size={18} />
-              <span>Start Guided Opening Shift</span>
+              <span>{t('shift.startGuidedOpening')}</span>
             </button>
           </div>
         </div>
@@ -740,26 +765,26 @@ export const ShiftManagement: React.FC = () => {
       <Modal
         isOpen={isOpenShiftModalOpen}
         onClose={() => setIsOpenShiftModalOpen(false)}
-        title="Open New Register Shift · Guided Float Count"
+        title={t('shift.guidedFloatCountTitle')}
         maxWidth="lg"
       >
         <div className="flex flex-col gap-5 py-2">
           {/* Identity confirmation */}
           <div className="p-3 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between text-xs">
             <div>
-              <span className="text-text-dim">Terminal & Lane:</span>{' '}
+              <span className="text-text-dim">{t('shift.terminalAndLane')}</span>{' '}
               <span className="font-bold text-text-main">{terminalCode} ({branchName})</span>
             </div>
             <div>
-              <span className="text-text-dim">Cashier:</span>{' '}
+              <span className="text-text-dim">{t('shift.cashier')}:</span>{' '}
               <span className="font-bold text-primary">{cashierName}</span>
             </div>
           </div>
 
           <div>
             <label className="text-xs font-bold text-text-main flex items-center justify-between mb-2">
-              <span>Denomination Counter (Ethiopian Birr)</span>
-              <span className="text-text-dim">Click denomination to enter via Keypad</span>
+              <span>{t('shift.denomCounterTitle')}</span>
+              <span className="text-text-dim">{t('shift.clickDenomHint')}</span>
             </label>
 
             {/* Denomination Counter Grid */}
@@ -824,7 +849,7 @@ export const ShiftManagement: React.FC = () => {
           {/* Quick presets & Total */}
           <div className="flex items-center justify-between p-4 rounded-xl bg-primary-soft/40 border border-primary/20">
             <div>
-              <span className="text-xs font-semibold text-text-muted">Total Calculated Opening Float</span>
+              <span className="text-xs font-semibold text-text-muted">{t('shift.totalCalcOpeningFloat')}</span>
               <div className="text-2xl font-black text-primary tabular-nums">
                 ETB {fmt(openFloatTotal)}
               </div>
@@ -850,12 +875,12 @@ export const ShiftManagement: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-xs font-bold text-text-muted mb-1 block">Shift Opening Notes</label>
+            <label className="text-xs font-bold text-text-muted mb-1 block">{t('shift.shiftOpeningNotes')}</label>
             <input
               type="text"
               value={openNotes}
               onChange={(e) => setOpenNotes(e.target.value)}
-              placeholder="e.g. Standard morning float checked and counted"
+              placeholder={t('shift.openingNotesPlaceholder')}
               className="w-full text-xs p-2.5 rounded-xl bg-surface border border-border-subtle text-text-main focus:border-primary focus:outline-none"
             />
           </div>
@@ -874,7 +899,7 @@ export const ShiftManagement: React.FC = () => {
               disabled={isOpenSubmitting || openFloatTotal <= 0}
               onClick={handleOpenShiftSubmit}
             >
-              {isOpenSubmitting ? 'Opening Shift...' : `Confirm Float (ETB ${fmt(openFloatTotal)})`}
+              {isOpenSubmitting ? t('common.loading') : t('shift.confirmFloat', { amount: formatCurrency(openFloatTotal) })}
             </button>
           </div>
         </div>
@@ -886,7 +911,7 @@ export const ShiftManagement: React.FC = () => {
       <Modal
         isOpen={isDropModalOpen}
         onClose={() => setIsDropModalOpen(false)}
-        title="Record Mid-Shift Safe Drop"
+        title={t('shift.recordSafeDropTitle')}
         maxWidth="md"
       >
         <div className="flex flex-col gap-4 py-2">
@@ -899,7 +924,7 @@ export const ShiftManagement: React.FC = () => {
                 dropMode === 'quick' ? 'bg-surface text-primary shadow-soft' : 'text-text-muted'
               }`}
             >
-              Quick / NumberPad
+              {t('shift.quickKeypad')}
             </button>
             <button
               type="button"
@@ -908,14 +933,14 @@ export const ShiftManagement: React.FC = () => {
                 dropMode === 'denoms' ? 'bg-surface text-primary shadow-soft' : 'text-text-muted'
               }`}
             >
-              Denomination Breakdown
+              {t('shift.denomBreakdown')}
             </button>
           </div>
 
           {dropMode === 'quick' ? (
             <div className="flex flex-col gap-3">
               <div className="p-3 rounded-xl bg-surface border border-border-subtle flex items-center justify-between">
-                <span className="text-xs font-bold text-text-muted">Amount to Transfer to Vault</span>
+                <span className="text-xs font-bold text-text-muted">{t('shift.amountToTransfer')}</span>
                 <span className="text-2xl font-black text-amber-600 dark:text-amber-400 tabular-nums">
                   ETB {fmt(effectiveDropAmount)}
                 </span>
@@ -972,7 +997,7 @@ export const ShiftManagement: React.FC = () => {
 
           {/* Drop Reason */}
           <div>
-            <label className="text-xs font-bold text-text-muted mb-1 block">Drop Reason</label>
+            <label className="text-xs font-bold text-text-muted mb-1 block">{t('shift.dropReason')}</label>
             <select
               value={dropReason}
               onChange={(e) => setDropReason(e.target.value)}
@@ -990,10 +1015,10 @@ export const ShiftManagement: React.FC = () => {
             <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400">
               <div className="flex items-center gap-2 text-xs font-bold mb-1.5">
                 <ShieldAlert size={16} />
-                <span>Manager Authorization Required (≥ 2,000 ETB)</span>
+                <span>{t('shift.managerAuthRequired2000')}</span>
               </div>
               <p className="text-[11px] text-text-dim mb-3">
-                Ethiopian financial internal control requires supervisor sign-off for safe drops exceeding 2,000 ETB.
+                {t('shift.managerAuth2000Desc')}
               </p>
 
               {dropAuthorizer ? (
@@ -1014,7 +1039,7 @@ export const ShiftManagement: React.FC = () => {
                     maxLength={6}
                     value={dropManagerPin}
                     onChange={(e) => setDropManagerPin(e.target.value)}
-                    placeholder="Enter Supervisor PIN (e.g. 1234)"
+                    placeholder={t('shift.enterSupervisorPin')}
                     className="flex-1 text-xs p-2 rounded-lg bg-surface border border-border-subtle text-text-main focus:border-primary focus:outline-none"
                   />
                   <button
@@ -1054,7 +1079,7 @@ export const ShiftManagement: React.FC = () => {
               }
               onClick={handleRecordSafeDrop}
             >
-              {isDropSubmitting ? 'Recording Drop...' : `Transfer ETB ${fmt(effectiveDropAmount)} to Safe`}
+              {isDropSubmitting ? t('common.loading') : t('shift.transferToSafe', { amount: formatCurrency(effectiveDropAmount) })}
             </button>
           </div>
         </div>
@@ -1066,16 +1091,16 @@ export const ShiftManagement: React.FC = () => {
       <Modal
         isOpen={isCloseModalOpen}
         onClose={() => setIsCloseModalOpen(false)}
-        title="Guided Register Shift Closure"
+        title={t('shift.guidedClosureTitle')}
         maxWidth="lg"
       >
         <div className="flex flex-col gap-5 py-2">
           {/* Step Indicator */}
           <div className="flex items-center justify-between border-b border-border-subtle pb-3">
             {[
-              { id: 'prereq', label: '1. Prerequisites' },
-              { id: 'count', label: '2. Blind Count' },
-              { id: 'reconcile', label: '3. Variance Approval' },
+              { id: 'prereq', label: t('shift.stepPrereq') },
+              { id: 'count', label: t('shift.stepBlindCount') },
+              { id: 'reconcile', label: t('shift.stepVarianceApproval') },
             ].map((s) => {
               const isActive = closeStep === s.id;
               return (
@@ -1103,7 +1128,7 @@ export const ShiftManagement: React.FC = () => {
             <div className="flex flex-col gap-4">
               <div className="p-4 rounded-xl bg-surface-2 border border-border-subtle">
                 <h4 className="text-xs font-bold text-text-main mb-3 uppercase tracking-wider">
-                  Pre-Close Invariants & Security Checks
+                  {t('shift.preCloseChecks')}
                 </h4>
 
                 {/* Invariant 1: Held Baskets Check */}
@@ -1137,9 +1162,9 @@ export const ShiftManagement: React.FC = () => {
                 <div className="p-3 rounded-xl border bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
                   <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-bold text-xs">Monotonic Shift Integrity</div>
+                    <div className="font-bold text-xs">{t('shift.monotonicIntegrity')}</div>
                     <p className="text-[11px] opacity-90 mt-0.5">
-                      Closing Shift #{currentShift?.shiftNumber} on {terminalCode}. Next shift will monotonically advance.
+                      {t('shift.closingShiftNotice', { shiftNumber: currentShift?.shiftNumber || 1, terminal: terminalCode })}
                     </p>
                   </div>
                 </div>
@@ -1159,7 +1184,7 @@ export const ShiftManagement: React.FC = () => {
                   onClick={() => setCloseStep('count')}
                   className="btn-primary px-6 py-2.5 font-bold flex items-center gap-1.5"
                 >
-                  <span>Proceed to Blind Cash Count</span>
+                  <span>{t('shift.proceedToBlindCount')}</span>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -1173,10 +1198,10 @@ export const ShiftManagement: React.FC = () => {
                 <Lock size={22} className="text-primary flex-shrink-0" />
                 <div>
                   <h4 className="text-xs font-black text-text-main">
-                    Blind Close Protocol Active
+                    {t('shift.blindCloseActiveTitle')}
                   </h4>
                   <p className="text-[11px] text-text-muted mt-0.5">
-                    System expected cash is strictly hidden. Count all physical cash notes and coins in your drawer below.
+                    {t('shift.blindCloseActiveDesc')}
                   </p>
                 </div>
               </div>
@@ -1240,8 +1265,8 @@ export const ShiftManagement: React.FC = () => {
               {/* Running Counted Cash Total */}
               <div className="p-3.5 rounded-xl bg-surface border border-border-subtle flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-bold text-text-muted">Total Physical Cash Counted</span>
-                  <p className="text-[11px] text-text-dim">Calculated from denomination breakdown</p>
+                  <span className="text-xs font-bold text-text-muted">{t('shift.totalPhysicalCashCounted')}</span>
+                  <p className="text-[11px] text-text-dim">{t('shift.calcFromDenoms')}</p>
                 </div>
                 <div className="text-2xl font-black text-primary tabular-nums">
                   ETB {fmt(closeDenomsTotal)}
@@ -1250,12 +1275,12 @@ export const ShiftManagement: React.FC = () => {
 
               {/* Notes */}
               <div>
-                <label className="text-xs font-bold text-text-muted mb-1 block">Closing Remarks</label>
+                <label className="text-xs font-bold text-text-muted mb-1 block">{t('shift.closingRemarks')}</label>
                 <input
                   type="text"
                   value={closeNotes}
                   onChange={(e) => setCloseNotes(e.target.value)}
-                  placeholder="e.g. Regular close, counted with supervisor"
+                  placeholder={t('shift.closingRemarksPlaceholder')}
                   className="w-full text-xs p-2.5 rounded-xl bg-surface border border-border-subtle text-text-main focus:border-primary focus:outline-none"
                 />
               </div>
@@ -1279,7 +1304,7 @@ export const ShiftManagement: React.FC = () => {
                   className="btn-primary px-6 py-2.5 font-bold flex items-center gap-1.5"
                   onClick={handleSubmitPhysicalCount}
                 >
-                  <span>Submit Physical Count & Evaluate</span>
+                  <span>{t('shift.submitPhysicalCount')}</span>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -1292,14 +1317,14 @@ export const ShiftManagement: React.FC = () => {
               {/* Expected vs Counted Comparison */}
               <div className="p-4 rounded-xl bg-surface border border-border-subtle divide-y divide-border-subtle text-sm">
                 <div className="flex justify-between items-center pb-2.5">
-                  <span className="text-text-muted">Physical Counted Cash:</span>
+                  <span className="text-text-muted">{t('shift.physicalCountedCash')}</span>
                   <span className="font-bold text-text-main tabular-nums">
                     ETB {fmt(submittedPhysicalCash)}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center py-2.5">
-                  <span className="text-text-muted">Expected System Cash:</span>
+                  <span className="text-text-muted">{t('shift.expectedSystemCash')}</span>
                   <span className="font-bold text-primary tabular-nums">
                     ETB {fmt(xReport?.expected_cash ?? 0)}
                   </span>
@@ -1314,7 +1339,7 @@ export const ShiftManagement: React.FC = () => {
                     <div className="pt-2.5">
                       <div className="flex justify-between items-center">
                         <span className="font-extrabold text-text-main">
-                          Variance (Over / Short):
+                          {t('shift.varianceOverShort')}
                         </span>
                         <span
                           className={`text-lg font-black tabular-nums ${
@@ -1330,16 +1355,16 @@ export const ShiftManagement: React.FC = () => {
                         {!isExceeded ? (
                           <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2 font-semibold">
                             <CheckCircle size={16} />
-                            <span>Variance is within the allowable threshold (≤ 50.00 ETB). Ready to finalize.</span>
+                            <span>{t('shift.varianceWithinThreshold')}</span>
                           </div>
                         ) : (
                           <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs">
                             <div className="flex items-center gap-2 font-bold mb-1">
                               <ShieldAlert size={16} />
-                              <span>Variance Exceeds 50.00 ETB Threshold · Manager Approval Required</span>
+                              <span>{t('shift.varianceExceedsThreshold')}</span>
                             </div>
                             <p className="text-[11px] opacity-90 mb-3">
-                              Variance of {Math.abs(variance).toFixed(2)} ETB requires supervisor PIN authorization before this shift can be sealed.
+                              {t('shift.varianceRequiresSupervisor', { amount: formatCurrency(Math.abs(variance)) })}
                             </p>
 
                             {closeAuthorizer ? (
@@ -1392,7 +1417,7 @@ export const ShiftManagement: React.FC = () => {
                   className="btn-secondary px-5 py-2.5"
                   onClick={() => setCloseStep('count')}
                 >
-                  Recount
+                  {t('shift.recount')}
                 </button>
                 <button
                   type="button"
@@ -1406,7 +1431,7 @@ export const ShiftManagement: React.FC = () => {
                   className="btn-danger px-6 py-2.5 font-bold flex items-center gap-1.5"
                 >
                   <Lock size={16} />
-                  <span>{isCloseSubmitting ? 'Sealing Shift...' : 'Seal & Emit Z-Report'}</span>
+                  <span>{isCloseSubmitting ? t('common.loading') : t('shift.sealAndEmitZReport')}</span>
                 </button>
               </div>
             </div>
@@ -1420,7 +1445,7 @@ export const ShiftManagement: React.FC = () => {
       <Modal
         isOpen={isZReportModalOpen}
         onClose={() => setIsZReportModalOpen(false)}
-        title="Z-Report Generated (Immutable Financial Record)"
+        title={t('shift.zReportGeneratedTitle')}
         maxWidth="md"
       >
         {zReportData && (
@@ -1429,10 +1454,10 @@ export const ShiftManagement: React.FC = () => {
               <CheckCircle size={20} />
               <div>
                 <h4 className="font-extrabold text-xs">
-                  Shift #{zReportData.shiftNumber} Sealed and Recorded
+                  {t('shift.shiftSealedAndRecorded', { shiftNumber: zReportData.shiftNumber })}
                 </h4>
                 <p className="text-[11px] opacity-90 mt-0.5">
-                  Audited to sync outbox event SHIFT_CLOSED. Z-Report numbers are immutable.
+                  {t('shift.zReportImmutableNotice')}
                 </p>
               </div>
             </div>
@@ -1441,7 +1466,7 @@ export const ShiftManagement: React.FC = () => {
             <div className="p-5 rounded-xl bg-surface-2 border border-border-subtle font-mono text-xs leading-relaxed text-text-main shadow-inner">
               <div className="text-center font-bold text-sm mb-1">{branchName.toUpperCase()}</div>
               <div className="text-center text-[11px] text-text-dim mb-3">
-                Z-REPORT (DAILY REGISTER CLOSING)
+                {t('shift.dailyRegisterClosing')}
               </div>
 
               <div className="border-t border-b border-dashed border-border-subtle py-2 mb-3 flex flex-col gap-1 text-[11px]">
@@ -1534,7 +1559,7 @@ export const ShiftManagement: React.FC = () => {
                 onClick={handlePrintZReport}
               >
                 <Printer size={16} />
-                <span>Print Z-Report</span>
+                <span>{t('shift.printZReport')}</span>
               </button>
               <button
                 type="button"

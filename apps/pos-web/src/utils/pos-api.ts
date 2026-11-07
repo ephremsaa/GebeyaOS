@@ -54,6 +54,16 @@ export interface XReportData {
   total_petty_cash_out: number;
   expected_cash: number | null;
   is_blind_close: boolean;
+  totalSalesCount?: number;
+  grossSalesAmount?: number;
+  cashSalesAmount?: number;
+  telebirrSalesAmount?: number;
+  cbeBirrSalesAmount?: number;
+  cardSalesAmount?: number;
+  totalRefunds?: number;
+  totalCashDrops?: number;
+  totalPettyCashOut?: number;
+  expectedCashInDrawer?: number | null;
 }
 
 export interface CashMovementRecord {
@@ -182,7 +192,48 @@ export const posApi = {
         headers,
       });
       if (res.ok) {
-        return await res.json();
+        const raw = await res.json();
+        const salesCount = Number(raw.totalSalesCount ?? raw.total_sales_count ?? 0);
+        const grossAmount = Number(raw.grossSalesAmount ?? raw.gross_sales_amount ?? 0);
+        const cashAmount = Number(raw.cashSalesAmount ?? raw.cash_sales_amount ?? 0);
+        const telebirrAmount = Number(raw.telebirrSalesAmount ?? raw.telebirr_sales_amount ?? 0);
+        const cbeBirrAmount = Number(raw.cbeBirrSalesAmount ?? raw.cbe_birr_sales_amount ?? 0);
+        const cardAmount = Number(raw.cardSalesAmount ?? raw.card_sales_amount ?? 0);
+        const floatAmount = Number(raw.openingFloat ?? raw.opening_float ?? 0);
+        const cashDrops = Number(raw.totalCashDrops ?? raw.total_cash_drops ?? 0);
+        const pettyCash = Number(raw.totalPettyCashOut ?? raw.total_petty_cash_out ?? 0);
+        const refunds = Number(raw.totalRefunds ?? raw.total_refunds ?? 0);
+        const expected = raw.expectedCashInDrawer !== undefined ? raw.expectedCashInDrawer : (raw.expected_cash ?? null);
+
+        return {
+          shift_id: raw.shiftId || raw.shift_id || shiftId,
+          terminal_id: raw.terminalId || raw.terminal_id || '',
+          cashier_id: raw.cashierId || raw.cashier_id || '',
+          shift_number: Number(raw.shiftNumber || raw.shift_number || 1),
+          status: raw.status || 'OPEN',
+          opened_at: raw.openedAt || raw.opened_at || new Date().toISOString(),
+          opening_float: floatAmount,
+          total_sales_count: salesCount,
+          totalSalesCount: salesCount,
+          gross_sales_amount: grossAmount,
+          grossSalesAmount: grossAmount,
+          cash_sales_amount: cashAmount,
+          cashSalesAmount: cashAmount,
+          telebirr_sales_amount: telebirrAmount,
+          telebirrSalesAmount: telebirrAmount,
+          cbe_birr_sales_amount: cbeBirrAmount,
+          cbeBirrSalesAmount: cbeBirrAmount,
+          card_sales_amount: cardAmount,
+          cardSalesAmount: cardAmount,
+          total_refunds: refunds,
+          total_cash_drops: cashDrops,
+          totalCashDrops: cashDrops,
+          total_petty_cash_out: pettyCash,
+          totalPettyCashOut: pettyCash,
+          expected_cash: expected,
+          expectedCashInDrawer: expected,
+          is_blind_close: Boolean(raw.isBlindClose ?? raw.is_blind_close ?? (userRole?.toUpperCase() === 'CASHIER')),
+        };
       }
     } catch {
       // Offline fallback
