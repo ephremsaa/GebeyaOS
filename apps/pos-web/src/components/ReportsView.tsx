@@ -28,6 +28,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useI18n } from '../i18n/I18nContext';
 import {
   DailySalesReport,
   ProductProfitabilityReport,
@@ -53,6 +54,7 @@ const AVAILABLE_BRANCHES: BranchOption[] = [
 
 export const ReportsView: React.FC = () => {
   const { currentUser } = useAuth();
+  const { t, language, formatCurrency } = useI18n();
 
   // Role authority check: Owner and HQ Admin see consolidated multi-branch selector; branch managers are locked to branch
   const isHqUser = currentUser?.role === 'OWNER' || currentUser?.role === 'HQ_ADMIN';
@@ -280,7 +282,7 @@ export const ReportsView: React.FC = () => {
                 style={{ color: timeRange === r ? '#fff' : 'var(--text-muted)' }}
                 onClick={() => setTimeRange(r)}
               >
-                {r === 'today' ? 'Today' : r === 'yesterday' ? 'Yesterday' : r === 'week' ? 'Week' : r === 'month' ? 'Month' : 'Custom'}
+                {r === 'today' ? t('reports.today') : r === 'yesterday' ? t('reports.yesterday') : r === 'week' ? t('reports.week') : r === 'month' ? t('reports.month') : t('reports.custom')}
               </button>
             ))}
           </div>
@@ -294,7 +296,7 @@ export const ReportsView: React.FC = () => {
             style={{ height: '34px', padding: '0 10px' }}
           >
             <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
-            <span>Sync</span>
+            <span>{t('reports.sync')}</span>
           </button>
 
           {/* Export Menu Dropdown */}
@@ -305,7 +307,7 @@ export const ReportsView: React.FC = () => {
               style={{ height: '34px', padding: '0 14px' }}
             >
               <Download size={14} />
-              <span>Export</span>
+              <span>{t('reports.export')}</span>
               <ChevronDown size={12} />
             </button>
 
