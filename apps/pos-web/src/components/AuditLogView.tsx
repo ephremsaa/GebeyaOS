@@ -30,7 +30,7 @@ interface AuditLogRow {
 }
 
 export const AuditLogView: React.FC = () => {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const { currentUser } = useAuth();
 
   const [logs, setLogs] = useState<AuditLogRow[]>([]);

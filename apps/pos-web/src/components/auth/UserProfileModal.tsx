@@ -214,7 +214,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 : 'border-transparent text-text-muted hover:text-text-main'
             }`}
           >
-            Profile & Preferences
+            {t('tabProfile')}
           </button>
           <button
             type="button"
@@ -225,7 +225,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 : 'border-transparent text-text-muted hover:text-text-main'
             }`}
           >
-            Password & PIN
+            {t('tabSecurity')}
           </button>
           <button
             type="button"
@@ -260,7 +260,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
               <div className="grid grid-cols-2 gap-3 text-xs p-3 rounded-2xl bg-surface-2 border border-border-subtle">
                 <div>
-                  <span className="text-text-muted">Supermarket:</span>
+                  <span className="text-text-muted">{t('supermarket')}</span>
                   <p className="font-semibold text-text-main">{currentUser?.tenantName || ''}</p>
                 </div>
                 <div>
@@ -278,7 +278,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-main mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-text-main mb-1">{t('fullNameLabel')}</label>
                 <input
                   type="text"
                   required
@@ -289,7 +289,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-main mb-1">Phone Number</label>
+                <label className="block text-xs font-semibold text-text-main mb-1">{t('phoneLabel')}</label>
                 <input
                   type="text"
                   value={phone}
@@ -348,7 +348,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 disabled={isSavingProfile}
                 className="btn-primary py-2.5 rounded-xl text-xs font-bold mt-2"
               >
-                {isSavingProfile ? 'Saving...' : 'Save Profile Changes'}
+                {isSavingProfile ? t('saving') : t('saveProfileChanges')}
               </button>
             </form>
           )}
@@ -360,7 +360,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-text-main">
                   <Lock size={15} className="text-primary" />
-                  <span>Change Password</span>
+                  <span>{t('changePassword')}</span>
                 </div>
 
                 {passSuccess && (
@@ -371,7 +371,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 )}
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-text-muted mb-1">Current Password</label>
+                  <label className="block text-[11px] font-semibold text-text-muted mb-1">{t('currentPasswordLabel')}</label>
                   <input
                     type="password"
                     required
@@ -412,7 +412,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-text-muted mb-1">Confirm New Password</label>
+                  <label className="block text-[11px] font-semibold text-text-muted mb-1">{t('confirmNewPasswordLabel')}</label>
                   <input
                     type="password"
                     required
@@ -427,7 +427,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   disabled={isChangingPass || !newPassStrength.isValid}
                   className="btn-primary py-2 rounded-xl text-xs font-bold self-start mt-1"
                 >
-                  {isChangingPass ? 'Updating...' : 'Update Password'}
+                  {isChangingPass ? t('saving') : t('updatePasswordBtn')}
                 </button>
               </form>
 
@@ -437,7 +437,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               <form onSubmit={handleChangePin} className="flex flex-col gap-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-text-main">
                   <KeyRound size={15} className="text-primary" />
-                  <span>Change Cashier POS PIN (4-6 Digits)</span>
+                  <span>{t('changeCashierPin')}</span>
                 </div>
 
                 {pinSuccess && (
@@ -449,7 +449,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-text-muted mb-1">New PIN</label>
+                    <label className="block text-[11px] font-semibold text-text-muted mb-1">{t('newPinLabel')}</label>
                     <input
                       type="password"
                       maxLength={6}
@@ -461,7 +461,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-text-muted mb-1">Confirm PIN</label>
+                    <label className="block text-[11px] font-semibold text-text-muted mb-1">{t('confirmPinLabel')}</label>
                     <input
                       type="password"
                       maxLength={6}
@@ -479,7 +479,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   disabled={isChangingPin || newPin.length < 4}
                   className="btn-secondary py-2 rounded-xl text-xs font-bold self-start mt-1"
                 >
-                  {isChangingPin ? 'Updating...' : 'Update Cashier PIN'}
+                  {isChangingPin ? t('saving') : t('updateCashierPinBtn')}
                 </button>
               </form>
             </div>
@@ -492,7 +492,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 <div>
                   <h3 className="text-xs font-bold text-text-main">{t('activeSessionsTitle')}</h3>
                   <p className="text-[11px] text-text-muted">
-                    Manage active sign-in sessions for your account across terminals and browsers.
+                    {t('manageActiveSessionsDesc')}
                   </p>
                 </div>
                 <button
@@ -512,10 +512,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               )}
 
               {sessionsLoading ? (
-                <div className="p-6 text-center text-xs text-text-muted">Loading active sessions...</div>
+                <div className="p-6 text-center text-xs text-text-muted">{t('loadingSessions')}</div>
               ) : sessions.length === 0 ? (
                 <div className="p-4 rounded-2xl bg-surface-2 border border-border-subtle text-xs text-text-muted text-center">
-                  1 Active LAN Session (Current device)
+                  {t('oneActiveSession')}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">

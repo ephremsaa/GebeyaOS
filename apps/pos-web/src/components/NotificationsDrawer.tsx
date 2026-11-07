@@ -37,7 +37,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
   onNavigate,
   onUnreadCountChange,
 }) => {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -87,10 +87,10 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                {language === 'am' ? 'የማሳወቂያ ሳጥን' : 'Notification Center'}
+                {t('notificationCenter')}
               </h2>
               <p className="text-[11px] text-slate-400">
-                {notifications.length} {language === 'am' ? 'አስቸኳይ ማንቂያዎች' : 'active system alert(s)'}
+                {t('activeSystemAlerts', { count: notifications.length })}
               </p>
             </div>
           </div>
@@ -118,7 +118,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
           {loading ? (
             <div className="py-12 text-center text-slate-400 text-xs">
               <RefreshCw className="animate-spin inline-block mr-2" size={16} />
-              Loading real-time notifications...
+              {t('loadingNotifications')}
             </div>
           ) : notifications.length === 0 ? (
             <div className="py-16 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
@@ -129,7 +129,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                 All systems healthy!
               </span>
               <p className="text-[11px] text-slate-400 max-w-xs">
-                No stockouts, expiring batches, sync delays, or cash threshold alerts at this time.
+                {t('allSystemsHealthyDesc')}
               </p>
             </div>
           ) : (
@@ -180,7 +180,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between pt-1 border-t border-black/5 dark:border-white/5 text-[10px]">
-                    <span className="opacity-60">Just now</span>
+                    <span className="opacity-60">{t('justNow')}</span>
                     {item.actionUrl && (
                       <button
                         onClick={() => {
@@ -189,7 +189,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                         }}
                         className="font-bold flex items-center gap-1 hover:underline cursor-pointer"
                       >
-                        Resolve issue <ArrowRight size={11} />
+                        {t('resolveIssue')} <ArrowRight size={11} />
                       </button>
                     )}
                   </div>
@@ -201,12 +201,12 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 
         {/* Footer */}
         <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 flex items-center justify-between">
-          <span>Branch LAN Guardian</span>
+          <span>{t('branchLanGuardian')}</span>
           <button
             onClick={fetchAlerts}
             className="font-bold text-gebeya-600 hover:underline flex items-center gap-1"
           >
-            <RefreshCw size={11} /> Refresh
+            <RefreshCw size={11} /> {t('refresh')}
           </button>
         </div>
       </div>
