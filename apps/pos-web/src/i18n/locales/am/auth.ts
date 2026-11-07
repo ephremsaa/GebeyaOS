@@ -71,3 +71,4 @@ export const authAm = {
   managerPinLabel: 'የሱቅ ኃላፊ ፒን',
   authorizeAction: 'አረጋግጥ',
 };
+

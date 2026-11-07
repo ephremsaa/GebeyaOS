@@ -13,3 +13,4 @@ export const errorsEn = {
   GENERIC_ERROR: 'An unexpected error occurred. Please try again.',
   MISSING_PARAM: 'Required parameter {{param}} is missing.',
 };
+

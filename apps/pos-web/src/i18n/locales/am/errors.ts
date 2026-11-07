@@ -13,3 +13,4 @@ export const errorsAm = {
   GENERIC_ERROR: 'ያልተጠበቀ ስህተት አጋጥሟል። እባክዎ እንደገና ይሞክሩ።',
   MISSING_PARAM: 'አስፈላጊው መረጃ {{param}} አልተገኘም።',
 };
+

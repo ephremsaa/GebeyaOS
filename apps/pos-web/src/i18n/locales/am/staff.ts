@@ -140,5 +140,15 @@ export const staffAm = {
   "permManageStaff": "ሰራተኞችን እና ፈቃዶችን ማስተዳደር",
   "staffCreatedSuccess": "የሰራተኛው መለያ በተሳካ ሁኔታ ተፈጥሯል።",
   "staffUpdatedSuccess": "የሰራተኛው መረጃ በተሳካ ሁኔታ ተሻሽሏል።",
-  "rolesAndMatrix": "የስራ ድርሻዎች እና የፈቃድ ዝርዝር"
+  "rolesAndMatrix": "የስራ ድርሻዎች እና የፈቃድ ዝርዝር",
+  "editStaff": "የሰራተኛ መረጃ ማስተካከያ",
+  "editStaffModalTitle": "የሰራተኛ መረጃ ማስተካከያ",
+  "editStaffModalDesc": "ሙሉ ስም፣ ስልክ ቁጥር፣ የስራ ድርሻ ወይም የተመደበበትን ቅርንጫፍ ያስተካክሉ።",
+  "saveUserChanges": "ለውጦችን መዝግብ",
+  "deleteStaff": "ሰራተኛውን ሰርዝ",
+  "deleteStaffConfirm": "የሰራተኛ መለያ @{{username}} ለመሰረዝ እርግጠኛ ነዎት? ይህ እርምጃ ሊመለስ አይችልም።",
+  "staffDeletedSuccess": "የሰራተኛው መለያ በተሳካ ሁኔታ ተሰርዟል።",
+  "cannotDeleteOwner": "የመጨረሻው ባለቤት ሊሰረዝ አይችልም።",
+  "editStaffTooltip": "የሰራተኛውን መረጃ አስተካክል",
+  "deleteStaffTooltip": "የሰራተኛ መለያ ሰርዝ"
 };

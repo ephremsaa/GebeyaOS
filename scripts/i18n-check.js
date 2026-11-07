@@ -6,8 +6,8 @@ function loadNamespace(lang, ns) {
   const filePath = path.resolve(__dirname, `../apps/pos-web/src/i18n/locales/${lang}/${ns}.ts`);
   const content = fs.readFileSync(filePath, 'utf8');
   
-  // Extract key-value pairs using regex
-  const kvRegex = /^\s*([a-zA-Z0-9_]+)\s*:\s*['"`]([\s\S]*?)['"`],?$/gm;
+  // Extract key-value pairs using regex (supporting both unquoted and quoted keys)
+  const kvRegex = /^\s*["']?([a-zA-Z0-9_]+)["']?\s*:\s*['"`]([\s\S]*?)['"`],?$/gm;
   const dict = {};
   let match;
   while ((match = kvRegex.exec(content)) !== null) {
@@ -78,3 +78,4 @@ if (hasErrors) {
   console.log('\n✨ All namespaces passed i18n parity check with 100% Amharic & English coverage!');
   process.exit(0);
 }
+

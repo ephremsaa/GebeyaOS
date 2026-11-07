@@ -45,3 +45,4 @@ assert.throws(() => {
 console.log('✅ Plural & Interpolation tests passed.');
 
 console.log('✨ All i18n foundation unit checks passed!');
+

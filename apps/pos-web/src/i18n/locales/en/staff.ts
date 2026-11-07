@@ -140,5 +140,15 @@ export const staffEn = {
   "permManageStaff": "Manage Staff & Roles",
   "staffCreatedSuccess": "Employee account created successfully.",
   "staffUpdatedSuccess": "Employee account updated successfully.",
-  "rolesAndMatrix": "Roles & Permission Matrix"
+  "rolesAndMatrix": "Roles & Permission Matrix",
+  "editStaff": "Edit Staff Member",
+  "editStaffModalTitle": "Edit Staff Member",
+  "editStaffModalDesc": "Update full name, phone number, store role, or assigned branch.",
+  "saveUserChanges": "Save Changes",
+  "deleteStaff": "Delete Staff Member",
+  "deleteStaffConfirm": "Are you sure you want to delete staff account @{{username}}? This action cannot be undone.",
+  "staffDeletedSuccess": "Staff account deleted successfully.",
+  "cannotDeleteOwner": "The last active Owner cannot be deleted.",
+  "editStaffTooltip": "Edit Staff Details",
+  "deleteStaffTooltip": "Delete Staff Account"
 };

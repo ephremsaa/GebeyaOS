@@ -62,3 +62,4 @@ export const NAMESPACED_TRANSLATIONS = {
 } as const;
 
 export type TranslationNamespace = keyof typeof NAMESPACED_TRANSLATIONS.en;
+

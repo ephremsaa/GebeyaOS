@@ -13,21 +13,20 @@ import {
   Power,
   RotateCcw,
   Clock,
-  Eye,
   Filter,
   RefreshCw,
   ChevronRight,
-  Building2,
   Phone,
   Mail,
   AlertOctagon,
   Plus,
   Trash2,
   History,
-  FileSpreadsheet,
   Check,
-  Calendar,
   LockKeyhole,
+  Pencil,
+  Building2,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
@@ -153,10 +152,6 @@ export const GRANULAR_PERMISSIONS_LIST: GranularPermissionDef[] = [
   },
 ];
 
-const DEFAULT_DEMO_STAFF: StaffUser[] = [];
-const DEFAULT_DEMO_ROLES: RoleMatrixItem[] = [];
-const DEFAULT_DEMO_AUDIT_LOGS: AuditLogRow[] = [];
-
 export const UserManagementView: React.FC = () => {
   const { hasPermission } = useAuth();
   const { t, language } = useI18n();
@@ -167,6 +162,7 @@ export const UserManagementView: React.FC = () => {
   // Staff users state
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [roles, setRoles] = useState<RoleMatrixItem[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE' | 'LOCKED'>('ALL');
@@ -178,6 +174,7 @@ export const UserManagementView: React.FC = () => {
 
   // Modals & Drawer State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isResetPassModalOpen, setIsResetPassModalOpen] = useState(false);
   const [isResetPinModalOpen, setIsResetPinModalOpen] = useState(false);
   const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false);
@@ -196,6 +193,14 @@ export const UserManagementView: React.FC = () => {
   const [newInitialPass, setNewInitialPass] = useState('');
   const [newPin, setNewPin] = useState('');
   const [forcePassChange, setForcePassChange] = useState(true);
+
+  // Edit staff form state
+  const [editUserId, setEditUserId] = useState('');
+  const [editFullName, setEditFullName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<string>('CASHIER');
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Reset form values
   const [resetPassValue, setResetPassValue] = useState('');
@@ -223,6 +228,7 @@ export const UserManagementView: React.FC = () => {
 
   // Load users & roles from branch-server
   const fetchUsers = async () => {
+    setLoadingUsers(true);
     try {
       const token = localStorage.getItem('gebeyaos_access_token');
       const res = await fetch('/api/users', {
@@ -236,6 +242,8 @@ export const UserManagementView: React.FC = () => {
       }
     } catch {
       setUsers([]);
+    } finally {
+      setLoadingUsers(false);
     }
   };
 
@@ -259,6 +267,7 @@ export const UserManagementView: React.FC = () => {
   const fetchAuditLogs = async () => {
     setAuditLoading(true);
     try {
+      const token = localStorage.getItem('gebeyaos_access_token');
       const params = new URLSearchParams();
       if (auditActionFilter) params.append('action', auditActionFilter);
       if (auditModuleFilter) params.append('entityName', auditModuleFilter);
@@ -277,16 +286,17 @@ export const UserManagementView: React.FC = () => {
       }
       params.append('limit', '100');
 
-      const res = await fetch(`/api/system/audit-logs?${params.toString()}`);
+      const res = await fetch(`/api/system/audit-logs?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
-        setAuditLogs(data.rows && data.rows.length > 0 ? data.rows : DEFAULT_DEMO_AUDIT_LOGS);
+        setAuditLogs(data.rows && data.rows.length > 0 ? data.rows : []);
       } else {
-        setAuditLogs(DEFAULT_DEMO_AUDIT_LOGS);
+        setAuditLogs([]);
       }
     } catch {
-      // Demo audit logs fallback
-      setAuditLogs(DEFAULT_DEMO_AUDIT_LOGS);
+      setAuditLogs([]);
     } finally {
       setAuditLoading(false);
     }
@@ -351,12 +361,12 @@ export const UserManagementView: React.FC = () => {
       const created = await res.json();
       setUsers((prev) => [created, ...prev]);
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to create staff user");
+      setErrorMsg(err.message || 'Failed to create staff user');
       return;
     }
 
     setIsAddModalOpen(false);
-    setSuccessMsg(`Staff member ${newFullName.trim()} successfully provisioned.`);
+    setSuccessMsg(t('staff.staffCreatedSuccess'));
     setTimeout(() => setSuccessMsg(null), 4000);
 
     // Reset inputs for next quick staff creation
@@ -369,6 +379,117 @@ export const UserManagementView: React.FC = () => {
     setNewInitialPass('Gebeya@2026');
   };
 
+  // Open edit modal
+  const handleOpenEditModal = (user: StaffUser) => {
+    setEditUserId(user.id);
+    setEditFullName(user.fullName);
+    setEditPhone(user.phone);
+    setEditEmail(user.email || '');
+    setEditRole(user.role);
+    setIsEditModalOpen(true);
+  };
+
+  // Update staff member handler
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUserId) return;
+    setErrorMsg(null);
+    setIsSubmittingEdit(true);
+
+    try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const res = await fetch(`/api/users/${editUserId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fullName: editFullName.trim(),
+          phone: editPhone.trim(),
+          email: editEmail.trim() || undefined,
+          role: editRole,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to update user');
+      }
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === editUserId
+            ? {
+                ...u,
+                fullName: editFullName.trim(),
+                phone: editPhone.trim(),
+                email: editEmail.trim() || undefined,
+                role: editRole as RoleName,
+              }
+            : u,
+        ),
+      );
+
+      if (drawerUser && drawerUser.id === editUserId) {
+        setDrawerUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                fullName: editFullName.trim(),
+                phone: editPhone.trim(),
+                email: editEmail.trim() || undefined,
+                role: editRole as RoleName,
+              }
+            : null,
+        );
+      }
+
+      setIsEditModalOpen(false);
+      setSuccessMsg(t('staff.staffUpdatedSuccess'));
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to update staff user');
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  // Delete staff member handler
+  const handleDeleteUser = async (user: StaffUser) => {
+    if (user.role === 'OWNER' && activeOwnersCount <= 1) {
+      setErrorMsg(t('staff.cannotDeleteOwner'));
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
+    }
+
+    if (!window.confirm(t('staff.deleteStaffConfirm', { username: user.username }))) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to delete user');
+      }
+
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      if (drawerUser && drawerUser.id === user.id) {
+        setDrawerUser(null);
+      }
+      setSuccessMsg(t('staff.staffDeletedSuccess'));
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to delete staff user');
+    }
+  };
+
   // LAST-OWNER RULE ENFORCEMENT & IMMEDIATE SESSION REVOCATION
   const handleToggleActive = async (user: StaffUser) => {
     const isCurrentlyActive = user.isActive;
@@ -376,7 +497,7 @@ export const UserManagementView: React.FC = () => {
 
     // Check Last-Owner rule in UI
     if (user.role === 'OWNER' && isCurrentlyActive && activeOwnersCount <= 1) {
-      setErrorMsg('The last active Owner of the system cannot be deactivated or removed.');
+      setErrorMsg(t('staff.lastOwnerWarning'));
       setTimeout(() => setErrorMsg(null), 4000);
       return;
     }
@@ -398,7 +519,7 @@ export const UserManagementView: React.FC = () => {
       }
     } catch (err: any) {
       if (err.message.includes('last active Owner')) {
-        setErrorMsg('The last active Owner cannot be deactivated or removed.');
+        setErrorMsg(t('staff.lastOwnerWarning'));
         setTimeout(() => setErrorMsg(null), 4000);
         return;
       }
@@ -642,108 +763,115 @@ export const UserManagementView: React.FC = () => {
   const getRoleBadgeClass = (role: string) => {
     switch (role.toUpperCase()) {
       case 'OWNER':
-        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300';
+        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
       case 'HQ_ADMIN':
-        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-300';
+        return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20';
       case 'BRANCH_MANAGER':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300';
+        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20';
       case 'CASHIER':
-        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300';
+        return 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20';
       case 'STOREKEEPER':
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300';
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
       case 'ACCOUNTANT':
-        return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300 border-cyan-300';
+        return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20';
       default:
-        return 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300';
+        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
     }
   };
 
   const getActionBadgeClass = (action: string) => {
     if (action.includes('SUCCESS') || action.includes('CREATED') || action.includes('ACTIVATED')) {
-      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200';
+      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
     }
     if (action.includes('DEACTIVATED') || action.includes('DELETED') || action.includes('FAILED') || action.includes('LOCKOUT')) {
-      return 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 border-red-200';
+      return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
     }
     if (action.includes('PRICE') || action.includes('OVERRIDE') || action.includes('RESET')) {
-      return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200';
+      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
     }
     if (action.includes('ROLE') || action.includes('PERMISSION')) {
-      return 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border-teal-200';
+      return 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20';
     }
-    return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-200';
+    return 'bg-surface-2 text-text-muted border-border-subtle';
   };
 
   // Format relative time helper
   const formatTimeAgo = (isoString?: string | null) => {
-    if (!isoString) return 'Never logged in';
+    if (!isoString) return t('staff.neverLoggedIn');
     const diffMs = Date.now() - new Date(isoString).getTime();
     const mins = Math.floor(diffMs / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1) return t('staff.justNow');
+    if (mins < 60) return t('staff.minutesAgo', { mins });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t('staff.hoursAgo', { hours });
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return t('staff.daysAgo', { days });
   };
 
   return (
-    <div className="page-container select-none h-full flex flex-col overflow-hidden relative">
+    <div className="page-container select-none h-full flex flex-col overflow-hidden relative p-4 sm:p-6 bg-page">
       {/* ─── 1. Header Toolbar ─── */}
-      <div className="page-header flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-border-subtle flex-shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border-subtle shrink-0">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="page-title">{t('staff.title')}</h1>
-            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-primary-soft text-primary border border-primary/20">
-              {t('staff.totalUsersBadge', { count: users.length })}
-            </span>
-            <span className="px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              {t('staff.internalOnlyBadge')}
-            </span>
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-soft">
+              <Users size={22} className="stroke-[2.2]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-extrabold text-text-main tracking-tight">{t('staff.title')}</h1>
+                <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-primary-soft text-primary border border-primary/20">
+                  {t('staff.totalUsersBadge', { count: users.length })}
+                </span>
+                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-surface-2 border border-border-subtle text-text-muted">
+                  {t('staff.internalOnlyBadge')}
+                </span>
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">
+                {t('staff.subtitle')}
+              </p>
+            </div>
           </div>
-          <p className="page-subtitle text-xs text-text-muted mt-1">
-            {t('staff.subtitle')}
-          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {/* Top-Level Navigation Tabs */}
           <div className="flex items-center bg-surface-2 p-1 rounded-xl border border-border-subtle text-xs font-semibold">
             <button
               type="button"
               onClick={() => setActiveTab('staff')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'staff'
-                  ? 'bg-surface text-primary shadow-sm font-bold'
+                  ? 'bg-surface text-primary shadow-xs font-bold'
                   : 'text-text-muted hover:text-text-main'
               }`}
             >
               <Users size={14} />
-              Staff Directory
+              <span>{t('staff.staffDirectoryTab')}</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('roles')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'roles'
-                  ? 'bg-surface text-primary shadow-sm font-bold'
+                  ? 'bg-surface text-primary shadow-xs font-bold'
                   : 'text-text-muted hover:text-text-main'
               }`}
             >
               <ShieldCheck size={14} />
-              Roles &amp; Matrix
+              <span>{t('staff.rolesAndMatrixTab')}</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('audit')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'audit'
-                  ? 'bg-surface text-primary shadow-sm font-bold'
+                  ? 'bg-surface text-primary shadow-xs font-bold'
                   : 'text-text-muted hover:text-text-main'
               }`}
             >
               <History size={14} />
-              Audit Log
+              <span>{t('staff.auditLogTab')}</span>
             </button>
           </div>
 
@@ -751,7 +879,7 @@ export const UserManagementView: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-primary flex items-center gap-1.5 py-2 px-3 text-xs shadow-sm"
+            className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer"
             title={t('staff.quickAddTooltip')}
           >
             <UserPlus size={15} />
@@ -762,65 +890,65 @@ export const UserManagementView: React.FC = () => {
 
       {/* ─── Feedback alerts ─── */}
       {successMsg && (
-        <div className="alert-success my-2 flex items-center gap-2 text-xs py-2 px-3 rounded-xl border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 animate-in fade-in">
-          <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
-          <span>{successMsg}</span>
+        <div className="my-2 flex items-center gap-2 text-xs py-2.5 px-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 animate-in fade-in shadow-soft">
+          <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+          <span className="font-semibold">{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="my-2 flex items-center gap-2 text-xs py-2 px-3 rounded-xl border border-red-300 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 animate-in fade-in">
-          <AlertOctagon size={16} className="text-red-600 flex-shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="my-2 flex items-center gap-2 text-xs py-2.5 px-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 animate-in fade-in shadow-soft">
+          <AlertOctagon size={16} className="text-rose-500 shrink-0" />
+          <span className="font-semibold">{errorMsg}</span>
         </div>
       )}
 
       {/* ─── TAB 1: STAFF DIRECTORY ─── */}
       {activeTab === 'staff' && (
-        <div className="flex-1 flex flex-col overflow-hidden pt-3">
+        <div className="flex-1 flex flex-col overflow-hidden pt-3 gap-3">
           {/* Quick Metrics Ribbon */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3 flex-shrink-0">
-            <div className="glass-panel p-3 rounded-xl flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 flex items-center justify-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+            <div className="bg-surface p-3.5 rounded-2xl border border-border-subtle shadow-soft flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                 <Users size={18} />
               </div>
-              <div>
-                <span className="text-[11px] text-text-muted block font-medium">{t('staff.totalStaff')}</span>
-                <span className="text-base font-bold text-text-main">{users.length}</span>
+              <div className="min-w-0">
+                <span className="text-[11px] text-text-muted block font-medium truncate">{t('staff.totalStaff')}</span>
+                <span className="text-lg font-extrabold text-text-main">{users.length}</span>
               </div>
             </div>
 
-            <div className="glass-panel p-3 rounded-xl flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 flex items-center justify-center">
+            <div className="bg-surface p-3.5 rounded-2xl border border-border-subtle shadow-soft flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                 <Power size={18} />
               </div>
-              <div>
-                <span className="text-[11px] text-text-muted block font-medium">{t('staff.activeAccounts')}</span>
-                <span className="text-base font-bold text-text-main">
+              <div className="min-w-0">
+                <span className="text-[11px] text-text-muted block font-medium truncate">{t('staff.activeAccounts')}</span>
+                <span className="text-lg font-extrabold text-text-main">
                   {users.filter((u) => u.isActive).length}
                 </span>
               </div>
             </div>
 
-            <div className="glass-panel p-3 rounded-xl flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-700 flex items-center justify-center">
+            <div className="bg-surface p-3.5 rounded-2xl border border-border-subtle shadow-soft flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-500 flex items-center justify-center shrink-0">
                 <KeyRound size={18} />
               </div>
-              <div>
-                <span className="text-[11px] text-text-muted block font-medium">{t('staff.cashierLanes')}</span>
-                <span className="text-base font-bold text-text-main">
+              <div className="min-w-0">
+                <span className="text-[11px] text-text-muted block font-medium truncate">{t('staff.cashierLanes')}</span>
+                <span className="text-lg font-extrabold text-text-main">
                   {users.filter((u) => u.role === 'CASHIER').length}
                 </span>
               </div>
             </div>
 
-            <div className="glass-panel p-3 rounded-xl flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 flex items-center justify-center">
+            <div className="bg-surface p-3.5 rounded-2xl border border-border-subtle shadow-soft flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
                 <LockKeyhole size={18} />
               </div>
-              <div>
-                <span className="text-[11px] text-text-muted block font-medium">{t('staff.mustChangePass')}</span>
-                <span className="text-base font-bold text-text-main">
+              <div className="min-w-0">
+                <span className="text-[11px] text-text-muted block font-medium truncate">{t('staff.mustChangePass')}</span>
+                <span className="text-lg font-extrabold text-text-main">
                   {users.filter((u) => u.forcePasswordChange).length}
                 </span>
               </div>
@@ -828,12 +956,12 @@ export const UserManagementView: React.FC = () => {
           </div>
 
           {/* Search & Filtering Toolbar */}
-          <div className="flex flex-wrap items-center gap-2.5 mb-3 flex-shrink-0">
-            <div className="search-bar-wrapper flex-1 min-w-[220px]">
-              <Search size={15} className="text-text-muted" />
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0 bg-surface p-2.5 rounded-2xl border border-border-subtle shadow-soft">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
               <input
                 type="text"
-                className="search-input text-xs"
+                className="w-full pl-9 pr-8 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary transition-colors"
                 placeholder={t('staff.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -842,7 +970,7 @@ export const UserManagementView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSearch('')}
-                  className="text-text-muted hover:text-text-main"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-main"
                 >
                   <X size={13} />
                 </button>
@@ -851,7 +979,7 @@ export const UserManagementView: React.FC = () => {
 
             {/* Role Filter */}
             <select
-              className="field-select text-xs py-1.5 px-2.5 w-auto"
+              className="text-xs py-2 px-3 rounded-xl bg-input border border-border-subtle text-text-main font-semibold focus:outline-none focus:border-primary transition-colors cursor-pointer"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
             >
@@ -865,19 +993,19 @@ export const UserManagementView: React.FC = () => {
 
             {/* Status Filter */}
             <select
-              className="field-select text-xs py-1.5 px-2.5 w-auto"
+              className="text-xs py-2 px-3 rounded-xl bg-input border border-border-subtle text-text-main font-semibold focus:outline-none focus:border-primary transition-colors cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
             >
-              <option value="ALL">All Statuses</option>
-              <option value="ACTIVE">Active Only</option>
-              <option value="INACTIVE">Deactivated Only</option>
-              <option value="LOCKED">Locked Out Only</option>
+              <option value="ALL">{t('staff.allStatuses')}</option>
+              <option value="ACTIVE">{t('staff.activeOnly')}</option>
+              <option value="INACTIVE">{t('staff.deactivatedOnly')}</option>
+              <option value="LOCKED">{t('staff.lockedOutOnly')}</option>
             </select>
 
             {/* Branch Filter */}
             <select
-              className="field-select text-xs py-1.5 px-2.5 w-auto"
+              className="text-xs py-2 px-3 rounded-xl bg-input border border-border-subtle text-text-main font-semibold focus:outline-none focus:border-primary transition-colors cursor-pointer"
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
             >
@@ -886,30 +1014,30 @@ export const UserManagementView: React.FC = () => {
               <option value="HQ-MAIN">HQ-MAIN (Corporate)</option>
             </select>
 
-            <span className="text-xs text-text-muted font-mono ml-auto">
+            <span className="text-xs text-text-muted font-mono ml-auto px-1">
               {t('staff.showingCount', { filtered: filteredUsers.length, total: users.length })}
             </span>
           </div>
 
           {/* Users Table */}
-          <div className="glass-panel overflow-hidden flex-1 flex flex-col">
+          <div className="bg-surface rounded-2xl border border-border-subtle shadow-soft overflow-hidden flex-1 flex flex-col min-h-0">
             <div className="overflow-x-auto flex-1">
-              <table className="data-table text-xs">
+              <table className="data-table text-xs w-full">
                 <thead>
-                  <tr>
-                    <th>Staff Member</th>
-                    <th>Role</th>
-                    <th>Branch</th>
-                    <th className="text-center">Status</th>
-                    <th>Last Login</th>
-                    <th className="text-center">Actions</th>
+                  <tr className="border-b border-border-subtle bg-surface-2/60 text-left">
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colStaffMember')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colRole')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colBranch')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted text-center">{t('staff.colStatus')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colLastLogin')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted text-right">{t('staff.colActions')}</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border-subtle">
                   {filteredUsers.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-sm text-text-muted">
-                        {t('staff.noStaffMatch')}
+                      <td colSpan={6} className="text-center py-16 text-sm text-text-muted">
+                        {loadingUsers ? t('common.loading') : t('staff.noStaffMatch')}
                       </td>
                     </tr>
                   )}
@@ -922,29 +1050,29 @@ export const UserManagementView: React.FC = () => {
                       <tr
                         key={user.id}
                         onClick={() => setDrawerUser(user)}
-                        className={`cursor-pointer transition-colors hover:bg-surface-2/60 ${
-                          !user.isActive ? 'opacity-60 bg-slate-50/50 dark:bg-slate-800/40' : ''
+                        className={`cursor-pointer transition-colors hover:bg-surface-2/50 ${
+                          !user.isActive ? 'opacity-60 bg-surface-2/30' : ''
                         }`}
                       >
                         {/* Name & Username */}
-                        <td>
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs border border-primary/20 flex-shrink-0">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary font-extrabold flex items-center justify-center text-xs border border-primary/20 shrink-0">
                               {user.fullName.charAt(0).toUpperCase()}
                             </div>
-                            <div className="flex flex-col">
-                              <span className="font-bold text-text-main flex items-center gap-1.5">
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-text-main flex items-center gap-1.5 truncate">
                                 {user.fullName}
                                 {isLastOwner && (
                                   <span
-                                    className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
+                                    className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                     title="Last Sovereign Owner of the Store"
                                   >
                                     {t('staff.soleOwner')}
                                   </span>
                                 )}
                               </span>
-                              <div className="flex items-center gap-2 text-[11px] text-text-muted font-mono">
+                              <div className="flex items-center gap-1.5 text-[11px] text-text-muted font-mono truncate">
                                 <span>@{user.username}</span>
                                 <span>•</span>
                                 <span>{user.phone}</span>
@@ -954,21 +1082,21 @@ export const UserManagementView: React.FC = () => {
                         </td>
 
                         {/* Role Badge */}
-                        <td>
+                        <td className="py-3 px-4">
                           <span
-                            className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border inline-flex items-center gap-1 ${getRoleBadgeClass(
+                            className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border inline-flex items-center gap-1 ${getRoleBadgeClass(
                               user.role,
                             )}`}
                           >
-                            <ShieldCheck size={11} />
+                            <ShieldCheck size={12} />
                             {user.role}
                           </span>
                         </td>
 
                         {/* Branch */}
-                        <td>
+                        <td className="py-3 px-4">
                           <div className="flex flex-col">
-                            <span className="font-mono text-xs font-semibold text-text-main">
+                            <span className="font-mono text-xs font-bold text-text-main">
                               {user.branchCode || 'BOLE-01'}
                             </span>
                             <span className="text-[10px] text-text-muted truncate max-w-[140px]">
@@ -978,9 +1106,9 @@ export const UserManagementView: React.FC = () => {
                         </td>
 
                         {/* Status */}
-                        <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                           {isLocked ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                               <Lock size={10} /> {t('staff.lockedOut')}
                             </span>
                           ) : (
@@ -988,14 +1116,14 @@ export const UserManagementView: React.FC = () => {
                               type="button"
                               onClick={() => handleToggleActive(user)}
                               disabled={isLastOwner && user.isActive}
-                              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all inline-flex items-center gap-1.5 ${
+                              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer ${
                                 user.isActive
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-300 hover:bg-emerald-100'
-                                  : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-300 hover:bg-red-100'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
                               } ${isLastOwner ? 'cursor-not-allowed opacity-75' : ''}`}
                               title={
                                 isLastOwner
-                                  ? 'Cannot deactivate the last active Owner of the system'
+                                  ? t('staff.lastOwnerWarning')
                                   : user.isActive
                                   ? 'Click to deactivate and immediately revoke all sessions'
                                   : 'Click to activate'
@@ -1008,14 +1136,14 @@ export const UserManagementView: React.FC = () => {
                         </td>
 
                         {/* Last Login & Force Password Change */}
-                        <td>
+                        <td className="py-3 px-4">
                           <div className="flex flex-col">
                             <span className="text-xs text-text-muted font-mono flex items-center gap-1">
                               <Clock size={11} />
                               {formatTimeAgo(user.lastLoginAt)}
                             </span>
                             {user.forcePasswordChange && (
-                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
+                              <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1 mt-0.5">
                                 <RotateCcw size={10} /> {t('staff.mustChangePasswordText')}
                               </span>
                             )}
@@ -1023,8 +1151,19 @@ export const UserManagementView: React.FC = () => {
                         </td>
 
                         {/* Actions */}
-                        <td className="text-center" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-center gap-1">
+                        <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Edit Details */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(user)}
+                              className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors cursor-pointer"
+                              title={t('staff.editStaffTooltip')}
+                            >
+                              <Pencil size={14} />
+                            </button>
+
+                            {/* Reset PIN */}
                             <button
                               type="button"
                               onClick={() => {
@@ -1032,11 +1171,13 @@ export const UserManagementView: React.FC = () => {
                                 setResetPinValue('1234');
                                 setIsResetPinModalOpen(true);
                               }}
-                              className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors cursor-pointer"
                               title={t('staff.resetPinTooltip')}
                             >
-                              <KeyRound size={15} />
+                              <KeyRound size={14} />
                             </button>
+
+                            {/* Reset Password */}
                             <button
                               type="button"
                               onClick={() => {
@@ -1044,15 +1185,29 @@ export const UserManagementView: React.FC = () => {
                                 setResetPassValue('Gebeya@2026');
                                 setIsResetPassModalOpen(true);
                               }}
-                              className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors cursor-pointer"
                               title={t('staff.resetPassTooltip')}
                             >
-                              <Lock size={15} />
+                              <Lock size={14} />
                             </button>
+
+                            {/* Delete User */}
+                            {!isLastOwner && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteUser(user)}
+                                className="p-1.5 rounded-lg hover:bg-rose-500/10 text-text-muted hover:text-rose-500 transition-colors cursor-pointer"
+                                title={t('staff.deleteStaffTooltip')}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+
+                            {/* Open Drawer */}
                             <button
                               type="button"
                               onClick={() => setDrawerUser(user)}
-                              className="p-1.5 rounded-lg hover:bg-primary-soft text-text-muted hover:text-primary transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-primary/10 text-text-muted hover:text-primary transition-colors cursor-pointer ml-1"
                               title={t('staff.viewDrawerTooltip')}
                             >
                               <ChevronRight size={16} />
@@ -1071,36 +1226,36 @@ export const UserManagementView: React.FC = () => {
 
       {/* ─── TAB 2: ROLES & PERMISSION MATRIX ─── */}
       {activeTab === 'roles' && (
-        <div className="flex-1 flex flex-col overflow-hidden pt-3">
-          <div className="flex items-center justify-between gap-3 mb-3 flex-shrink-0">
+        <div className="flex-1 flex flex-col overflow-hidden pt-3 gap-3">
+          <div className="flex items-center justify-between gap-3 shrink-0 bg-surface p-3.5 rounded-2xl border border-border-subtle shadow-soft">
             <div>
               <h2 className="text-sm font-bold text-text-main flex items-center gap-2">
                 <ShieldCheck size={16} className="text-primary" />
                 {t('staff.matrixTitle')}
               </h2>
-              <p className="text-xs text-text-muted">
+              <p className="text-xs text-text-muted mt-0.5">
                 {t('staff.matrixSubtitle')}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setIsCreateRoleModalOpen(true)}
-              className="btn-secondary text-xs flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold flex items-center gap-1.5 border border-border-subtle transition-colors cursor-pointer shadow-2xs"
             >
-              <Plus size={14} />
-              Create Custom Role
+              <Plus size={14} className="text-primary" />
+              <span>{t('staff.createCustomRole')}</span>
             </button>
           </div>
 
-          <div className="glass-panel overflow-hidden flex-1 flex flex-col">
+          <div className="bg-surface rounded-2xl border border-border-subtle shadow-soft overflow-hidden flex-1 flex flex-col min-h-0">
             <div className="overflow-auto flex-1">
-              <table className="data-table text-xs">
+              <table className="data-table text-xs w-full">
                 <thead>
-                  <tr>
-                    <th className="min-w-[280px]">Granular Capability</th>
-                    <th className="min-w-[70px] text-center">Module</th>
+                  <tr className="border-b border-border-subtle bg-surface-2/60">
+                    <th className="min-w-[280px] py-3 px-4 font-bold text-text-muted">{t('staff.colGranularCapability')}</th>
+                    <th className="min-w-[80px] text-center py-3 px-4 font-bold text-text-muted">{t('staff.colModule')}</th>
                     {roles.map((r) => (
-                      <th key={r.id} className="text-center min-w-[110px]">
+                      <th key={r.id} className="text-center min-w-[120px] py-3 px-3">
                         <div className="flex flex-col items-center gap-1">
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getRoleBadgeClass(
@@ -1116,7 +1271,7 @@ export const UserManagementView: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleDeleteCustomRole(r)}
-                              className="text-red-500 hover:text-red-700 text-[10px] flex items-center gap-0.5"
+                              className="text-rose-500 hover:text-rose-700 text-[10px] flex items-center gap-0.5 cursor-pointer mt-0.5"
                               title="Delete custom role"
                             >
                               <Trash2 size={10} /> {t('staff.deleteRole')}
@@ -1127,11 +1282,11 @@ export const UserManagementView: React.FC = () => {
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border-subtle">
                   {GRANULAR_PERMISSIONS_LIST.map((perm) => (
                     <tr key={perm.key} className="hover:bg-surface-2/40">
-                      <td>
-                        <div className="flex flex-col py-1">
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col">
                           <span className="font-bold text-text-main">
                             {perm.label}
                             {language === 'am' && (
@@ -1141,14 +1296,14 @@ export const UserManagementView: React.FC = () => {
                           <span className="text-[11px] text-text-muted leading-tight mt-0.5">
                             {perm.description}
                           </span>
-                          <span className="text-[9px] font-mono text-slate-400 mt-0.5">
+                          <span className="text-[9px] font-mono text-text-dim mt-0.5">
                             Key: {perm.key}
                           </span>
                         </div>
                       </td>
 
-                      <td className="text-center">
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      <td className="text-center py-3 px-4">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-surface-2 border border-border-subtle text-text-muted">
                           {perm.module}
                         </span>
                       </td>
@@ -1159,16 +1314,16 @@ export const UserManagementView: React.FC = () => {
                         const isOwner = role.name === 'OWNER';
 
                         return (
-                          <td key={role.id} className="text-center">
+                          <td key={role.id} className="text-center py-3 px-3">
                             <button
                               type="button"
                               disabled={isOwner}
                               onClick={() => handleToggleMatrixPermission(role.id, perm.key)}
-                              className={`w-6 h-6 rounded-md inline-flex items-center justify-center transition-all ${
+                              className={`w-6 h-6 rounded-md inline-flex items-center justify-center transition-all cursor-pointer ${
                                 isGranted
-                                  ? 'bg-emerald-600 text-white shadow-sm'
-                                  : 'bg-surface-2 border border-border-subtle text-transparent hover:border-slate-400'
-                              } ${isOwner ? 'cursor-not-allowed opacity-90' : 'cursor-pointer hover:scale-105'}`}
+                                  ? 'bg-primary text-white shadow-xs'
+                                  : 'bg-surface-2 border border-border-subtle text-transparent hover:border-text-dim'
+                              } ${isOwner ? 'cursor-not-allowed opacity-90' : 'hover:scale-105'}`}
                               title={
                                 isOwner
                                   ? 'Owner has permanent sovereign rights'
@@ -1193,11 +1348,11 @@ export const UserManagementView: React.FC = () => {
 
       {/* ─── TAB 3: IMMUTABLE AUDIT TRAIL ─── */}
       {activeTab === 'audit' && (
-        <div className="flex-1 flex flex-col overflow-hidden pt-3">
+        <div className="flex-1 flex flex-col overflow-hidden pt-3 gap-3">
           {/* Audit Header & Filter Ribbon */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3 flex-shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 bg-surface p-3.5 rounded-2xl border border-border-subtle shadow-soft">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-primary/10 text-primary border border-primary/20">
                 <ShieldAlert size={14} />
                 {t('staff.auditBanner')}
               </span>
@@ -1208,21 +1363,21 @@ export const UserManagementView: React.FC = () => {
                 type="button"
                 onClick={fetchAuditLogs}
                 disabled={auditLoading}
-                className="btn-secondary text-xs flex items-center gap-1.5 py-1.5 px-2.5"
+                className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main border border-border-subtle text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
                 <RefreshCw size={13} className={auditLoading ? 'animate-spin' : ''} />
-                {t('staff.refreshLogs')}
+                <span>{t('staff.refreshLogs')}</span>
               </button>
             </div>
           </div>
 
           {/* Audit Filtering Controls */}
-          <div className="flex flex-wrap items-center gap-2 mb-3 flex-shrink-0">
-            <div className="search-bar-wrapper flex-1 min-w-[200px]">
-              <Search size={14} className="text-text-muted" />
+          <div className="flex flex-wrap items-center gap-2 shrink-0 bg-surface p-2.5 rounded-2xl border border-border-subtle shadow-soft">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
               <input
                 type="text"
-                className="search-input text-xs"
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-input border border-border-subtle text-xs text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary transition-colors"
                 placeholder={t('staff.searchAuditPlaceholder')}
                 value={auditSearch}
                 onChange={(e) => setAuditSearch(e.target.value)}
@@ -1231,7 +1386,7 @@ export const UserManagementView: React.FC = () => {
 
             {/* User Filter */}
             <select
-              className="field-select text-xs py-1.5 px-2 w-auto"
+              className="text-xs py-1.5 px-3 rounded-xl bg-input border border-border-subtle text-text-main font-semibold focus:outline-none focus:border-primary transition-colors cursor-pointer"
               value={auditUserFilter}
               onChange={(e) => setAuditUserFilter(e.target.value)}
             >
@@ -1245,7 +1400,7 @@ export const UserManagementView: React.FC = () => {
 
             {/* Action Filter */}
             <select
-              className="field-select text-xs py-1.5 px-2 w-auto"
+              className="text-xs py-1.5 px-3 rounded-xl bg-input border border-border-subtle text-text-main font-semibold focus:outline-none focus:border-primary transition-colors cursor-pointer"
               value={auditActionFilter}
               onChange={(e) => setAuditActionFilter(e.target.value)}
             >
@@ -1264,7 +1419,7 @@ export const UserManagementView: React.FC = () => {
 
             {/* Module Filter */}
             <select
-              className="field-select text-xs py-1.5 px-2 w-auto"
+              className="text-xs py-1.5 px-3 rounded-xl bg-input border border-border-subtle text-text-main font-semibold focus:outline-none focus:border-primary transition-colors cursor-pointer"
               value={auditModuleFilter}
               onChange={(e) => setAuditModuleFilter(e.target.value)}
             >
@@ -1280,36 +1435,36 @@ export const UserManagementView: React.FC = () => {
 
             {/* Date Range Filter */}
             <select
-              className="field-select text-xs py-1.5 px-2 w-auto"
+              className="text-xs py-1.5 px-3 rounded-xl bg-input border border-border-subtle text-text-main font-semibold focus:outline-none focus:border-primary transition-colors cursor-pointer"
               value={auditDateRange}
               onChange={(e) => setAuditDateRange(e.target.value as any)}
             >
-              <option value="today">Today</option>
-              <option value="7d">Past 7 Days</option>
-              <option value="30d">Past 30 Days</option>
-              <option value="all">All Time</option>
+              <option value="today">{t('staff.timeToday')}</option>
+              <option value="7d">{t('staff.time7d')}</option>
+              <option value="30d">{t('staff.time30d')}</option>
+              <option value="all">{t('staff.timeAll')}</option>
             </select>
           </div>
 
           {/* Audit Logs Table */}
-          <div className="glass-panel overflow-hidden flex-1 flex flex-col">
+          <div className="bg-surface rounded-2xl border border-border-subtle shadow-soft overflow-hidden flex-1 flex flex-col min-h-0">
             <div className="overflow-x-auto flex-1">
-              <table className="data-table text-xs">
+              <table className="data-table text-xs w-full">
                 <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Entity / Module</th>
-                    <th>IP / Terminal</th>
-                    <th>Details</th>
+                  <tr className="border-b border-border-subtle bg-surface-2/60 text-left">
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colTimestamp')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colUser')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colAction')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colEntityModule')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colIpTerminal')}</th>
+                    <th className="py-3 px-4 font-bold text-text-muted">{t('staff.colDetails')}</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border-subtle">
                   {filteredAuditLogs.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-sm text-text-muted">
-                        {t('staff.noAuditLogs')}
+                      <td colSpan={6} className="text-center py-16 text-sm text-text-muted">
+                        {auditLoading ? t('common.loading') : t('staff.noAuditLogs')}
                       </td>
                     </tr>
                   )}
@@ -1320,9 +1475,9 @@ export const UserManagementView: React.FC = () => {
                         setSelectedAuditLog(log);
                         setIsAuditDetailModalOpen(true);
                       }}
-                      className="cursor-pointer hover:bg-surface-2/60 transition-colors"
+                      className="cursor-pointer hover:bg-surface-2/50 transition-colors"
                     >
-                      <td className="font-mono text-[11px] text-text-muted whitespace-nowrap">
+                      <td className="py-3 px-4 font-mono text-[11px] text-text-muted whitespace-nowrap">
                         {new Date(log.created_at).toLocaleString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -1332,9 +1487,9 @@ export const UserManagementView: React.FC = () => {
                         })}
                       </td>
 
-                      <td>
+                      <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-[10px]">
+                          <div className="w-6 h-6 rounded-full bg-surface-2 border border-border-subtle flex items-center justify-center font-bold text-[10px] text-text-muted">
                             {(log.user_name || log.username || 'S').charAt(0).toUpperCase()}
                           </div>
                           <div className="flex flex-col">
@@ -1350,7 +1505,7 @@ export const UserManagementView: React.FC = () => {
                         </div>
                       </td>
 
-                      <td>
+                      <td className="py-3 px-4">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${getActionBadgeClass(
                             log.action,
@@ -1360,15 +1515,15 @@ export const UserManagementView: React.FC = () => {
                         </span>
                       </td>
 
-                      <td>
+                      <td className="py-3 px-4">
                         <span className="font-mono text-xs text-text-muted">{log.entity_name}</span>
                       </td>
 
-                      <td className="font-mono text-[11px] text-text-muted whitespace-nowrap">
+                      <td className="py-3 px-4 font-mono text-[11px] text-text-muted whitespace-nowrap">
                         {log.ip_address || '127.0.0.1'}
                       </td>
 
-                      <td className="max-w-[240px] truncate text-[11px] font-mono text-text-muted">
+                      <td className="py-3 px-4 max-w-[240px] truncate text-[11px] font-mono text-text-muted">
                         {typeof log.details === 'object'
                           ? JSON.stringify(log.details)
                           : String(log.details || '—')}
@@ -1386,15 +1541,15 @@ export const UserManagementView: React.FC = () => {
       {drawerUser && (
         <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
           <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={() => setDrawerUser(null)}
           />
 
-          <div className="relative w-full max-w-md bg-surface h-full shadow-2xl flex flex-col border-l border-border-subtle z-10 animate-in slide-in-from-right duration-200 overflow-hidden">
+          <div className="relative w-full max-w-md bg-surface h-full shadow-modal flex flex-col border-l border-border-subtle z-10 animate-in slide-in-from-right duration-200 overflow-hidden">
             {/* Drawer Header */}
             <div className="p-4 border-b border-border-subtle flex items-center justify-between bg-surface-2/40">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-primary text-white font-bold flex items-center justify-center text-lg shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-primary text-white font-extrabold flex items-center justify-center text-lg shadow-soft">
                   {drawerUser.fullName.charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -1412,8 +1567,8 @@ export const UserManagementView: React.FC = () => {
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
                         drawerUser.isActive
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300'
-                          : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 border-red-300'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                          : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                       }`}
                     >
                       {drawerUser.isActive ? 'Active Session' : 'Deactivated'}
@@ -1425,7 +1580,7 @@ export const UserManagementView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDrawerUser(null)}
-                className="p-1.5 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-2"
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-2 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1435,24 +1590,33 @@ export const UserManagementView: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5 text-xs">
               {/* Profile details */}
               <div className="flex flex-col gap-2">
-                <h3 className="font-bold text-text-muted uppercase text-[10px] tracking-wider">
-                  {t('staff.drawerContact')}
-                </h3>
-                <div className="grid grid-cols-2 gap-2 bg-surface-2/40 p-3 rounded-xl border border-border-subtle font-mono text-[11px]">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-text-muted uppercase text-[10px] tracking-wider">
+                    {t('staff.drawerContact')}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal(drawerUser)}
+                    className="text-xs text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Pencil size={11} /> {t('staff.editStaff')}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 bg-surface-2 p-3 rounded-2xl border border-border-subtle font-mono text-[11px]">
                   <div>
-                    <span className="text-text-muted block text-[10px]">Username</span>
+                    <span className="text-text-muted block text-[10px] font-sans">Username</span>
                     <span className="font-bold text-text-main">@{drawerUser.username}</span>
                   </div>
                   <div>
-                    <span className="text-text-muted block text-[10px]">Phone</span>
+                    <span className="text-text-muted block text-[10px] font-sans">Phone</span>
                     <span className="font-bold text-text-main">{drawerUser.phone}</span>
                   </div>
                   <div>
-                    <span className="text-text-muted block text-[10px]">Email</span>
+                    <span className="text-text-muted block text-[10px] font-sans">Email</span>
                     <span className="text-text-main truncate block">{drawerUser.email || '—'}</span>
                   </div>
                   <div>
-                    <span className="text-text-muted block text-[10px]">Branch</span>
+                    <span className="text-text-muted block text-[10px] font-sans">Branch</span>
                     <span className="font-bold text-text-main">{drawerUser.branchCode || 'BOLE-01'}</span>
                   </div>
                 </div>
@@ -1463,10 +1627,10 @@ export const UserManagementView: React.FC = () => {
                 <h3 className="font-bold text-text-muted uppercase text-[10px] tracking-wider">
                   {t('staff.drawerSecurity')}
                 </h3>
-                <div className="flex flex-col gap-2 bg-surface-2/40 p-3 rounded-xl border border-border-subtle">
+                <div className="flex flex-col gap-2 bg-surface-2 p-3 rounded-2xl border border-border-subtle">
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">{t('staff.passwordEncryption')}</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                    <span className="font-mono text-emerald-500 font-bold">
                       {t('staff.passwordArgon')}
                     </span>
                   </div>
@@ -1474,7 +1638,7 @@ export const UserManagementView: React.FC = () => {
                     <span className="text-text-muted">Must Change Password</span>
                     <span
                       className={`font-bold ${
-                        drawerUser.forcePasswordChange ? 'text-amber-600' : 'text-slate-500'
+                        drawerUser.forcePasswordChange ? 'text-amber-500' : 'text-text-muted'
                       }`}
                     >
                       {drawerUser.forcePasswordChange ? 'Yes (Enforced on next login)' : 'No'}
@@ -1486,21 +1650,21 @@ export const UserManagementView: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-text-muted">{t('staff.accountLockoutState')}</span>
-                    <span className="font-bold text-emerald-600">
+                    <span className="font-bold text-emerald-500">
                       {drawerUser.lockedUntil && new Date(drawerUser.lockedUntil) > new Date()
-                        ? 'Temporarily Locked'
-                        : 'Normal (0 Failed Attempts)'}
+                        ? t('staff.tempLocked')
+                        : t('staff.normalAttempts')}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* {t('staff.drawerPerms')} */}
+              {/* Effective Granular Permissions */}
               <div className="flex flex-col gap-2">
                 <h3 className="font-bold text-text-muted uppercase text-[10px] tracking-wider">
-                  Effective Granular Permissions
+                  {t('staff.drawerPerms')}
                 </h3>
-                <div className="grid grid-cols-1 gap-1.5 bg-surface-2/40 p-3 rounded-xl border border-border-subtle">
+                <div className="grid grid-cols-1 gap-1.5 bg-surface-2 p-3 rounded-2xl border border-border-subtle max-h-48 overflow-y-auto">
                   {GRANULAR_PERMISSIONS_LIST.map((perm) => {
                     const isGranted =
                       drawerUser.role === 'OWNER' ||
@@ -1516,8 +1680,8 @@ export const UserManagementView: React.FC = () => {
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             isGranted
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                              : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-surface text-text-dim border border-border-subtle'
                           }`}
                         >
                           {isGranted ? t('staff.enabled') : t('staff.disabled')}
@@ -1541,10 +1705,10 @@ export const UserManagementView: React.FC = () => {
                       setResetPinValue('1234');
                       setIsResetPinModalOpen(true);
                     }}
-                    className="btn-secondary text-xs flex items-center justify-center gap-1.5 py-2"
+                    className="px-3 py-2 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold flex items-center justify-center gap-1.5 border border-border-subtle transition-colors cursor-pointer"
                   >
-                    <KeyRound size={14} />
-                    Reset PIN
+                    <KeyRound size={14} className="text-primary" />
+                    <span>{t('staff.resetPin')}</span>
                   </button>
                   <button
                     type="button"
@@ -1553,33 +1717,31 @@ export const UserManagementView: React.FC = () => {
                       setResetPassValue('Gebeya@2026');
                       setIsResetPassModalOpen(true);
                     }}
-                    className="btn-secondary text-xs flex items-center justify-center gap-1.5 py-2"
+                    className="px-3 py-2 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold flex items-center justify-center gap-1.5 border border-border-subtle transition-colors cursor-pointer"
                   >
-                    <Lock size={14} />
-                    Reset Password
+                    <Lock size={14} className="text-primary" />
+                    <span>{t('staff.resetPassword')}</span>
                   </button>
                 </div>
 
                 {/* Deactivate Button with Last-Owner Rule Warning */}
                 {drawerUser.role === 'OWNER' && drawerUser.isActive && activeOwnersCount <= 1 ? (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-center gap-2">
-                    <AlertTriangle size={15} className="flex-shrink-0" />
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] flex items-center gap-2">
+                    <AlertTriangle size={15} className="shrink-0" />
                     <span>{t('staff.lastOwnerWarning')}</span>
                   </div>
                 ) : (
                   <button
                     type="button"
                     onClick={() => handleToggleActive(drawerUser)}
-                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors ${
+                    className={`py-2.5 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                       drawerUser.isActive
-                        ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-300'
-                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300'
+                        ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                     }`}
                   >
                     <Power size={14} />
-                    {drawerUser.isActive
-                      ? 'Deactivate Staff & Revoke Sessions'
-                      : 'Re-activate Staff Account'}
+                    <span>{drawerUser.isActive ? t('staff.deactivateStaff') : t('staff.reactivateStaff')}</span>
                   </button>
                 )}
               </div>
@@ -1591,24 +1753,24 @@ export const UserManagementView: React.FC = () => {
       {/* ─── 5. ADD STAFF MODAL (< 1 MINUTE UX) ─── */}
       {isAddModalOpen && (
         <div
-          className="modal-overlay"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setIsAddModalOpen(false)}
         >
-          <div className="modal-content max-w-lg">
+          <div className="bg-surface border border-border-subtle rounded-3xl w-full max-w-lg p-6 shadow-modal max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
               <div>
-                <h2 className="modal-title flex items-center gap-2">
+                <h2 className="text-base font-bold text-text-main flex items-center gap-2">
                   <UserPlus size={18} className="text-primary" />
-                  {t('addStaff')}
+                  {t('staff.addStaffModalTitle')}
                 </h2>
-                <p className="text-xs text-text-muted">
+                <p className="text-xs text-text-muted mt-0.5">
                   {t('staff.addStaffModalDesc')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-text-muted hover:text-text-main"
+                className="text-text-muted hover:text-text-main p-1 rounded-lg cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1618,12 +1780,12 @@ export const UserManagementView: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Full Name */}
                 <div>
-                  <label className="field-label text-xs">{t('staff.fullNameLabel')}</label>
+                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.fullNameLabel')}</label>
                   <input
                     type="text"
                     required
                     placeholder={t('staff.fullNamePlaceholder')}
-                    className="field-input mt-1"
+                    className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors"
                     value={newFullName}
                     onChange={(e) => handleFullNameChange(e.target.value)}
                   />
@@ -1631,12 +1793,12 @@ export const UserManagementView: React.FC = () => {
 
                 {/* 2. Phone */}
                 <div>
-                  <label className="field-label text-xs">{t('staff.phoneLabel')}</label>
+                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.phoneLabel')}</label>
                   <input
                     type="text"
                     required
                     placeholder="+251 9..."
-                    className="field-input mt-1 font-mono"
+                    className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main font-mono focus:outline-none focus:border-primary transition-colors"
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
                   />
@@ -1644,9 +1806,9 @@ export const UserManagementView: React.FC = () => {
 
                 {/* 3. Role */}
                 <div>
-                  <label className="field-label text-xs">{t('staff.roleLabel')}</label>
+                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.roleLabel')}</label>
                   <select
-                    className="field-select mt-1"
+                    className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors cursor-pointer"
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value)}
                   >
@@ -1660,9 +1822,9 @@ export const UserManagementView: React.FC = () => {
 
                 {/* 4. Branch */}
                 <div>
-                  <label className="field-label text-xs">{t('staff.branchLabel')}</label>
+                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.branchLabel')}</label>
                   <select
-                    className="field-select mt-1"
+                    className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors cursor-pointer"
                     value={newBranchCode}
                     onChange={(e) => setNewBranchCode(e.target.value)}
                   >
@@ -1673,13 +1835,13 @@ export const UserManagementView: React.FC = () => {
 
                 {/* 5. Terminal Quick PIN (4-6 digits) */}
                 <div>
-                  <label className="field-label text-xs">{t('staff.pinLabel')}</label>
+                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.pinLabel')}</label>
                   <input
                     type="password"
                     required
                     maxLength={6}
                     placeholder="4-6 digits"
-                    className="field-input mt-1 font-mono tracking-widest text-center font-bold text-base"
+                    className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle font-mono tracking-widest text-center font-bold text-base text-text-main focus:outline-none focus:border-primary transition-colors"
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
                   />
@@ -1687,12 +1849,12 @@ export const UserManagementView: React.FC = () => {
 
                 {/* Username */}
                 <div>
-                  <label className="field-label text-xs">{t('staff.usernameLabel')}</label>
+                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.usernameLabel')}</label>
                   <input
                     type="text"
                     required
                     placeholder="almaz.tadesse"
-                    className="field-input mt-1 font-mono text-xs"
+                    className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main font-mono focus:outline-none focus:border-primary transition-colors"
                     value={newUsername}
                     onChange={(e) => setNewUsername(e.target.value.toLowerCase().trim())}
                   />
@@ -1700,11 +1862,11 @@ export const UserManagementView: React.FC = () => {
 
                 {/* Email (Optional) */}
                 <div>
-                  <label className="field-label text-xs">{t('staff.emailLabel')}</label>
+                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.emailLabel')}</label>
                   <input
                     type="email"
                     placeholder="almaz@gebeyaos.et"
-                    className="field-input mt-1 text-xs"
+                    className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                   />
@@ -1712,12 +1874,12 @@ export const UserManagementView: React.FC = () => {
 
                 {/* Initial Temporary Password */}
                 <div>
-                  <label className="field-label text-xs">{t('staff.tempPassLabel')}</label>
+                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.tempPassLabel')}</label>
                   <input
                     type="text"
                     required
                     minLength={8}
-                    className="field-input mt-1 font-mono text-xs"
+                    className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle font-mono text-xs text-text-main focus:outline-none focus:border-primary transition-colors"
                     value={newInitialPass}
                     onChange={(e) => setNewInitialPass(e.target.value)}
                   />
@@ -1725,13 +1887,13 @@ export const UserManagementView: React.FC = () => {
               </div>
 
               {/* Force Password Change on first login */}
-              <div className="flex items-center gap-2 mt-1 bg-surface-2/40 p-2.5 rounded-xl border border-border-subtle">
+              <div className="flex items-center gap-2 mt-1 bg-surface-2 p-3 rounded-xl border border-border-subtle">
                 <input
                   type="checkbox"
                   id="forcePass"
                   checked={forcePassChange}
                   onChange={(e) => setForcePassChange(e.target.checked)}
-                  className="rounded text-primary focus:ring-primary"
+                  className="w-4 h-4 rounded text-primary focus:ring-primary border-border-subtle"
                 />
                 <label htmlFor="forcePass" className="text-xs text-text-main cursor-pointer">
                   <strong>{t('staff.forcePassLabel')}</strong>
@@ -1741,13 +1903,16 @@ export const UserManagementView: React.FC = () => {
               <div className="flex gap-3 mt-3 pt-3 border-t border-border-subtle">
                 <button
                   type="button"
-                  className="btn-secondary flex-1"
+                  className="px-4 py-2.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold border border-border-subtle flex-1 cursor-pointer transition-colors"
                   onClick={() => setIsAddModalOpen(false)}
                 >
-                  {t('cancel')}
+                  {t('staff.cancelBtn')}
                 </button>
-                <button type="submit" className="btn-primary flex-1 py-2">
-                  Provision Staff Member
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex-1 cursor-pointer shadow-soft transition-colors"
+                >
+                  {t('staff.provisionStaffBtn')}
                 </button>
               </div>
             </form>
@@ -1755,16 +1920,111 @@ export const UserManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── 6. RESET PASSWORD MODAL ─── */}
+      {/* ─── 6. EDIT STAFF MODAL ─── */}
+      {isEditModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={(e) => e.target === e.currentTarget && setIsEditModalOpen(false)}
+        >
+          <div className="bg-surface border border-border-subtle rounded-3xl w-full max-w-md p-6 shadow-modal">
+            <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+              <div>
+                <h2 className="text-base font-bold text-text-main flex items-center gap-2">
+                  <Pencil size={18} className="text-primary" />
+                  {t('staff.editStaffModalTitle')}
+                </h2>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {t('staff.editStaffModalDesc')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-text-muted hover:text-text-main p-1 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUser} className="flex flex-col gap-3.5 mt-4">
+              <div>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.fullNameLabel')}</label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.phoneLabel')}</label>
+                <input
+                  type="text"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main font-mono focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.emailLabel')}</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.roleLabel')}</label>
+                <select
+                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                >
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 mt-3 pt-3 border-t border-border-subtle">
+                <button
+                  type="button"
+                  className="px-4 py-2.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold border border-border-subtle flex-1 cursor-pointer transition-colors"
+                  onClick={() => setIsEditModalOpen(false)}
+                >
+                  {t('staff.cancelBtn')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEdit}
+                  className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex-1 cursor-pointer shadow-soft transition-colors disabled:opacity-50"
+                >
+                  {isSubmittingEdit ? t('common.saving') : t('staff.saveUserChanges')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 7. RESET PASSWORD MODAL ─── */}
       {isResetPassModalOpen && selectedUserForModal && (
         <div
-          className="modal-overlay"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setIsResetPassModalOpen(false)}
         >
-          <div className="modal-content max-w-sm">
-            <h2 className="modal-title flex items-center gap-2">
+          <div className="bg-surface border border-border-subtle rounded-3xl w-full max-w-sm p-6 shadow-modal">
+            <h2 className="text-base font-bold text-text-main flex items-center gap-2 mb-1">
               <Lock size={18} className="text-primary" />
-              {t('resetPassword')}
+              {t('staff.resetPassModalTitle')}
             </h2>
             <p className="text-xs text-text-muted mb-4">
               {t('staff.resetPassDesc', { name: selectedUserForModal.fullName })}
@@ -1772,31 +2032,34 @@ export const UserManagementView: React.FC = () => {
 
             <form onSubmit={handleAdminResetPassword} className="flex flex-col gap-3">
               <div>
-                <label className="field-label">{t('staff.newTempPassLabel')}</label>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.newTempPassLabel')}</label>
                 <input
                   type="text"
                   required
                   minLength={8}
-                  className="field-input mt-1 font-mono"
+                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle font-mono text-xs text-text-main focus:outline-none focus:border-primary transition-colors"
                   value={resetPassValue}
                   onChange={(e) => setResetPassValue(e.target.value)}
                 />
               </div>
 
-              <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-[11px] border border-amber-300">
+              <div className="p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] border border-amber-500/20">
                 {t('staff.resetPassNotice')}
               </div>
 
               <div className="flex gap-2.5 mt-2">
                 <button
                   type="button"
-                  className="btn-secondary flex-1"
+                  className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold border border-border-subtle flex-1 cursor-pointer transition-colors"
                   onClick={() => setIsResetPassModalOpen(false)}
                 >
-                  {t('cancel')}
+                  {t('staff.cancelBtn')}
                 </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Save Password
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex-1 cursor-pointer shadow-soft transition-colors"
+                >
+                  {t('staff.savePasswordBtn')}
                 </button>
               </div>
             </form>
@@ -1804,16 +2067,16 @@ export const UserManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── 7. RESET PIN MODAL ─── */}
+      {/* ─── 8. RESET PIN MODAL ─── */}
       {isResetPinModalOpen && selectedUserForModal && (
         <div
-          className="modal-overlay"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setIsResetPinModalOpen(false)}
         >
-          <div className="modal-content max-w-sm">
-            <h2 className="modal-title flex items-center gap-2">
+          <div className="bg-surface border border-border-subtle rounded-3xl w-full max-w-sm p-6 shadow-modal">
+            <h2 className="text-base font-bold text-text-main flex items-center gap-2 mb-1">
               <KeyRound size={18} className="text-primary" />
-              {t('resetPin')}
+              {t('staff.resetPinModalTitle')}
             </h2>
             <p className="text-xs text-text-muted mb-4">
               {t('staff.resetPinDesc', { name: selectedUserForModal.fullName })}
@@ -1821,12 +2084,12 @@ export const UserManagementView: React.FC = () => {
 
             <form onSubmit={handleAdminResetPin} className="flex flex-col gap-3">
               <div>
-                <label className="field-label">{t('staff.quickPinInputLabel')}</label>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.quickPinInputLabel')}</label>
                 <input
                   type="password"
                   required
                   maxLength={6}
-                  className="field-input mt-1 font-mono tracking-widest text-center text-xl font-bold py-2"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle font-mono tracking-widest text-center text-xl font-bold text-text-main focus:outline-none focus:border-primary transition-colors"
                   value={resetPinValue}
                   onChange={(e) => setResetPinValue(e.target.value.replace(/\D/g, ''))}
                 />
@@ -1835,13 +2098,16 @@ export const UserManagementView: React.FC = () => {
               <div className="flex gap-2.5 mt-2">
                 <button
                   type="button"
-                  className="btn-secondary flex-1"
+                  className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold border border-border-subtle flex-1 cursor-pointer transition-colors"
                   onClick={() => setIsResetPinModalOpen(false)}
                 >
-                  {t('cancel')}
+                  {t('staff.cancelBtn')}
                 </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Save New PIN
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex-1 cursor-pointer shadow-soft transition-colors"
+                >
+                  {t('staff.saveNewPinBtn')}
                 </button>
               </div>
             </form>
@@ -1849,72 +2115,72 @@ export const UserManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── 8. CREATE CUSTOM ROLE MODAL ─── */}
+      {/* ─── 9. CREATE CUSTOM ROLE MODAL ─── */}
       {isCreateRoleModalOpen && (
         <div
-          className="modal-overlay"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setIsCreateRoleModalOpen(false)}
         >
-          <div className="modal-content max-w-md">
+          <div className="bg-surface border border-border-subtle rounded-3xl w-full max-w-md p-6 shadow-modal">
             <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-              <h2 className="modal-title flex items-center gap-2">
+              <h2 className="text-base font-bold text-text-main flex items-center gap-2">
                 <ShieldCheck size={18} className="text-primary" />
-                Create Custom Role
+                {t('staff.createRoleModalTitle')}
               </h2>
               <button
                 type="button"
                 onClick={() => setIsCreateRoleModalOpen(false)}
-                className="text-text-muted hover:text-text-main"
+                className="text-text-muted hover:text-text-main p-1 rounded-lg cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCustomRole} className="flex flex-col gap-3 mt-4">
+            <form onSubmit={handleCreateCustomRole} className="flex flex-col gap-3.5 mt-4">
               <div>
-                <label className="field-label text-xs">{t('staff.roleNameLabel')}</label>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.roleNameLabel')}</label>
                 <input
                   type="text"
                   required
                   placeholder={t('staff.roleNamePlaceholder')}
-                  className="field-input mt-1 font-mono uppercase"
+                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main font-mono uppercase focus:outline-none focus:border-primary transition-colors"
                   value={customRoleName}
                   onChange={(e) => setCustomRoleName(e.target.value)}
                 />
               </div>
 
               <div>
-                <label className="field-label text-xs">{t('staff.descLabel')}</label>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.descLabel')}</label>
                 <input
                   type="text"
                   placeholder={t('staff.descPlaceholder')}
-                  className="field-input mt-1"
+                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors"
                   value={customRoleDesc}
                   onChange={(e) => setCustomRoleDesc(e.target.value)}
                 />
               </div>
 
               <div>
-                <label className="field-label text-xs">{t('staff.maxDiscountLabel')}</label>
+                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.maxDiscountLabel')}</label>
                 <input
                   type="number"
                   min={0}
                   max={100}
-                  className="field-input mt-1 font-mono"
+                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main font-mono focus:outline-none focus:border-primary transition-colors"
                   value={customRoleMaxDiscount}
                   onChange={(e) => setCustomRoleMaxDiscount(parseFloat(e.target.value) || 0)}
                 />
               </div>
 
               <div>
-                <label className="field-label text-xs mb-1.5 block">{t('staff.initialPermsLabel')}</label>
-                <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5 p-2 bg-surface-2/40 rounded-xl border border-border-subtle">
+                <label className="text-xs font-bold text-text-muted block mb-1.5">{t('staff.initialPermsLabel')}</label>
+                <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5 p-2 bg-surface-2 rounded-2xl border border-border-subtle">
                   {GRANULAR_PERMISSIONS_LIST.map((p) => {
                     const isChecked = customRolePerms.includes(p.key);
                     return (
                       <label
                         key={p.key}
-                        className="flex items-center gap-2 text-xs text-text-main cursor-pointer hover:bg-surface-2 p-1 rounded-lg"
+                        className="flex items-center gap-2.5 text-xs text-text-main cursor-pointer hover:bg-surface p-1.5 rounded-xl transition-colors"
                       >
                         <input
                           type="checkbox"
@@ -1923,9 +2189,9 @@ export const UserManagementView: React.FC = () => {
                             if (e.target.checked) setCustomRolePerms((prev) => [...prev, p.key]);
                             else setCustomRolePerms((prev) => prev.filter((k) => k !== p.key));
                           }}
-                          className="rounded text-primary focus:ring-primary"
+                          className="w-4 h-4 rounded text-primary focus:ring-primary border-border-subtle"
                         />
-                        <span>{p.label}</span>
+                        <span className="font-medium">{p.label}</span>
                       </label>
                     );
                   })}
@@ -1935,13 +2201,16 @@ export const UserManagementView: React.FC = () => {
               <div className="flex gap-2.5 mt-3 pt-3 border-t border-border-subtle">
                 <button
                   type="button"
-                  className="btn-secondary flex-1"
+                  className="px-4 py-2.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold border border-border-subtle flex-1 cursor-pointer transition-colors"
                   onClick={() => setIsCreateRoleModalOpen(false)}
                 >
-                  {t('cancel')}
+                  {t('staff.cancelBtn')}
                 </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Create Role
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex-1 cursor-pointer shadow-soft transition-colors"
+                >
+                  {t('staff.createRoleBtn')}
                 </button>
               </div>
             </form>
@@ -1949,45 +2218,45 @@ export const UserManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── 9. AUDIT DETAIL JSON MODAL ─── */}
+      {/* ─── 10. AUDIT DETAIL JSON MODAL ─── */}
       {isAuditDetailModalOpen && selectedAuditLog && (
         <div
-          className="modal-overlay"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setIsAuditDetailModalOpen(false)}
         >
-          <div className="modal-content max-w-lg">
+          <div className="bg-surface border border-border-subtle rounded-3xl w-full max-w-lg p-6 shadow-modal max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-              <h2 className="modal-title flex items-center gap-2 text-sm">
+              <h2 className="text-sm font-bold text-text-main flex items-center gap-2">
                 <History size={16} className="text-primary" />
                 {t('staff.auditDetailTitle')}
               </h2>
               <button
                 type="button"
                 onClick={() => setIsAuditDetailModalOpen(false)}
-                className="text-text-muted hover:text-text-main"
+                className="text-text-muted hover:text-text-main p-1 rounded-lg cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="flex flex-col gap-2 mt-4 text-xs font-mono">
-              <div className="grid grid-cols-2 gap-2 bg-surface-2/40 p-2.5 rounded-xl border border-border-subtle">
+            <div className="flex flex-col gap-3 mt-4 text-xs font-mono overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-2 bg-surface-2 p-3 rounded-2xl border border-border-subtle">
                 <div>
-                  <span className="text-[10px] text-text-muted block">{t('staff.actionLabel')}</span>
+                  <span className="text-[10px] text-text-muted block font-sans">{t('staff.actionLabel')}</span>
                   <span className="font-bold text-text-main">{selectedAuditLog.action}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-text-muted block">{t('staff.moduleLabel')}</span>
+                  <span className="text-[10px] text-text-muted block font-sans">{t('staff.moduleLabel')}</span>
                   <span className="font-bold text-text-main">{selectedAuditLog.entity_name}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-text-muted block">{t('staff.actorLabel')}</span>
+                  <span className="text-[10px] text-text-muted block font-sans">{t('staff.actorLabel')}</span>
                   <span className="font-bold text-text-main">
                     {selectedAuditLog.user_name || selectedAuditLog.username || 'System'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-text-muted block">{t('staff.timestampLabel')}</span>
+                  <span className="text-[10px] text-text-muted block font-sans">{t('staff.timestampLabel')}</span>
                   <span className="font-bold text-text-main">
                     {new Date(selectedAuditLog.created_at).toLocaleString()}
                   </span>
@@ -1995,10 +2264,10 @@ export const UserManagementView: React.FC = () => {
               </div>
 
               <div>
-                <span className="text-text-muted text-[11px] font-sans font-semibold block mb-1">
+                <span className="text-text-muted text-[11px] font-sans font-bold block mb-1">
                   {t('staff.immutablePayloadLabel')}
                 </span>
-                <pre className="p-3 rounded-xl bg-slate-900 text-slate-100 text-[11px] overflow-auto max-h-56">
+                <pre className="p-3.5 rounded-2xl bg-[#0B1220] text-emerald-400 border border-border-subtle text-[11px] overflow-auto max-h-56 font-mono leading-relaxed">
                   {JSON.stringify(selectedAuditLog.details || {}, null, 2)}
                 </pre>
               </div>
@@ -2007,10 +2276,10 @@ export const UserManagementView: React.FC = () => {
             <div className="flex justify-end mt-4 pt-3 border-t border-border-subtle">
               <button
                 type="button"
-                className="btn-secondary text-xs"
+                className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold border border-border-subtle cursor-pointer transition-colors"
                 onClick={() => setIsAuditDetailModalOpen(false)}
               >
-                Close Inspector
+                {t('staff.closeInspectorBtn')}
               </button>
             </div>
           </div>

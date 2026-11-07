@@ -71,3 +71,4 @@ export const authEn = {
   managerPinLabel: 'Manager / Supervisor PIN',
   authorizeAction: 'Authorize',
 };
+
