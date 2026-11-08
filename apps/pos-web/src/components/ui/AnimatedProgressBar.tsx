@@ -66,3 +66,4 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
     </div>
   );
 };
+

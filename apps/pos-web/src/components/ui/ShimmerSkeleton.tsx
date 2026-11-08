@@ -76,3 +76,4 @@ export const TableSkeleton: React.FC<{ rows?: number; columns?: number; classNam
     </div>
   </div>
 );
+

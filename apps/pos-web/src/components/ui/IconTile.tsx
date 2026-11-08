@@ -70,3 +70,4 @@ export const IconTile: React.FC<IconTileProps> = ({
     </div>
   );
 };
+

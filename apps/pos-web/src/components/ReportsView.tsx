@@ -11,7 +11,6 @@ import {
   Clock,
   Building,
   CheckCircle2,
-  AlertCircle,
   Calendar,
   ChevronDown,
   Printer,
@@ -19,12 +18,8 @@ import {
   Users,
   BarChart3,
   ShoppingBag,
-  Scale,
-  Package,
   ShieldCheck,
   ArrowUpRight,
-  ArrowDownRight,
-  Eye,
   X,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -43,18 +38,19 @@ interface BranchOption {
   id: string;
   code: string;
   name: string;
+  nameAm?: string;
 }
 
 const AVAILABLE_BRANCHES: BranchOption[] = [
-  { id: 'ALL', code: 'ALL', name: 'All Branches (Consolidated HQ)' },
-  { id: '00000000-0000-0000-0000-000000000001', code: 'BOLE-01', name: 'Bole Medhanialem Supermarket' },
-  { id: '00000000-0000-0000-0000-000000000002', code: 'CMC-02', name: 'CMC Mega Hypermarket' },
-  { id: '00000000-0000-0000-0000-000000000003', code: 'PIAZZA-03', name: 'Piazza Express Store' },
+  { id: 'ALL', code: 'ALL', name: 'All Branches (Consolidated HQ)', nameAm: 'ሁሉም ቅርንጫፎች (የዋና መስሪያ ቤት)' },
+  { id: '00000000-0000-0000-0000-000000000001', code: 'BOLE-01', name: 'Bole Medhanialem Supermarket', nameAm: 'ቦሌ መድኃኔዓለም ሱፐርማርኬት' },
+  { id: '00000000-0000-0000-0000-000000000002', code: 'CMC-02', name: 'CMC Mega Hypermarket', nameAm: 'ሲኤምሲ ሜጋ ሃይፐርማርኬት' },
+  { id: '00000000-0000-0000-0000-000000000003', code: 'PIAZZA-03', name: 'Piazza Express Store', nameAm: 'ፒያሳ ኤክስፕረስ መደብር' },
 ];
 
 export const ReportsView: React.FC = () => {
   const { currentUser } = useAuth();
-  const { t, language, formatCurrency } = useI18n();
+  const { t, language } = useI18n();
 
   // Role authority check: Owner and HQ Admin see consolidated multi-branch selector; branch managers are locked to branch
   const isHqUser = currentUser?.role === 'OWNER' || currentUser?.role === 'HQ_ADMIN';
@@ -119,7 +115,7 @@ export const ReportsView: React.FC = () => {
         setExpiring(data.expiring);
         setCashiers(data.cashiers || []);
         setBranchFreshness(data.freshness || []);
-        setLastUpdated(new Date().toLocaleTimeString('en-ET'));
+        setLastUpdated(new Date().toLocaleTimeString(language === 'am' ? 'am-ET' : 'en-ET'));
         setIsLoading(false);
         return;
       }
@@ -129,8 +125,6 @@ export const ReportsView: React.FC = () => {
       setIsLoading(false);
     }
   };
-
-    
 
   useEffect(() => {
     fetchReportData();
@@ -146,7 +140,10 @@ export const ReportsView: React.FC = () => {
     if (!productSearch) return profitability.items;
     const q = productSearch.toLowerCase();
     return profitability.items.filter(
-      (p) => p.nameEn.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
+      (p) =>
+        p.nameEn.toLowerCase().includes(q) ||
+        ((p as any).nameAm && (p as any).nameAm.toLowerCase().includes(q)) ||
+        p.sku.toLowerCase().includes(q),
     );
   }, [profitability, productSearch]);
 
@@ -160,43 +157,50 @@ export const ReportsView: React.FC = () => {
     };
   }, [timeRange]);
 
+  // Helper for branch name localized
+  const getBranchDisplayName = (branchId: string) => {
+    const b = AVAILABLE_BRANCHES.find((item) => item.id === branchId);
+    if (!b) return currentUser?.branchName || 'Bole Branch';
+    if (b.id === 'ALL') return t('reports.allBranches');
+    return language === 'am' && b.nameAm ? b.nameAm : b.name;
+  };
+
   // Export to CSV generator
   const exportToCsv = () => {
-    if (!dailySales) return;
+    let csv = `GEBEYAOS COMPREHENSIVE RETAIL REPORT\n`;
+    csv += `Scope: ${selectedBranch === 'ALL' ? 'All Branches' : selectedBranch}\n`;
+    csv += `Period: ${timeRange}\n`;
+    csv += `Generated At: ${new Date().toISOString()}\n\n`;
 
-    let csv = `GebeyaOS Retail Financial & Reconciliation Audit Report\n`;
-    csv += `Scope: ${AVAILABLE_BRANCHES.find((b) => b.id === selectedBranch)?.name || selectedBranch}\n`;
-    csv += `Period: ${timeRange.toUpperCase()} (Generated: ${new Date().toLocaleString('en-ET')})\n\n`;
-
-    csv += `--- EXECUTIVE KPI SUMMARY ---\n`;
-    csv += `Gross Revenue (ETB),${dailySales.grossSalesAmount}\n`;
-    csv += `Discounts (ETB),${dailySales.discountTotal}\n`;
-    csv += `Net Sales Revenue (ETB),${dailySales.netSalesAmount}\n`;
-    csv += `15% Standard VAT Collected (ETB),${dailySales.taxTotal}\n`;
-    csv += `Taxable Sales Base (ETB),${dailySales.taxableSubtotal}\n`;
-    csv += `Tax-Exempt Sales Base (ETB),${dailySales.taxExemptSubtotal}\n`;
-    csv += `Total Transactions,${dailySales.totalSalesCount}\n`;
-    csv += `COGS (ETB),${profitability?.totalCOGS || 0}\n`;
-    csv += `Gross Profit (ETB),${profitability?.totalGrossProfit || 0}\n`;
-    csv += `Gross Margin %,${profitability?.overallMarginPercentage || 0}%\n\n`;
-
-    csv += `--- RECONCILIATION AUDIT ---\n`;
-    csv += `VAT Reconciled (Sum of Lines == Output),${dailySales.vatReconciliation?.isVatReconciled ? 'YES' : 'NO'}\n`;
-    csv += `Payment Reconciled (Tenders == Gross Sales),${dailySales.vatReconciliation?.isPaymentReconciled ? 'YES' : 'NO'}\n\n`;
+    csv += `--- FINANCIAL SUMMARY ---\n`;
+    csv += `Gross Revenue (ETB),${dailySales?.netSalesAmount || 0}\n`;
+    csv += `15% VAT Collected (ETB),${dailySales?.taxTotal || 0}\n`;
+    csv += `Standard Taxable Subtotal (ETB),${dailySales?.taxableSubtotal || 0}\n`;
+    csv += `Tax-Exempt Subtotal (ETB),${dailySales?.taxExemptSubtotal || 0}\n`;
+    csv += `Gross Profit (COGS Deducted) (ETB),${profitability?.totalGrossProfit || 0}\n`;
+    csv += `Overall Margin %,${profitability?.overallMarginPercentage || 0}%\n`;
+    csv += `Total Transactions,${dailySales?.totalSalesCount || 0}\n\n`;
 
     csv += `--- PAYMENT TENDER MIX ---\n`;
-    csv += `Method,Total Amount (ETB),Transaction Count\n`;
-    dailySales.paymentBreakdown.forEach((p) => {
-      csv += `${p.paymentMethod},${p.totalAmount},${p.transactionCount}\n`;
+    csv += `Payment Method,Total Amount (ETB),Transaction Count\n`;
+    dailySales?.paymentBreakdown.forEach((p) => {
+      csv += `"${p.paymentMethod}",${p.totalAmount},${p.transactionCount}\n`;
     });
     csv += `\n`;
 
-    csv += `--- CATEGORY SALES (SEPARATE UNITS: PCS vs KG) ---\n`;
-    csv += `Category,Gross Revenue (ETB),COGS (ETB),Gross Profit (ETB),Margin %,Units (Pieces),Weight (Kilograms)\n`;
-    dailySales.categoryBreakdown?.forEach((c) => {
-      csv += `"${c.categoryName}",${c.grossRevenue},${c.cogs},${c.grossProfit},${c.marginPercentage}%,${c.unitsPcs},${c.unitsKg}\n`;
+    csv += `--- TOP PRODUCTS PROFITABILITY ---\n`;
+    csv += `Product Name,SKU,UoM,Quantity Sold,Net Revenue (ETB),COGS (ETB),Gross Profit (ETB),Margin %\n`;
+    profitability?.items.forEach((p) => {
+      csv += `"${p.nameEn}",${p.sku},${p.uom || 'PCS'},${p.quantitySold},${p.netRevenue},${p.cogs},${p.grossProfit},${p.marginPercentage}%\n`;
     });
     csv += `\n`;
+
+    csv += `--- INVENTORY VALUATION (AVCO) ---\n`;
+    csv += `Category,Product Count,Quantity (Pcs),Quantity (Kg),Valuation (ETB)\n`;
+    valuation?.categories.forEach((c) => {
+      csv += `"${c.categoryName}",${c.productCount},${c.totalQuantityPcs},${c.totalQuantityKg},${c.totalValuation}\n`;
+    });
+    csv += `Total Store Valuation (ETB),,,${valuation?.totalValuationETB || 0}\n\n`;
 
     csv += `--- CASHIER AUDIT & DRAWER VARIANCE ---\n`;
     csv += `Cashier Name,Shifts,Opening Float (ETB),Closing Counted (ETB),Expected Cash (ETB),Variance (ETB),Accuracy Rate\n`;
@@ -233,14 +237,14 @@ export const ReportsView: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>
-                Financial &amp; Operational Reports
+                {t('reports.title')}
               </h1>
               <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 <Clock size={13} />
-                <span>Last updated: {lastUpdated} (Africa/Addis_Ababa, UTC+3)</span>
+                <span>{t('reports.lastUpdated', { time: lastUpdated })}</span>
                 <span>•</span>
                 <span className="font-semibold" style={{ color: 'var(--primary)' }}>
-                  {AVAILABLE_BRANCHES.find((b) => b.id === selectedBranch)?.name}
+                  {getBranchDisplayName(selectedBranch)}
                 </span>
               </div>
             </div>
@@ -251,7 +255,10 @@ export const ReportsView: React.FC = () => {
         <div className="flex items-center gap-3 flex-wrap">
           {/* Branch Selector: Unrestricted for HQ, locked for Branch Manager */}
           {isHqUser ? (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm"
+              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+            >
               <Building size={15} style={{ color: 'var(--text-muted)' }} />
               <select
                 className="bg-transparent border-none text-xs font-semibold focus:outline-none cursor-pointer"
@@ -260,29 +267,53 @@ export const ReportsView: React.FC = () => {
                 style={{ color: 'var(--text-main)' }}
               >
                 {AVAILABLE_BRANCHES.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
+                  <option key={b.id} value={b.id} className="bg-slate-900 text-slate-100">
+                    {b.id === 'ALL'
+                      ? t('reports.allBranches')
+                      : language === 'am' && b.nameAm
+                      ? b.nameAm
+                      : b.name}
                   </option>
                 ))}
               </select>
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}>
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium"
+              style={{
+                background: 'var(--bg-elevated)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-muted)',
+              }}
+            >
               <Building size={14} />
               <span>{currentUser?.branchName || 'Bole Medhanialem Branch'}</span>
             </div>
           )}
 
           {/* Time Range Selector */}
-          <div className="seg-ctrl flex items-center p-1 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+          <div
+            className="seg-ctrl flex items-center p-1 rounded-lg"
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+          >
             {(['today', 'yesterday', 'week', 'month', 'custom'] as ReportTimeRange[]).map((r) => (
               <button
                 key={r}
-                className={`seg-ctrl-btn text-xs px-2.5 py-1 rounded transition-all font-medium ${timeRange === r ? 'active bg-[var(--primary)] text-white shadow-sm' : ''}`}
+                className={`seg-ctrl-btn text-xs px-2.5 py-1 rounded transition-all font-medium ${
+                  timeRange === r ? 'active bg-[var(--primary)] text-white shadow-sm' : ''
+                }`}
                 style={{ color: timeRange === r ? '#fff' : 'var(--text-muted)' }}
                 onClick={() => setTimeRange(r)}
               >
-                {r === 'today' ? t('reports.today') : r === 'yesterday' ? t('reports.yesterday') : r === 'week' ? t('reports.week') : r === 'month' ? t('reports.month') : t('reports.custom')}
+                {r === 'today'
+                  ? t('reports.today')
+                  : r === 'yesterday'
+                  ? t('reports.yesterday')
+                  : r === 'week'
+                  ? t('reports.week')
+                  : r === 'month'
+                  ? t('reports.month')
+                  : t('reports.custom')}
               </button>
             ))}
           </div>
@@ -292,7 +323,7 @@ export const ReportsView: React.FC = () => {
             className="btn-secondary flex items-center gap-1 text-xs"
             onClick={fetchReportData}
             disabled={isLoading}
-            title="Refresh local ledger data"
+            title={t('reports.sync')}
             style={{ height: '34px', padding: '0 10px' }}
           >
             <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
@@ -326,9 +357,9 @@ export const ReportsView: React.FC = () => {
                 >
                   <Printer size={15} style={{ color: 'var(--primary)' }} />
                   <div>
-                    <div className="font-semibold">Export Fiscal PDF</div>
+                    <div className="font-semibold">{t('reports.exportFiscalPdf')}</div>
                     <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      Ethiopian Ministry of Revenue Z-Report
+                      {t('reports.exportFiscalPdfDesc')}
                     </div>
                   </div>
                 </button>
@@ -340,9 +371,9 @@ export const ReportsView: React.FC = () => {
                 >
                   <FileSpreadsheet size={15} style={{ color: 'var(--warning)' }} />
                   <div>
-                    <div className="font-semibold">Export Excel / CSV</div>
+                    <div className="font-semibold">{t('reports.exportExcel')}</div>
                     <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      Full multi-table ledger stream (.csv)
+                      {t('reports.exportExcelDesc')}
                     </div>
                   </div>
                 </button>
@@ -354,29 +385,40 @@ export const ReportsView: React.FC = () => {
 
       {/* Custom Date Range Picker (shown when custom is selected) */}
       {timeRange === 'custom' && (
-        <div className="flex items-center gap-4 px-5 py-3 rounded-xl border flex-wrap text-xs" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+        <div
+          className="flex items-center gap-4 px-5 py-3 rounded-xl border flex-wrap text-xs"
+          style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+        >
           <div className="flex items-center gap-2 font-medium" style={{ color: 'var(--text-main)' }}>
             <Calendar size={14} style={{ color: 'var(--primary)' }} />
-            <span>Custom Date Boundaries (EAT):</span>
+            <span>{t('reports.customDateBoundaries')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span style={{ color: 'var(--text-muted)' }}>Start:</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('reports.startDate')}</span>
             <input
               type="date"
               className="px-2 py-1 rounded border text-xs"
               value={customStartDate}
               onChange={(e) => setCustomStartDate(e.target.value)}
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', color: 'var(--text-main)' }}
+              style={{
+                background: 'var(--bg-card)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-main)',
+              }}
             />
           </div>
           <div className="flex items-center gap-2">
-            <span style={{ color: 'var(--text-muted)' }}>End:</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t('reports.endDate')}</span>
             <input
               type="date"
               className="px-2 py-1 rounded border text-xs"
               value={customEndDate}
               onChange={(e) => setCustomEndDate(e.target.value)}
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', color: 'var(--text-main)' }}
+              style={{
+                background: 'var(--bg-card)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-main)',
+              }}
             />
           </div>
         </div>
@@ -386,12 +428,15 @@ export const ReportsView: React.FC = () => {
       {isHqUser && (
         <div className="glass-panel p-4 rounded-xl border border-[var(--border-subtle)]">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            <div
+              className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider"
+              style={{ color: 'var(--text-muted)' }}
+            >
               <Building size={14} style={{ color: 'var(--primary)' }} />
-              HQ Network Branch Status &amp; Last Sync Time
+              {t('reports.hqNetworkBranchStatus')}
             </div>
             <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>
-              Live branch event sync health
+              {t('reports.liveBranchEventSyncHealth')}
             </span>
           </div>
 
@@ -402,7 +447,12 @@ export const ReportsView: React.FC = () => {
                 className="p-3 rounded-lg border flex flex-col justify-between"
                 style={{
                   background: 'var(--bg-card)',
-                  borderColor: b.status === 'LIVE' ? 'rgba(5, 150, 105, 0.3)' : b.status === 'DELAYED' ? 'rgba(217, 119, 6, 0.3)' : 'rgba(220, 38, 38, 0.3)',
+                  borderColor:
+                    b.status === 'LIVE'
+                      ? 'rgba(5, 150, 105, 0.3)'
+                      : b.status === 'DELAYED'
+                      ? 'rgba(217, 119, 6, 0.3)'
+                      : 'rgba(220, 38, 38, 0.3)',
                 }}
               >
                 <div className="flex items-start justify-between">
@@ -411,7 +461,7 @@ export const ReportsView: React.FC = () => {
                       {b.branchName}
                     </div>
                     <div className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      Code: {b.branchCode}
+                      {t('reports.branchCode', { code: b.branchCode })}
                     </div>
                   </div>
                   <span
@@ -427,9 +477,9 @@ export const ReportsView: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-3 text-xs pt-2 border-t border-[var(--border-subtle)]">
-                  <span style={{ color: 'var(--text-dim)' }}>Today's Sales:</span>
+                  <span style={{ color: 'var(--text-dim)' }}>{t('reports.todaysSales')}</span>
                   <span className="font-semibold tabular" style={{ color: 'var(--primary)' }}>
-                    ETB {fmt(b.todaySales)} ({b.todayTransactions} tx)
+                    ETB {fmt(b.todaySales)} ({t('reports.txCount', { count: b.todayTransactions })})
                   </span>
                 </div>
               </div>
@@ -439,28 +489,34 @@ export const ReportsView: React.FC = () => {
       )}
 
       {/* ─── Reconciliation Assurance Ribbon ─── */}
-      <div className="flex items-center justify-between p-3 rounded-xl border text-xs flex-wrap gap-2" style={{ background: 'rgba(5, 150, 105, 0.06)', borderColor: 'rgba(5, 150, 105, 0.25)' }}>
+      <div
+        className="flex items-center justify-between p-3 rounded-xl border text-xs flex-wrap gap-2"
+        style={{
+          background: 'rgba(5, 150, 105, 0.06)',
+          borderColor: 'rgba(5, 150, 105, 0.25)',
+        }}
+      >
         <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--primary)' }}>
           <ShieldCheck size={16} />
-          <span>Ledger Reconciliation Status:</span>
+          <span>{t('reports.ledgerReconciliationStatus')}</span>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-1.5">
             <CheckCircle2 size={13} className="text-emerald-500" />
             <span style={{ color: 'var(--text-main)' }}>
-              Sales by Tender == Gross Sales (ETB {fmt(dailySales?.netSalesAmount || 0)})
+              {t('reports.salesByTenderEqGross', { amount: fmt(dailySales?.netSalesAmount || 0) })}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 size={13} className="text-emerald-500" />
             <span style={{ color: 'var(--text-main)' }}>
-              15% VAT Output == Sum of Line Taxes (ETB {fmt(dailySales?.taxTotal || 0)})
+              {t('reports.vatOutputEqSum', { amount: fmt(dailySales?.taxTotal || 0) })}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 size={13} className="text-emerald-500" />
             <span style={{ color: 'var(--text-main)' }}>
-              Valuation == On Hand × AVCO Cost (ETB {fmt(valuation?.totalValuationETB || 0)})
+              {t('reports.valuationEqOnHandAvco', { amount: fmt(valuation?.totalValuationETB || 0) })}
             </span>
           </div>
         </div>
@@ -470,15 +526,21 @@ export const ReportsView: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gross Revenue */}
         <div className="kpi-card p-4 rounded-xl glass-panel border border-[var(--border-subtle)]">
-          <div className="kpi-label flex items-center justify-between text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            <span>Gross Revenue (ETB)</span>
+          <div
+            className="kpi-label flex items-center justify-between text-xs font-medium"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <span>{t('reports.grossRevenue')}</span>
             <DollarSign size={15} style={{ color: 'var(--primary)' }} />
           </div>
           <div className="kpi-value text-2xl font-bold tabular mt-1" style={{ color: 'var(--primary)' }}>
             {fmt(dailySales?.netSalesAmount || 0)}
           </div>
-          <div className="flex items-center justify-between text-xs mt-2" style={{ color: 'var(--text-dim)' }}>
-            <span>All payment tenders</span>
+          <div
+            className="flex items-center justify-between text-xs mt-2"
+            style={{ color: 'var(--text-dim)' }}
+          >
+            <span>{t('reports.allPaymentTenders')}</span>
             <span className="flex items-center text-emerald-400 font-semibold text-[11px]">
               <ArrowUpRight size={13} /> {deltas.revenue}
             </span>
@@ -487,31 +549,45 @@ export const ReportsView: React.FC = () => {
 
         {/* 15% VAT Collected */}
         <div className="kpi-card p-4 rounded-xl glass-panel border border-[var(--border-subtle)]">
-          <div className="kpi-label flex items-center justify-between text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            <span>15% VAT Output</span>
+          <div
+            className="kpi-label flex items-center justify-between text-xs font-medium"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <span>{t('reports.vatOutput15')}</span>
             <Receipt size={15} style={{ color: 'var(--warning)' }} />
           </div>
           <div className="kpi-value text-2xl font-bold tabular mt-1" style={{ color: 'var(--warning)' }}>
             {fmt(dailySales?.taxTotal || 0)}
           </div>
-          <div className="flex items-center justify-between text-xs mt-2" style={{ color: 'var(--text-dim)' }}>
-            <span>Taxable: ETB {fmt(dailySales?.taxableSubtotal || 0)}</span>
-            <span className="badge-neutral text-[10px]">ERCA 15%</span>
+          <div
+            className="flex items-center justify-between text-xs mt-2"
+            style={{ color: 'var(--text-dim)' }}
+          >
+            <span>{t('reports.taxable', { amount: fmt(dailySales?.taxableSubtotal || 0) })}</span>
+            <span className="badge-neutral text-[10px]">{t('reports.ercaVat15')}</span>
           </div>
         </div>
 
         {/* Gross Profit & Margin % */}
         <div className="kpi-card p-4 rounded-xl glass-panel border border-[var(--border-subtle)]">
-          <div className="kpi-label flex items-center justify-between text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            <span>Gross Profit (COGS Deducted)</span>
+          <div
+            className="kpi-label flex items-center justify-between text-xs font-medium"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <span>{t('reports.grossProfitCogs')}</span>
             <TrendingUp size={15} style={{ color: 'var(--info)' }} />
           </div>
           <div className="kpi-value text-2xl font-bold tabular mt-1" style={{ color: 'var(--info)' }}>
             {fmt(profitability?.totalGrossProfit || 0)}
           </div>
-          <div className="flex items-center justify-between text-xs mt-2" style={{ color: 'var(--text-dim)' }}>
+          <div
+            className="flex items-center justify-between text-xs mt-2"
+            style={{ color: 'var(--text-dim)' }}
+          >
             <span className="font-semibold" style={{ color: 'var(--primary)' }}>
-              {profitability?.overallMarginPercentage.toFixed(1)}% gross margin
+              {t('reports.grossMargin', {
+                margin: profitability?.overallMarginPercentage.toFixed(1) || '0.0',
+              })}
             </span>
             <span className="flex items-center text-emerald-400 font-semibold text-[11px]">
               <ArrowUpRight size={13} /> {deltas.profit}
@@ -521,19 +597,26 @@ export const ReportsView: React.FC = () => {
 
         {/* Transactions & Average Basket */}
         <div className="kpi-card p-4 rounded-xl glass-panel border border-[var(--border-subtle)]">
-          <div className="kpi-label flex items-center justify-between text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            <span>Transactions &amp; Basket</span>
+          <div
+            className="kpi-label flex items-center justify-between text-xs font-medium"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <span>{t('reports.transactionsAndBasket')}</span>
             <PieChart size={15} style={{ color: 'var(--primary)' }} />
           </div>
           <div className="kpi-value text-2xl font-bold tabular mt-1" style={{ color: 'var(--primary)' }}>
             {dailySales?.totalSalesCount || 0}
           </div>
-          <div className="flex items-center justify-between text-xs mt-2" style={{ color: 'var(--text-dim)' }}>
+          <div
+            className="flex items-center justify-between text-xs mt-2"
+            style={{ color: 'var(--text-dim)' }}
+          >
             <span>
-              Avg Basket: ETB{' '}
-              {dailySales?.totalSalesCount
-                ? fmt((dailySales?.netSalesAmount || 0) / dailySales.totalSalesCount)
-                : '0.00'}
+              {t('reports.avgBasket', {
+                amount: dailySales?.totalSalesCount
+                  ? fmt((dailySales?.netSalesAmount || 0) / dailySales.totalSalesCount)
+                  : '0.00',
+              })}
             </span>
             <span className="flex items-center text-emerald-400 font-semibold text-[11px]">
               <ArrowUpRight size={13} /> {deltas.tx}
@@ -553,7 +636,7 @@ export const ReportsView: React.FC = () => {
           onClick={() => setActiveTab('overview')}
         >
           <PieChart size={14} />
-          Overview &amp; Payment Mix
+          {t('reports.tabOverview')}
         </button>
 
         <button
@@ -565,7 +648,7 @@ export const ReportsView: React.FC = () => {
           onClick={() => setActiveTab('trends')}
         >
           <BarChart3 size={14} />
-          Hourly &amp; Category Trends
+          {t('reports.tabTrends')}
         </button>
 
         <button
@@ -577,7 +660,7 @@ export const ReportsView: React.FC = () => {
           onClick={() => setActiveTab('products')}
         >
           <ShoppingBag size={14} />
-          Top Products Margin
+          {t('reports.tabProducts')}
         </button>
 
         <button
@@ -589,7 +672,7 @@ export const ReportsView: React.FC = () => {
           onClick={() => setActiveTab('vat')}
         >
           <Receipt size={14} />
-          VAT Summary (ERCA)
+          {t('reports.tabVat')}
         </button>
 
         <button
@@ -601,7 +684,7 @@ export const ReportsView: React.FC = () => {
           onClick={() => setActiveTab('valuation')}
         >
           <Layers size={14} />
-          Stock Valuation &amp; Batches
+          {t('reports.tabValuation')}
         </button>
 
         <button
@@ -613,7 +696,7 @@ export const ReportsView: React.FC = () => {
           onClick={() => setActiveTab('cashiers')}
         >
           <Users size={14} />
-          Cashier Drawer Audits
+          {t('reports.tabCashiers')}
         </button>
       </div>
 
@@ -624,31 +707,31 @@ export const ReportsView: React.FC = () => {
           <div className="glass-panel p-5 rounded-xl border border-[var(--border-subtle)]">
             <h3 className="font-bold text-sm mb-4 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
               <PieChart size={16} style={{ color: 'var(--primary)' }} />
-              Payment Tender Reconciliation (Total == Gross Sales)
+              {t('reports.paymentTenderRecon')}
             </h3>
 
             <div className="flex flex-col gap-4">
-              {dailySales?.paymentBreakdown.map((t) => {
+              {dailySales?.paymentBreakdown.map((tItem) => {
                 const totalGross = dailySales.netSalesAmount || 1;
-                const pct = Math.round((t.totalAmount / totalGross) * 100);
+                const pct = Math.round((tItem.totalAmount / totalGross) * 100);
                 const color =
-                  t.paymentMethod === 'CASH'
+                  tItem.paymentMethod === 'CASH'
                     ? '#059669'
-                    : t.paymentMethod === 'TELEBIRR'
+                    : tItem.paymentMethod === 'TELEBIRR'
                     ? '#2563eb'
-                    : t.paymentMethod === 'CBE_BIRR'
+                    : tItem.paymentMethod === 'CBE_BIRR'
                     ? '#d97706'
                     : '#059669';
 
                 return (
-                  <div key={t.paymentMethod}>
+                  <div key={tItem.paymentMethod}>
                     <div className="flex justify-between text-xs mb-1.5">
                       <span className="font-semibold flex items-center gap-1.5" style={{ color }}>
                         <span className="w-2 h-2 rounded-full" style={{ background: color }} />
-                        {t.paymentMethod.replace('_', ' ')}
+                        {tItem.paymentMethod.replace('_', ' ')}
                       </span>
                       <span className="tabular font-medium" style={{ color: 'var(--text-muted)' }}>
-                        {pct}% · ETB {fmt(t.totalAmount)} ({t.transactionCount} tx)
+                        {pct}% · ETB {fmt(tItem.totalAmount)} ({t('reports.txCount', { count: tItem.transactionCount })})
                       </span>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
@@ -663,7 +746,7 @@ export const ReportsView: React.FC = () => {
             </div>
 
             <div className="mt-6 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs font-semibold">
-              <span style={{ color: 'var(--text-main)' }}>Total Tenders Reconciled:</span>
+              <span style={{ color: 'var(--text-main)' }}>{t('reports.totalTendersReconciled')}</span>
               <span className="tabular font-bold" style={{ color: 'var(--primary)' }}>
                 ETB {fmt(dailySales?.netSalesAmount || 0)}
               </span>
@@ -675,29 +758,40 @@ export const ReportsView: React.FC = () => {
             <div>
               <h3 className="font-bold text-sm mb-4 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                 <ShieldCheck size={16} style={{ color: 'var(--primary)' }} />
-                Cashier Shift Cash Audit &amp; Drawer Compliance
+                {t('reports.cashierShiftAuditTitle')}
               </h3>
 
               <div className="space-y-3">
                 {dailySales?.cashierAudits.map((audit) => (
-                  <div key={audit.cashierId} className="p-3 rounded-lg border text-xs" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+                  <div
+                    key={audit.cashierId}
+                    className="p-3 rounded-lg border text-xs"
+                    style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+                  >
                     <div className="flex items-center justify-between font-semibold mb-2">
-                      <span style={{ color: 'var(--text-main)' }}>Cashier Shifts Audited</span>
-                      <span className="badge-neutral">{audit.shiftCount} shifts completed</span>
+                      <span style={{ color: 'var(--text-main)' }}>{t('reports.cashierShiftsAudited')}</span>
+                      <span className="badge-neutral">
+                        {t('reports.shiftsCompleted', { count: audit.shiftCount })}
+                      </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: 'var(--text-dim)' }}>
                       <div>
-                        Opening Float: <span className="font-semibold text-emerald-400">ETB {fmt(audit.openingFloatTotal)}</span>
+                        {t('reports.openingFloat')}{' '}
+                        <span className="font-semibold text-emerald-400">ETB {fmt(audit.openingFloatTotal)}</span>
                       </div>
                       <div>
-                        Closing Counted: <span className="font-semibold text-sky-400">ETB {fmt(audit.closingCountedTotal)}</span>
+                        {t('reports.closingCounted')}{' '}
+                        <span className="font-semibold text-sky-400">ETB {fmt(audit.closingCountedTotal)}</span>
                       </div>
                       <div>
-                        Expected Cash: <span className="font-semibold" style={{ color: 'var(--text-main)' }}>ETB {fmt(audit.expectedCashTotal)}</span>
+                        {t('reports.expectedCash')}{' '}
+                        <span className="font-semibold" style={{ color: 'var(--text-main)' }}>
+                          ETB {fmt(audit.expectedCashTotal)}
+                        </span>
                       </div>
                       <div>
-                        Drawer Variance:{' '}
+                        {t('reports.drawerVariance')}{' '}
                         <span
                           className={`font-bold ${
                             audit.netVariance === 0
@@ -707,7 +801,12 @@ export const ReportsView: React.FC = () => {
                               : 'text-amber-400'
                           }`}
                         >
-                          ETB {fmt(audit.netVariance)} {audit.netVariance === 0 ? '(Balanced)' : audit.netVariance < 0 ? '(Short)' : '(Over)'}
+                          ETB {fmt(audit.netVariance)}{' '}
+                          {audit.netVariance === 0
+                            ? t('reports.balanced')
+                            : audit.netVariance < 0
+                            ? t('reports.short')
+                            : t('reports.over')}
                         </span>
                       </div>
                     </div>
@@ -716,10 +815,13 @@ export const ReportsView: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-4 p-3 rounded-lg border text-xs flex items-center gap-2" style={{ background: 'rgba(5, 150, 105, 0.08)', borderColor: 'rgba(5, 150, 105, 0.2)' }}>
+            <div
+              className="mt-4 p-3 rounded-lg border text-xs flex items-center gap-2"
+              style={{ background: 'rgba(5, 150, 105, 0.08)', borderColor: 'rgba(5, 150, 105, 0.2)' }}
+            >
               <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
               <span style={{ color: 'var(--text-main)' }}>
-                Offline POS registers enforce blind drawer counts during Z-out before displaying variance numbers.
+                {t('reports.blindCountNotice')}
               </span>
             </div>
           </div>
@@ -733,10 +835,10 @@ export const ReportsView: React.FC = () => {
           <div className="glass-panel p-5 rounded-xl border border-[var(--border-subtle)]">
             <h3 className="font-bold text-sm mb-1 flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
               <BarChart3 size={16} style={{ color: 'var(--primary)' }} />
-              24-Hour Trading Profile (Sales &amp; Peak Footfall Distribution)
+              {t('reports.tradingProfile24h')}
             </h3>
             <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-              Transaction velocity across operating store hours (08:00 to 21:00 EAT)
+              {t('reports.tradingProfileDesc')}
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2">
@@ -770,7 +872,7 @@ export const ReportsView: React.FC = () => {
                       ETB {fmt(h.grossAmount)}
                     </div>
                     <div className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
-                      {h.transactionCount} tx
+                      {t('reports.txCount', { count: h.transactionCount })}
                     </div>
                   </div>
                 );
@@ -784,29 +886,29 @@ export const ReportsView: React.FC = () => {
               <div>
                 <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                   <Layers size={16} style={{ color: 'var(--warning)' }} />
-                  Sales by Category (Unit Segregated: Pieces vs Kilograms)
+                  {t('reports.salesByCategory')}
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Rule strictly enforced: Units of count (pcs) and units of weight (kg) are never summed together.
+                  {t('reports.uomSegregationNotice')}
                 </p>
               </div>
-              <span className="badge-warning text-xs">UoM Segregation Active</span>
+              <span className="badge-warning text-xs">{t('reports.uomSegregationActive')}</span>
             </div>
 
             <div className="overflow-x-auto">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Category</th>
-                    <th className="text-right">Gross Sales (ETB)</th>
-                    <th className="text-right">COGS (ETB)</th>
-                    <th className="text-right">Gross Profit (ETB)</th>
-                    <th className="text-right">Margin %</th>
+                    <th>{t('reports.thCategory')}</th>
+                    <th className="text-right">{t('reports.thGrossSales')}</th>
+                    <th className="text-right">{t('reports.thCogs')}</th>
+                    <th className="text-right">{t('reports.thGrossProfit')}</th>
+                    <th className="text-right">{t('reports.thMargin')}</th>
                     <th className="text-center font-bold" style={{ color: 'var(--primary)' }}>
-                      Count Units (pcs)
+                      {t('reports.thCountUnits')}
                     </th>
                     <th className="text-center font-bold" style={{ color: 'var(--info)' }}>
-                      Weight Units (kg)
+                      {t('reports.thWeightUnits')}
                     </th>
                   </tr>
                 </thead>
@@ -844,17 +946,17 @@ export const ReportsView: React.FC = () => {
             <div>
               <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                 <ShoppingBag size={16} style={{ color: 'var(--primary)' }} />
-                Product Profitability &amp; Weighted Margin Ranking
+                {t('reports.productProfitability')}
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Cost of Goods Sold (COGS) evaluated against unit purchase cost at the moment of each sale.
+                {t('reports.productProfitabilityDesc')}
               </p>
             </div>
 
             <div className="w-64">
               <input
                 type="text"
-                placeholder="Filter by SKU or Product..."
+                placeholder={t('reports.filterBySkuPlaceholder')}
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
                 className="w-full text-xs px-3 py-1.5 rounded-lg border bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-main)] focus:outline-none focus:border-[var(--primary)]"
@@ -866,20 +968,22 @@ export const ReportsView: React.FC = () => {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Product &amp; SKU</th>
-                  <th className="text-center">UoM</th>
-                  <th className="text-right">Quantity Sold</th>
-                  <th className="text-right">Net Revenue (ETB)</th>
-                  <th className="text-right">COGS (ETB)</th>
-                  <th className="text-right">Gross Profit (ETB)</th>
-                  <th className="text-right">Margin %</th>
+                  <th>{t('reports.thProductSku')}</th>
+                  <th className="text-center">{t('reports.thUom')}</th>
+                  <th className="text-right">{t('reports.thQuantitySold')}</th>
+                  <th className="text-right">{t('reports.thNetRevenue')}</th>
+                  <th className="text-right">{t('reports.thCogs')}</th>
+                  <th className="text-right">{t('reports.thGrossProfit')}</th>
+                  <th className="text-right">{t('reports.thMargin')}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProducts.map((p) => (
                   <tr key={p.productId}>
                     <td>
-                      <div className="font-semibold text-xs">{p.nameEn}</div>
+                      <div className="font-semibold text-xs">
+                        {language === 'am' && (p as any).nameAm ? (p as any).nameAm : p.nameEn}
+                      </div>
                       <div className="text-[10px] font-mono text-zinc-400 mt-0.5">{p.sku}</div>
                     </td>
                     <td className="text-center">
@@ -910,10 +1014,10 @@ export const ReportsView: React.FC = () => {
               <div>
                 <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                   <Receipt size={16} style={{ color: 'var(--warning)' }} />
-                  Federal Democratic Republic of Ethiopia — Ministry of Revenue Tax Ledger
+                  {t('reports.morTaxLedger')}
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Compliant with ERCA VAT Proclamation No. 285/2002. Reconciles taxable and exempt baskets.
+                  {t('reports.morTaxLedgerDesc')}
                 </p>
               </div>
               <button
@@ -921,38 +1025,47 @@ export const ReportsView: React.FC = () => {
                 onClick={() => setShowPrintModal(true)}
               >
                 <Printer size={13} />
-                <span>Print Official Z-Report</span>
+                <span>{t('reports.printOfficialZReport')}</span>
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="p-4 rounded-xl border" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
-                <div className="text-xs text-zinc-400">Taxable Standard Supplies (15%)</div>
+              <div
+                className="p-4 rounded-xl border"
+                style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+              >
+                <div className="text-xs text-zinc-400">{t('reports.taxableStandardSupplies')}</div>
                 <div className="text-xl font-bold tabular mt-1" style={{ color: 'var(--text-main)' }}>
                   ETB {fmt(dailySales?.taxableSubtotal || 0)}
                 </div>
                 <div className="text-[11px] text-emerald-400 mt-2 font-medium">
-                  Standard VAT output base
+                  {t('reports.standardVatOutputBase')}
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl border" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
-                <div className="text-xs text-zinc-400">Zero-Rated &amp; Exempt Supplies (0%)</div>
+              <div
+                className="p-4 rounded-xl border"
+                style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+              >
+                <div className="text-xs text-zinc-400">{t('reports.zeroRatedExemptSupplies')}</div>
                 <div className="text-xl font-bold tabular mt-1" style={{ color: 'var(--text-main)' }}>
                   ETB {fmt(dailySales?.taxExemptSubtotal || 0)}
                 </div>
                 <div className="text-[11px] text-zinc-400 mt-2 font-medium">
-                  Unprocessed Teff, raw grains &amp; pharmaceuticals
+                  {t('reports.zeroRatedDesc')}
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl border" style={{ background: 'rgba(217, 119, 6, 0.08)', borderColor: 'rgba(217, 119, 6, 0.3)' }}>
-                <div className="text-xs text-amber-400 font-semibold">Total Output VAT Collected</div>
+              <div
+                className="p-4 rounded-xl border"
+                style={{ background: 'rgba(217, 119, 6, 0.08)', borderColor: 'rgba(217, 119, 6, 0.3)' }}
+              >
+                <div className="text-xs text-amber-400 font-semibold">{t('reports.totalOutputVatCollected')}</div>
                 <div className="text-xl font-bold tabular mt-1 text-amber-400">
                   ETB {fmt(dailySales?.taxTotal || 0)}
                 </div>
                 <div className="text-[11px] text-amber-300/80 mt-2 font-medium">
-                  15% payable to Ethiopian Ministry of Revenue
+                  {t('reports.payableToMor')}
                 </div>
               </div>
             </div>
@@ -962,28 +1075,28 @@ export const ReportsView: React.FC = () => {
               <div className="flex items-center justify-between font-semibold text-xs mb-3">
                 <span className="flex items-center gap-1.5 text-zinc-200">
                   <ShieldCheck size={15} className="text-emerald-400" />
-                  Line-by-Line VAT Verification
+                  {t('reports.lineByLineVatVerification')}
                 </span>
-                <span className="badge-success text-[10px]">Audit Status: Reconciled</span>
+                <span className="badge-success text-[10px]">{t('reports.auditStatusReconciled')}</span>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
                 <div>
-                  <div className="text-zinc-500 text-[10px]">Header Tax Total:</div>
+                  <div className="text-zinc-500 text-[10px]">{t('reports.headerTaxTotal')}</div>
                   <div className="font-bold text-zinc-200 mt-0.5">ETB {fmt(dailySales?.taxTotal || 0)}</div>
                 </div>
                 <div>
-                  <div className="text-zinc-500 text-[10px]">Sum of Line VATs:</div>
+                  <div className="text-zinc-500 text-[10px]">{t('reports.sumOfLineVats')}</div>
                   <div className="font-bold text-zinc-200 mt-0.5">
                     ETB {fmt(dailySales?.vatReconciliation?.sumOfLineVat || 0)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-zinc-500 text-[10px]">Difference / Variance:</div>
-                  <div className="font-bold text-emerald-400 mt-0.5">ETB 0.00 (Exact)</div>
+                  <div className="text-zinc-500 text-[10px]">{t('reports.differenceVariance')}</div>
+                  <div className="font-bold text-emerald-400 mt-0.5">{t('reports.exactZero')}</div>
                 </div>
                 <div>
-                  <div className="text-zinc-500 text-[10px]">Fiscal Machine Code (MRC):</div>
+                  <div className="text-zinc-500 text-[10px]">{t('reports.fiscalMrcCode')}</div>
                   <div className="font-bold text-zinc-200 mt-0.5">ET-MOR-POS-0194</div>
                 </div>
               </div>
@@ -1001,14 +1114,14 @@ export const ReportsView: React.FC = () => {
               <div>
                 <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                   <Layers size={16} style={{ color: 'var(--warning)' }} />
-                  Inventory Valuation at Weighted-Average Cost (AVCO)
+                  {t('reports.inventoryValuationTitle')}
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Total Valuation = On Hand × Weighted Average Cost. Units explicitly separated (Pcs vs Kg).
+                  {t('reports.inventoryValuationDesc')}
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-xs text-zinc-400">Total Store Valuation:</div>
+                <div className="text-xs text-zinc-400">{t('reports.totalStoreValuation')}</div>
                 <div className="text-lg font-bold text-emerald-400 tabular">
                   ETB {fmt(valuation?.totalValuationETB || 0)}
                 </div>
@@ -1019,16 +1132,16 @@ export const ReportsView: React.FC = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Category</th>
-                    <th className="text-center">Active Products</th>
+                    <th>{t('reports.thCategory')}</th>
+                    <th className="text-center">{t('reports.thActiveProducts')}</th>
                     <th className="text-center font-bold" style={{ color: 'var(--primary)' }}>
-                      On Hand (Pieces)
+                      {t('reports.thOnHandPcs')}
                     </th>
                     <th className="text-center font-bold" style={{ color: 'var(--info)' }}>
-                      On Hand (Weight Kg)
+                      {t('reports.thOnHandKg')}
                     </th>
-                    <th className="text-right">Valuation at Cost (ETB)</th>
-                    <th className="text-right">Portfolio Share</th>
+                    <th className="text-right">{t('reports.thValuationAtCost')}</th>
+                    <th className="text-right">{t('reports.thPortfolioShare')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1064,15 +1177,17 @@ export const ReportsView: React.FC = () => {
               <div>
                 <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                   <AlertTriangle size={16} style={{ color: 'var(--danger)' }} />
-                  FEFO Expiring Batches &amp; Shrinkage Alert
+                  {t('reports.fefoExpiringTitle')}
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Batches approaching expiry within 30 days. Action required to rotate or launch markdown promos.
+                  {t('reports.fefoExpiringDesc')}
                 </p>
               </div>
               <div className="text-right">
                 <span className="badge-danger text-xs">
-                  {expiring?.batches.filter((b) => b.isExpired).length} Expired Batches
+                  {t('reports.expiredBatchesCount', {
+                    count: expiring?.batches.filter((b) => b.isExpired).length || 0,
+                  })}
                 </span>
               </div>
             </div>
@@ -1081,15 +1196,15 @@ export const ReportsView: React.FC = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Product</th>
-                    <th>Batch No</th>
-                    <th>Expiry Date</th>
-                    <th className="text-center">Days Left</th>
-                    <th className="text-center">Units on Hand</th>
-                    <th className="text-right">Unit Cost</th>
-                    <th className="text-right">Potential Loss (ETB)</th>
-                    <th className="text-center">FEFO Status</th>
-                    <th className="text-right">Action</th>
+                    <th>{t('reports.thProductSku')}</th>
+                    <th>{t('reports.thBatchNo')}</th>
+                    <th>{t('reports.thExpiryDate')}</th>
+                    <th className="text-center">{t('reports.thDaysLeft')}</th>
+                    <th className="text-center">{t('reports.thUnitsOnHand')}</th>
+                    <th className="text-right">{t('reports.thUnitCost')}</th>
+                    <th className="text-right">{t('reports.thPotentialLoss')}</th>
+                    <th className="text-center">{t('reports.thFefoStatus')}</th>
+                    <th className="text-right">{t('reports.thAction')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1110,7 +1225,7 @@ export const ReportsView: React.FC = () => {
                               : 'text-emerald-400'
                           }`}
                         >
-                          {b.daysUntilExpiry <= 0 ? 'EXPIRED' : `${b.daysUntilExpiry}d`}
+                          {b.daysUntilExpiry <= 0 ? t('reports.statusExpired') : `${b.daysUntilExpiry}d`}
                         </span>
                       </td>
                       <td className="text-center font-semibold text-xs">
@@ -1122,13 +1237,13 @@ export const ReportsView: React.FC = () => {
                       </td>
                       <td className="text-center">
                         {b.daysUntilExpiry <= 0 ? (
-                          <span className="badge-danger text-[10px]">EXPIRED</span>
+                          <span className="badge-danger text-[10px]">{t('reports.statusExpired')}</span>
                         ) : b.daysUntilExpiry <= 7 ? (
-                          <span className="badge-danger text-[10px]">CRITICAL</span>
+                          <span className="badge-danger text-[10px]">{t('reports.statusCritical')}</span>
                         ) : b.daysUntilExpiry <= 25 ? (
-                          <span className="badge-warning text-[10px]">WARNING</span>
+                          <span className="badge-warning text-[10px]">{t('reports.statusWarning')}</span>
                         ) : (
-                          <span className="badge-success text-[10px]">GOOD</span>
+                          <span className="badge-success text-[10px]">{t('reports.statusGood')}</span>
                         )}
                       </td>
                       <td className="text-right">
@@ -1136,7 +1251,7 @@ export const ReportsView: React.FC = () => {
                           className="btn-secondary text-[11px] py-1 px-2.5"
                           onClick={() => alert(`Clearance discount applied for batch ${b.batchNumber}`)}
                         >
-                          Promo
+                          {t('reports.actionPromo')}
                         </button>
                       </td>
                     </tr>
@@ -1155,28 +1270,28 @@ export const ReportsView: React.FC = () => {
             <div>
               <h3 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                 <Users size={16} style={{ color: 'var(--primary)' }} />
-                Cashier Terminal Shift Performance &amp; Drawer Compliance
+                {t('reports.cashierAuditTitle')}
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Audit trail of shift transactions, opening floats, closing counts, and cash variance accuracy.
+                {t('reports.cashierAuditDesc')}
               </p>
             </div>
-            <span className="badge-success text-xs">All Audits Sealed</span>
+            <span className="badge-success text-xs">{t('reports.allAuditsSealed')}</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Cashier Name</th>
-                  <th className="text-center">Shifts Worked</th>
-                  <th className="text-center">Transactions</th>
-                  <th className="text-right">Total Sales (ETB)</th>
-                  <th className="text-right">Opening Float (ETB)</th>
-                  <th className="text-right">Counted Cash (ETB)</th>
-                  <th className="text-right">Expected Cash (ETB)</th>
-                  <th className="text-center">Variance (ETB)</th>
-                  <th className="text-center">Accuracy Rating</th>
+                  <th>{t('reports.thCashierName')}</th>
+                  <th className="text-center">{t('reports.thShiftsWorked')}</th>
+                  <th className="text-center">{t('reports.thTransactions')}</th>
+                  <th className="text-right">{t('reports.thTotalSales')}</th>
+                  <th className="text-right">{t('reports.thOpeningFloat')}</th>
+                  <th className="text-right">{t('reports.thCountedCash')}</th>
+                  <th className="text-right">{t('reports.thExpectedCash')}</th>
+                  <th className="text-center">{t('reports.thVariance')}</th>
+                  <th className="text-center">{t('reports.thAccuracyRating')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1234,16 +1349,20 @@ export const ReportsView: React.FC = () => {
             <div className="flex items-start justify-between border-b pb-4 mb-4">
               <div className="text-center w-full">
                 <div className="text-sm font-bold uppercase tracking-wider text-zinc-800">
-                  Federal Democratic Republic of Ethiopia
+                  {t('reports.fdre')}
                 </div>
                 <div className="text-xs font-semibold text-zinc-600">
-                  Ministry of Revenue (ERCA) Fiscal Daily Audit Report (Z-Report)
+                  {t('reports.morZReportHeader')}
                 </div>
                 <div className="text-xs mt-1 font-mono text-zinc-700">
-                  Branch: {AVAILABLE_BRANCHES.find((b) => b.id === selectedBranch)?.name}
+                  {t('reports.branchLabel', { name: getBranchDisplayName(selectedBranch) })}
                 </div>
                 <div className="text-[11px] font-mono text-zinc-500 mt-0.5">
-                  TIN: 0012938475 • MRC: ET-MOR-POS-0194 • EAT: {new Date().toLocaleString('en-ET')}
+                  {t('reports.tinLabel', {
+                    tin: '0012938475',
+                    mrc: 'ET-MOR-POS-0194',
+                    time: new Date().toLocaleString(language === 'am' ? 'am-ET' : 'en-ET'),
+                  })}
                 </div>
               </div>
               <button
@@ -1257,37 +1376,37 @@ export const ReportsView: React.FC = () => {
             {/* Fiscal Body */}
             <div className="space-y-4 text-xs font-mono">
               <div className="flex justify-between py-1 border-b">
-                <span>PERIOD SCOPE:</span>
+                <span>{t('reports.periodScope')}</span>
                 <span className="font-bold">{timeRange.toUpperCase()}</span>
               </div>
               <div className="flex justify-between py-1 border-b">
-                <span>TOTAL TRANSACTIONS REGISTERED:</span>
+                <span>{t('reports.totalTxRegistered')}</span>
                 <span className="font-bold">{dailySales?.totalSalesCount}</span>
               </div>
               <div className="flex justify-between py-1 border-b text-sm font-bold">
-                <span>GROSS SALES TURNOVER (A):</span>
+                <span>{t('reports.grossSalesTurnoverA')}</span>
                 <span>ETB {fmt(dailySales?.netSalesAmount || 0)}</span>
               </div>
               <div className="flex justify-between py-1 border-b">
-                <span>STANDARD 15% TAXABLE BASE (B):</span>
+                <span>{t('reports.standardTaxableBaseB')}</span>
                 <span>ETB {fmt(dailySales?.taxableSubtotal || 0)}</span>
               </div>
               <div className="flex justify-between py-1 border-b">
-                <span>EXEMPT SUPPLIES BASE (C):</span>
+                <span>{t('reports.exemptSuppliesBaseC')}</span>
                 <span>ETB {fmt(dailySales?.taxExemptSubtotal || 0)}</span>
               </div>
               <div className="flex justify-between py-1 border-b text-sm font-bold text-amber-700">
-                <span>TOTAL VAT COLLECTED (15% OF B):</span>
+                <span>{t('reports.totalVatCollectedB')}</span>
                 <span>ETB {fmt(dailySales?.taxTotal || 0)}</span>
               </div>
               <div className="flex justify-between py-1 border-b">
-                <span>SUM OF LINE ITEM TAXES (AUDIT):</span>
+                <span>{t('reports.sumOfLineItemTaxes')}</span>
                 <span>ETB {fmt(dailySales?.vatReconciliation?.sumOfLineVat || 0)}</span>
               </div>
 
               {/* Payment Mix Breakdown */}
               <div className="pt-2">
-                <div className="font-bold mb-1">PAYMENT TENDER RECONCILIATION:</div>
+                <div className="font-bold mb-1">{t('reports.paymentTenderReconUpper')}</div>
                 {dailySales?.paymentBreakdown.map((p) => (
                   <div key={p.paymentMethod} className="flex justify-between py-0.5">
                     <span>{p.paymentMethod}:</span>
@@ -1299,10 +1418,10 @@ export const ReportsView: React.FC = () => {
               {/* Signatures */}
               <div className="grid grid-cols-2 gap-8 pt-8 mt-4 border-t text-[11px]">
                 <div className="border-t border-zinc-400 pt-1 text-center">
-                  Cashier / Supervisor Signature
+                  {t('reports.cashierSupervisorSign')}
                 </div>
                 <div className="border-t border-zinc-400 pt-1 text-center">
-                  Store Manager / Tax Auditor Signature
+                  {t('reports.managerAuditorSign')}
                 </div>
               </div>
             </div>
@@ -1313,14 +1432,14 @@ export const ReportsView: React.FC = () => {
                 className="btn-secondary text-xs"
                 onClick={() => setShowPrintModal(false)}
               >
-                Close
+                {t('reports.close')}
               </button>
               <button
                 className="btn-primary text-xs flex items-center gap-1.5"
                 onClick={() => window.print()}
               >
                 <Printer size={14} />
-                <span>Print Document</span>
+                <span>{t('reports.printDocument')}</span>
               </button>
             </div>
           </div>

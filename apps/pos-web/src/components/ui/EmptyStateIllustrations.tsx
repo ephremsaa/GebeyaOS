@@ -126,3 +126,4 @@ export const EmptySyncIllustration: React.FC<IllustrationProps> = ({
     <circle cx="60" cy="96" r="4" className="fill-secondary" />
   </svg>
 );
+

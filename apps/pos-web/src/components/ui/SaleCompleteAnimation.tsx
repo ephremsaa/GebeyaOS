@@ -120,3 +120,4 @@ export const SaleCompleteAnimation: React.FC<SaleCompleteAnimationProps> = ({
     </div>
   );
 };
+

@@ -232,10 +232,10 @@ export const SyncMonitor: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>
-                HQ Cloud Synchronization
+                {t('sync.title')}
               </h1>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Bole Medhanialem Branch (BOLE-01) • Central HQ Replication Engine
+                {t('sync.subtitle')}
               </p>
             </div>
           </div>
