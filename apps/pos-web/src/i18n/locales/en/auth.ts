@@ -70,5 +70,8 @@ export const authEn = {
   managerOverrideDesc: 'This action exceeds cashier limits and requires supervisor/manager PIN.',
   managerPinLabel: 'Manager / Supervisor PIN',
   authorizeAction: 'Authorize',
+  profileModalTitle: 'User Profile & Settings',
+  changePassword: 'Change Password',
+  changePin: 'Change PIN',
 };
 

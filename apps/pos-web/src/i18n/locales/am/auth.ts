@@ -70,5 +70,8 @@ export const authAm = {
   managerOverrideDesc: 'ይህ ተግባር የገንዘብ ተቀባይ ፈቃድ ገደብን ስለሚበልጥ የኃላፊ ማረጋገጫ ያስፈልገዋል።',
   managerPinLabel: 'የሱቅ ኃላፊ ፒን',
   authorizeAction: 'አረጋግጥ',
+  profileModalTitle: 'የተጠቃሚ መገለጫ እና ቅንብሮች',
+  changePassword: 'የይለፍ ቃል ቀይር',
+  changePin: 'ፒን ቀይር',
 };
 
