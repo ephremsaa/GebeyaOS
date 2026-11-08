@@ -14,6 +14,12 @@ export default {
   theme: {
     extend: {
       colors: {
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          soft: 'var(--accent-soft)',
+          glow: 'var(--accent-glow)',
+        },
         page: 'var(--bg-page)',
         sidebar: 'var(--bg-sidebar)',
         card: 'var(--bg-card)',
@@ -118,12 +124,15 @@ export default {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       borderRadius: {
-        card: '12px',
+        control: '12px',
+        card: '18px',
         input: '12px',
-        panel: '16px',
+        panel: '20px',
         pill: '9999px',
       },
       boxShadow: {
+        glow: '0 0 16px -2px var(--primary-glow)',
+        'accent-glow': '0 0 16px -2px var(--accent-glow)',
         soft: 'var(--shadow-soft)',
         card: 'var(--shadow-soft)',
         modal: 'var(--shadow-modal)',

@@ -1,4 +1,5 @@
 export const catalogAm = {
+  "loadingCatalog": "የምርት ዝርዝር በመጫን ላይ...",
   title: 'የምርቶች ማውጫ',
   subtitle: 'የሱፐርማርኬት ዕቃዎች፣ ባርኮዶች እና የመሸጫ ዋጋዎች ማስተዳደሪያ',
   addProduct: 'አዲስ ምርት ጨምር',

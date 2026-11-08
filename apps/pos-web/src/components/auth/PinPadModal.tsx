@@ -131,6 +131,36 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
     setPin('');
   };
 
+  // Physical keyboard listener for PIN entry
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if an input is focused (e.g. search box)
+      const target = e.target as HTMLElement;
+      if (target && target.tagName === 'INPUT') {
+        return;
+      }
+
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleDigit(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleBackspace();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClear();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, pin, selectedCashier, isLockScreen]);
+
   const handleSubmit = async () => {
     if (pin.length < 4) {
       setError(language === 'am' ? 'እባክዎ ቢያንስ የ4-አሃዝ ፒን ያስገቡ' : 'Please enter at least a 4-digit PIN');
@@ -191,6 +221,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
 
   return (
     <div
+      data-testid="pinpad-modal"
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 select-none ${
         isLockScreen
           ? 'bg-page/95 backdrop-blur-md'

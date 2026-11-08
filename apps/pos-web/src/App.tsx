@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { I18nProvider } from './i18n/I18nContext';
+import { BrandThemeProvider } from './theme/BrandThemeContext';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ShiftProvider } from './context/ShiftContext';
 import { TopBar } from './components/TopBar';
@@ -231,10 +232,12 @@ const MainApp: React.FC = () => {
 
 export const App: React.FC = () => (
   <I18nProvider>
-    <AuthProvider>
+    <BrandThemeProvider>
+      <AuthProvider>
       <ShiftProvider>
         <MainApp />
       </ShiftProvider>
     </AuthProvider>
+    </BrandThemeProvider>
   </I18nProvider>
 );

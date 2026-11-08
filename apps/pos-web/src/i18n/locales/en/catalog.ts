@@ -1,4 +1,5 @@
 export const catalogEn = {
+  "loadingCatalog": "Loading catalog products...",
   title: 'Product Catalog',
   subtitle: 'Manage supermarket products, barcodes, and pricing',
   addProduct: 'Add Product',

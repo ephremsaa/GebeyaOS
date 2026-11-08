@@ -15,17 +15,18 @@ test.describe('GebeyaOS POS Core Flow Stabilization', () => {
     await page.goto('/');
 
     // 2. Step 1: Supermarket Company Code
-    const companyInput = page.locator('input[placeholder*="Company" i], input[type="text"]').first();
-    await expect(companyInput).toBeVisible({ timeout: 15000 });
-    await companyInput.fill('kerod');
-    await page.click('button[type="submit"]');
+    const companyInput = page.locator('input[placeholder*="Company" i], input[placeholder*="KEROD" i]').first();
+    if (await companyInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await companyInput.fill('kerod');
+      await companyInput.press('Enter');
+      await expect(companyInput).toBeHidden({ timeout: 10000 });
+    }
 
     // 3. Step 2: Cashier / Owner Authentication
-    const usernameInput = page.locator('input[placeholder*="username" i], input[type="text"]').first();
-    await expect(usernameInput).toBeVisible({ timeout: 10000 });
-    await usernameInput.fill('kerodpos');
-
     const passwordInput = page.locator('input[type="password"]').first();
+    await expect(passwordInput).toBeVisible({ timeout: 10000 });
+    const usernameInput = page.locator('input[placeholder*="admin" i], input[type="text"]').first();
+    await usernameInput.fill('kerodpos');
     await passwordInput.fill('Kerod2026!');
     await page.click('button[type="submit"]');
 
