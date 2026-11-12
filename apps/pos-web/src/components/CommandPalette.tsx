@@ -2,24 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   ShoppingCart,
-  Clock,
-  Package,
+  Tag,
+  Archive,
   Truck,
   BarChart3,
-  RefreshCw,
   Users,
   Settings,
-  HardDrive,
-  ShieldCheck,
-  Tag,
-  ClipboardList,
   PlusCircle,
-  Printer,
   Moon,
   Sun,
   Lock,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
@@ -49,7 +42,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onOpenAddStock,
 }) => {
   const { language, isDarkMode, toggleDarkMode } = useI18n();
-  const { lockSession, switchCashier } = useAuth();
+  const { lockSession } = useAuth();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [productResults, setProductResults] = useState<any[]>([]);
@@ -78,7 +71,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           const data = await res.json();
           setProductResults(data.rows || []);
         }
-      } catch (err) {
+      } catch {
         setProductResults([]);
       }
     }, 200);
@@ -86,206 +79,111 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     return () => clearTimeout(timer);
   }, [query, isOpen]);
 
-  // Static Commands
+  // ── Static Commands for the 7 pages ──
   const staticActions: PaletteAction[] = [
-    // 1. Navigation
     {
-      id: 'nav-dashboard',
+      id: 'nav-sales',
       category: 'Navigation',
-      label: 'Home Dashboard',
-      sublabel: 'View sales KPIs, alerts, and system health',
-      icon: <Sparkles size={16} className="text-gebeya-500" />,
-      run: () => {
-        onNavigate('dashboard');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-checkout',
-      category: 'Navigation',
-      label: 'POS Register / Checkout',
-      sublabel: 'Barcode scanning, scales, and customer payment',
+      label: language === 'am' ? 'መሸጫ' : 'Sales',
+      sublabel: language === 'am' ? 'ምርቶችን ቅኙ፣ ሸምቱ፣ ክፍያ ይፈጽሙ' : 'Scan, sell, and collect payment',
       icon: <ShoppingCart size={16} className="text-emerald-500" />,
       shortcut: 'F1',
-      run: () => {
-        onNavigate('checkout');
-        onClose();
-      },
+      run: () => { onNavigate('sales'); onClose(); },
     },
     {
-      id: 'nav-catalog',
+      id: 'nav-items',
       category: 'Navigation',
-      label: 'Product Master Catalog',
-      sublabel: 'SKU registry, pricing, and barcode labels',
+      label: language === 'am' ? 'ዕቃዎች' : 'Items',
+      sublabel: language === 'am' ? 'ምርቶች እና ምድቦች ያስተዳድሩ' : 'Products, categories, and barcodes',
       icon: <Tag size={16} className="text-cyan-500" />,
-      run: () => {
-        onNavigate('catalog');
-        onClose();
-      },
+      run: () => { onNavigate('items'); onClose(); },
     },
     {
-      id: 'nav-inventory',
+      id: 'nav-stock',
       category: 'Navigation',
-      label: 'Inventory & Stock Ledger',
-      sublabel: 'Stock balances, movements, and add stock intake',
-      icon: <Package size={16} className="text-blue-500" />,
-      run: () => {
-        onNavigate('inventory');
-        onClose();
-      },
+      label: language === 'am' ? 'ክምችት እና ማብቂያ' : 'Stock & Expiry',
+      sublabel: language === 'am' ? 'ክምችት፣ ቀን፣ እና ዝቅ ያለ ክምችት' : 'Stock levels, expiry dates, and low-stock',
+      icon: <Archive size={16} className="text-blue-500" />,
+      run: () => { onNavigate('stock'); onClose(); },
     },
     {
-      id: 'nav-stocktake',
+      id: 'nav-suppliers',
       category: 'Navigation',
-      label: 'Stocktake & Cycle Count',
-      sublabel: 'Audit physical stock, variances, and reconciliation',
-      icon: <ClipboardList size={16} className="text-emerald-500" />,
-      run: () => {
-        onNavigate('stocktake');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-reorder',
-      category: 'Navigation',
-      label: 'Reorder Suggestions',
-      sublabel: 'Replenishment forecasting and 1-click PO draft',
+      label: language === 'am' ? 'አቅራቢዎች' : 'Suppliers',
+      sublabel: language === 'am' ? 'አቅራቢዎች እና ዕቃ ተቀበል' : 'Suppliers and receive items',
       icon: <Truck size={16} className="text-amber-500" />,
-      run: () => {
-        onNavigate('reorder');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-shifts',
-      category: 'Navigation',
-      label: 'Cashier Shifts & Floats',
-      sublabel: 'Shift open/close, cash drops, and register count',
-      icon: <Clock size={16} className="text-indigo-500" />,
-      run: () => {
-        onNavigate('shifts');
-        onClose();
-      },
+      run: () => { onNavigate('suppliers'); onClose(); },
     },
     {
       id: 'nav-reports',
       category: 'Navigation',
-      label: 'Financial & Sales Reports',
-      sublabel: 'Z-report, profit margins, and valuation',
+      label: language === 'am' ? 'ሪፖርቶች' : 'Reports',
+      sublabel: language === 'am' ? 'ሽያጭ፣ ትርፍ፣ እና ቫት ሪፖርቶች' : 'Sales, profit, and VAT reports',
       icon: <BarChart3 size={16} className="text-rose-500" />,
-      run: () => {
-        onNavigate('reports');
-        onClose();
-      },
+      run: () => { onNavigate('reports'); onClose(); },
+    },
+    {
+      id: 'nav-staff',
+      category: 'Navigation',
+      label: language === 'am' ? 'ሰራተኞች' : 'Staff',
+      sublabel: language === 'am' ? 'ሰራተኞች ጨምር፣ ሚና ቀይር' : 'Add employees, change roles, deactivate',
+      icon: <Users size={16} className="text-orange-500" />,
+      run: () => { onNavigate('staff'); onClose(); },
     },
     {
       id: 'nav-settings',
       category: 'Navigation',
-      label: 'System & Branch Settings',
-      sublabel: 'Receipt templates, TIN, VAT rate, and currency',
+      label: language === 'am' ? 'ቅንብሮች' : 'Settings',
+      sublabel: language === 'am' ? 'ቅርንጫፍ፣ ደረሰኝ፣ ዳሳ፣ ምትኬ' : 'Branch info, receipt, data, backup',
       icon: <Settings size={16} className="text-slate-500" />,
-      run: () => {
-        onNavigate('settings');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-backup',
-      category: 'Navigation',
-      label: 'Backup & Restore',
-      sublabel: '1-click JSON snapshot with SHA-256 verification',
-      icon: <HardDrive size={16} className="text-emerald-600" />,
-      run: () => {
-        onNavigate('backup');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-audit',
-      category: 'Navigation',
-      label: 'Immutable Audit Log Viewer',
-      sublabel: 'Track user logins, overrides, and settings events',
-      icon: <ShieldCheck size={16} className="text-indigo-600" />,
-      run: () => {
-        onNavigate('audit');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-sync',
-      category: 'Navigation',
-      label: 'HQ Sync Monitor',
-      sublabel: 'Outbox queue and cloud connectivity status',
-      icon: <RefreshCw size={16} className="text-teal-500" />,
-      run: () => {
-        onNavigate('sync');
-        onClose();
-      },
-    },
-    {
-      id: 'nav-users',
-      category: 'Navigation',
-      label: 'User Management & RBAC',
-      sublabel: 'Cashier PINs, staff roles, and permissions',
-      icon: <Users size={16} className="text-orange-500" />,
-      run: () => {
-        onNavigate('users');
-        onClose();
-      },
+      run: () => { onNavigate('settings'); onClose(); },
     },
 
-    // 2. Quick Actions
+    // ── Quick Actions ──
     {
       id: 'act-add-stock',
       category: 'Quick Actions',
-      label: 'Add Stock Intake',
-      sublabel: 'Barcode scan, manual entry, or Excel import',
+      label: language === 'am' ? 'ዕቃ ጨምር' : 'Add Stock',
+      sublabel: language === 'am' ? 'ስካን፣ ወይም ብዛት ጨምር' : 'Barcode scan, manual entry, or Excel',
       icon: <PlusCircle size={16} className="text-emerald-500" />,
       run: () => {
         onClose();
         if (onOpenAddStock) onOpenAddStock();
-        else onNavigate('inventory');
+        else onNavigate('stock');
       },
     },
     {
       id: 'act-lock',
       category: 'Quick Actions',
-      label: 'Lock Terminal Register',
-      sublabel: 'Require Cashier PIN to unlock',
+      label: language === 'am' ? 'ተርሚናሉን ቆልፍ' : 'Lock Terminal',
+      sublabel: language === 'am' ? 'ፒን ያስፈልጋል ለመክፈት' : 'Require PIN to unlock',
       icon: <Lock size={16} className="text-amber-500" />,
       shortcut: 'F9',
-      run: () => {
-        onClose();
-        lockSession();
-      },
+      run: () => { onClose(); lockSession(); },
     },
     {
       id: 'act-theme',
       category: 'Quick Actions',
-      label: 'Toggle Dark / Light Theme',
-      sublabel: isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-      icon: isDarkMode ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-slate-600" />,
-      run: () => {
-        toggleDarkMode();
-        onClose();
-      },
+      label: language === 'am'
+        ? (isDarkMode ? 'ብርሃን ገጽታ' : 'ጨለማ ገጽታ')
+        : (isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'),
+      icon: isDarkMode
+        ? <Sun size={16} className="text-amber-400" />
+        : <Moon size={16} className="text-slate-600" />,
+      run: () => { toggleDarkMode(); onClose(); },
     },
   ];
 
   // Convert product results to actions
   const productActions: PaletteAction[] = productResults.map((p) => ({
     id: `prod-${p.id}`,
-    category: 'Product Catalog',
+    category: 'Product Catalog' as const,
     label: p.name_en,
     sublabel: `${p.sku} • ${Number(p.base_price).toFixed(2)} ETB • Stock: ${p.stock_on_hand || 0}`,
     icon: <Tag size={16} className="text-cyan-500" />,
-    run: () => {
-      onNavigate('catalog');
-      onClose();
-    },
+    run: () => { onNavigate('items'); onClose(); },
   }));
 
-  // Filter actions based on search
   const q = query.toLowerCase();
   const filteredActions = [
     ...productActions,
@@ -296,7 +194,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     ),
   ];
 
-  // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -306,9 +203,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       setSelectedIndex((prev) => (prev - 1 + filteredActions.length) % Math.max(1, filteredActions.length));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filteredActions[selectedIndex]) {
-        filteredActions[selectedIndex].run();
-      }
+      if (filteredActions[selectedIndex]) filteredActions[selectedIndex].run();
     } else if (e.key === 'Escape') {
       onClose();
     }
@@ -332,15 +227,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedIndex(0);
-            }}
+            onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
             placeholder={
               language === 'am'
-                ? 'ወደ ማንኛውም ገጽ፣ እቃ ወይም ተግባር በ2 ኪይ ይሂዱ...'
-                : 'Type a command, page name, or search any product...'
+                ? 'ወደ ማንኛውም ገጽ፣ እቃ ወይም ተግባር ይፈልጉ...'
+                : 'Type a page name, product, or action...'
             }
             className="flex-1 bg-transparent text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden"
           />
@@ -353,7 +245,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         <div className="max-h-96 overflow-y-auto p-2 space-y-1">
           {filteredActions.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
-              No results found for "{query}".
+              {language === 'am' ? `"${query}" ምንም ውጤት አልተገኘም።` : `No results for "${query}".`}
             </div>
           ) : (
             filteredActions.map((action, idx) => {
@@ -380,13 +272,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       {action.icon}
                     </div>
                     <div>
-                      <div className="text-xs font-bold leading-tight">
-                        {action.label}
-                      </div>
+                      <div className="text-xs font-bold leading-tight">{action.label}</div>
                       {action.sublabel && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          {action.sublabel}
-                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{action.sublabel}</div>
                       )}
                     </div>
                   </div>
@@ -408,13 +296,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           )}
         </div>
 
-        {/* Footer shortcuts */}
+        {/* Footer */}
         <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 text-[10px] text-slate-400 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span>Use <kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&uarr;</kbd> <kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&darr;</kbd> to navigate</span>
             <span><kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&crarr;</kbd> to select</span>
           </div>
-          <span>GebeyaOS Fast Command v1.0</span>
+          <span>GebeyaOS</span>
         </div>
       </div>
     </div>

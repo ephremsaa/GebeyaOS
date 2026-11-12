@@ -5,35 +5,70 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ShiftProvider } from './context/ShiftContext';
 import { TopBar } from './components/TopBar';
 import { NavigationRail, NavTabId } from './components/NavigationRail';
-import { DashboardView } from './components/DashboardView';
-import { PosCheckout } from './components/PosCheckout';
-import { ShiftManagement } from './components/ShiftManagement';
-import { ProductCatalogView } from './components/catalog/ProductCatalogView';
-import { InventoryView } from './components/InventoryView';
-import { StockTakeView } from './components/inventory/StockTakeView';
-import { ReorderSuggestionsView } from './components/inventory/ReorderSuggestionsView';
-import { PurchasingView } from './components/PurchasingView';
-import { ReportsView } from './components/ReportsView';
-import { UserManagementView } from './components/auth/UserManagementView';
-import { SettingsView } from './components/SettingsView';
-import { BackupRestoreView } from './components/BackupRestoreView';
-import { AuditLogView } from './components/AuditLogView';
-import { SyncMonitor } from './components/SyncMonitor';
 import { CommandPalette } from './components/CommandPalette';
 import { NotificationsDrawer } from './components/NotificationsDrawer';
 import { OnboardingHints } from './components/OnboardingHints';
-import { SetupWizard } from './components/auth/SetupWizard';
+import { SessionExpiredDialog } from './components/auth/SessionExpiredDialog';
 import { LoginPage } from './components/auth/LoginPage';
 import { PinPadModal } from './components/auth/PinPadModal';
-import { SessionExpiredDialog } from './components/auth/SessionExpiredDialog';
+import { SetupWizard } from './components/auth/SetupWizard';
 import { PlatformAdminConsole } from './components/platform/PlatformAdminConsole';
 import { TenantOnboardingWizard } from './components/onboarding/TenantOnboardingWizard';
 import { RegisterApplicationPage } from './components/auth/RegisterApplicationPage';
 
+// ── The 7 pages ──
+import { PosCheckout } from './components/PosCheckout';        // Sales (checkout + day control)
+import { ProductCatalogView } from './components/catalog/ProductCatalogView'; // Items
+import { InventoryView } from './components/InventoryView';     // Stock & Expiry (wrapper TBD in Step 4)
+import { PurchasingView } from './components/PurchasingView';  // Suppliers (wrapper TBD in Step 5)
+import { ReportsView } from './components/ReportsView';        // Reports
+import { UserManagementView } from './components/auth/UserManagementView'; // Staff
+import { SettingsView } from './components/SettingsView';      // Settings
+
+/**
+ * Legacy → new page redirect map.
+ * When an old NavTabId lands in state (via hash param or legacy bookmark),
+ * it is immediately mapped to the matching new id.
+ */
+const LEGACY_REDIRECT: Partial<Record<NavTabId, NavTabId>> = {
+  checkout:  'sales',
+  shifts:    'sales',
+  catalog:   'items',
+  inventory: 'stock',
+  stocktake: 'stock',
+  reorder:   'stock',
+  purchasing:'suppliers',
+  users:     'staff',
+  audit:     'reports',
+  backup:    'settings',
+  sync:      'settings',
+  dashboard: 'sales',   // manager/owner will override below
+};
+
+/** Resolve the hash fragment (#checkout, #sales …) into a NavTabId.
+ * Returns null if the hash is a special route (platform, register, onboarding). */
+function resolveHashTab(): NavTabId | null {
+  const raw = window.location.hash.replace('#', '').split('?')[0].trim();
+  if (!raw) return null;
+  // Special routes handled before this function is called
+  if (raw === 'platform' || raw === 'register' || raw.startsWith('onboarding')) return null;
+  return raw as NavTabId;
+}
+
+/** Default landing tab per role (after legacy redirect). */
+function defaultTabForRole(role: string | undefined): NavTabId {
+  switch (role) {
+    case 'CASHIER':      return 'sales';
+    case 'STOREKEEPER':  return 'items';
+    case 'ACCOUNTANT':   return 'reports';
+    default:             return 'sales'; // Manager, Owner, HQ_ADMIN
+  }
+}
+
 const MainApp: React.FC = () => {
   const { isAuthenticated, isLocked, setupStatus, currentUser, lockSession } = useAuth();
-  const [activeTab, setActiveTab] = useState<NavTabId>('dashboard');
-  const [showPinModal, setShowPinModal] = useState<boolean>(false);
+
+  // ── Special route flags ──
   const [isPlatformRoute, setIsPlatformRoute] = useState<boolean>(
     () => window.location.hash === '#platform' || window.location.pathname.startsWith('/platform'),
   );
@@ -41,55 +76,66 @@ const MainApp: React.FC = () => {
     () => window.location.hash === '#register' || window.location.pathname.startsWith('/register'),
   );
 
-  // Sync hash routing
+  // Sync route flags on hash change
   useEffect(() => {
     const handleHashChange = () => {
-      const isPlatform = window.location.hash === '#platform' || window.location.pathname.startsWith('/platform');
-      const isRegister = window.location.hash === '#register' || window.location.pathname.startsWith('/register');
-      setIsPlatformRoute(isPlatform);
-      setIsRegisterRoute(isRegister);
+      setIsPlatformRoute(
+        window.location.hash === '#platform' || window.location.pathname.startsWith('/platform'),
+      );
+      setIsRegisterRoute(
+        window.location.hash === '#register' || window.location.pathname.startsWith('/register'),
+      );
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Command Palette & Notifications state
+  // ── Active page state ──
+  const [activeTab, setActiveTabRaw] = useState<NavTabId>('sales');
+
+  /** Wrap setActiveTab so legacy ids are silently redirected. */
+  const setActiveTab = (tab: NavTabId) => {
+    const resolved = LEGACY_REDIRECT[tab] ?? tab;
+    setActiveTabRaw(resolved);
+    window.location.hash = resolved;
+  };
+
+  // Set initial tab from hash OR role, once user is known
+  useEffect(() => {
+    const hashTab = resolveHashTab();
+    if (hashTab) {
+      const resolved = LEGACY_REDIRECT[hashTab] ?? hashTab;
+      setActiveTabRaw(resolved);
+    } else if (currentUser?.role) {
+      setActiveTabRaw(defaultTabForRole(currentUser.role));
+    }
+  }, [currentUser?.role]);
+
+  // ── Global modals ──
+  const [showPinModal, setShowPinModal] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  // Set initial tab based on role
-  useEffect(() => {
-    if (currentUser?.role === 'CASHIER') {
-      setActiveTab('checkout');
-    } else if (currentUser?.role === 'STOREKEEPER') {
-      setActiveTab('inventory');
-    } else {
-      setActiveTab('dashboard');
-    }
-  }, [currentUser?.role]);
-
-  // Global Keyboard Shortcuts (Ctrl+K, F1, F9)
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+K / Cmd+K -> Toggle Command Palette
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
       } else if (e.key === 'F1') {
         e.preventDefault();
-        setActiveTab('checkout');
+        setActiveTab('sales');
       } else if (e.key === 'F9') {
         e.preventDefault();
         lockSession();
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [lockSession]);
 
-  // Check for Tenant Onboarding Token (#onboarding?token=... or /onboarding?token=...)
+  // ── Onboarding token check ──
   const getOnboardingToken = () => {
     const hash = window.location.hash;
     const search = window.location.search;
@@ -117,7 +163,6 @@ const MainApp: React.FC = () => {
     );
   }
 
-  // 0. Public Supermarket Registration Application (#register or /register)
   if (isRegisterRoute) {
     return (
       <RegisterApplicationPage
@@ -129,25 +174,22 @@ const MainApp: React.FC = () => {
     );
   }
 
-  // 0. Platform Admin Console Route (accessed strictly via dedicated #platform or /platform route)
   if (isPlatformRoute) {
     return (
       <PlatformAdminConsole
         onExit={() => {
           window.location.hash = '';
           setIsPlatformRoute(false);
-          setActiveTab('dashboard');
+          setActiveTabRaw('sales');
         }}
       />
     );
   }
 
-  // 1. First-Run Setup Wizard Gate
   if (setupStatus && !setupStatus.setupCompleted) {
     return <SetupWizard />;
   }
 
-  // 2. Unauthenticated State (Login vs PIN Login)
   if (!isAuthenticated) {
     return (
       <>
@@ -161,43 +203,44 @@ const MainApp: React.FC = () => {
     );
   }
 
-  // 3. Authenticated POS Application
+  // ── Authenticated POS application ──
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden font-sans bg-page text-text-main">
-      {/* 1. Slim Top Bar with Command Search, Notifications, Active Cashier, Menu, Language & Theme */}
+      {/* Top bar */}
       <TopBar
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenNotifications={() => setIsNotificationsOpen(true)}
         unreadNotificationsCount={unreadCount}
       />
 
-      {/* 2. Main Workspace: Left Navigation Rail + Active Screen */}
+      {/* Main workspace */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Navigation Rail with permission gates */}
-        <NavigationRail
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+        <NavigationRail activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Active Content Pane */}
         <main className="flex-1 flex overflow-hidden bg-page">
-          {activeTab === 'dashboard'  && <DashboardView onNavigate={setActiveTab} />}
-          {activeTab === 'checkout'   && <PosCheckout />}
-          {activeTab === 'shifts'     && <ShiftManagement />}
-          {activeTab === 'catalog'    && <ProductCatalogView />}
-          {activeTab === 'inventory'  && <InventoryView />}
-          {activeTab === 'stocktake'  && <StockTakeView />}
-          {activeTab === 'reorder'    && <ReorderSuggestionsView onNavigateToPurchasing={() => setActiveTab('purchasing')} />}
-          {activeTab === 'purchasing' && <PurchasingView />}
-          {activeTab === 'reports'    && <ReportsView />}
-          {activeTab === 'users'      && <UserManagementView />}
-          {activeTab === 'audit'      && <AuditLogView />}
-          {activeTab === 'settings'   && <SettingsView />}
-          {activeTab === 'backup'     && <BackupRestoreView />}
-          {activeTab === 'sync'       && <SyncMonitor />}
+          {/* PAGE 1 — Sales (checkout + day control strip added in Step 2) */}
+          {activeTab === 'sales' && <PosCheckout />}
+
+          {/* PAGE 2 — Items (catalog: products + categories) */}
+          {activeTab === 'items' && <ProductCatalogView />}
+
+          {/* PAGE 3 — Stock & Expiry (full wrapper added in Step 4; InventoryView used now) */}
+          {activeTab === 'stock' && <InventoryView />}
+
+          {/* PAGE 4 — Suppliers (wrapper added in Step 5; PurchasingView used now) */}
+          {activeTab === 'suppliers' && <PurchasingView />}
+
+          {/* PAGE 5 — Reports */}
+          {activeTab === 'reports' && <ReportsView />}
+
+          {/* PAGE 6 — Staff */}
+          {activeTab === 'staff' && <UserManagementView />}
+
+          {/* PAGE 7 — Settings (absorbs Backup + Sync in Step 7) */}
+          {activeTab === 'settings' && <SettingsView />}
         </main>
 
-        {/* 3. Inactivity Terminal Lock Overlay */}
+        {/* Terminal lock overlay */}
         {isLocked && (
           <PinPadModal
             isOpen={true}
@@ -206,14 +249,14 @@ const MainApp: React.FC = () => {
         )}
       </div>
 
-      {/* 4. Global Command Palette Modal (Ctrl+K) */}
+      {/* Command palette (Ctrl+K) */}
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         onNavigate={setActiveTab}
       />
 
-      {/* 5. Notifications Drawer */}
+      {/* Notifications drawer */}
       <NotificationsDrawer
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
@@ -221,10 +264,10 @@ const MainApp: React.FC = () => {
         onUnreadCountChange={setUnreadCount}
       />
 
-      {/* 6. Contextual Onboarding Hints */}
+      {/* Contextual onboarding hints */}
       <OnboardingHints currentTab={activeTab} />
 
-      {/* 7. Session Expired Dialog (preserves held basket/drafts) */}
+      {/* Session expired dialog */}
       <SessionExpiredDialog />
     </div>
   );
@@ -234,10 +277,10 @@ export const App: React.FC = () => (
   <I18nProvider>
     <BrandThemeProvider>
       <AuthProvider>
-      <ShiftProvider>
-        <MainApp />
-      </ShiftProvider>
-    </AuthProvider>
+        <ShiftProvider>
+          <MainApp />
+        </ShiftProvider>
+      </AuthProvider>
     </BrandThemeProvider>
   </I18nProvider>
 );

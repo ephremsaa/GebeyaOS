@@ -1,20 +1,30 @@
 import React from 'react';
 import {
   ShoppingCart,
-  Clock,
-  Package,
+  Tag,
+  Archive,
   Truck,
   BarChart3,
-  RefreshCw,
   Users,
   Settings,
-  Tag,
-  ClipboardList,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
 
+/**
+ * The 7 primary pages plus legacy ids (kept for redirect handling in App.tsx).
+ * No new code should use the legacy ids directly — they redirect on mount.
+ */
 export type NavTabId =
+  // ── 7 pages ──
+  | 'sales'
+  | 'items'
+  | 'stock'
+  | 'suppliers'
+  | 'reports'
+  | 'staff'
+  | 'settings'
+  // ── legacy ids (redirected in App.tsx, never rendered directly) ──
   | 'dashboard'
   | 'checkout'
   | 'shifts'
@@ -23,16 +33,21 @@ export type NavTabId =
   | 'stocktake'
   | 'reorder'
   | 'purchasing'
-  | 'reports'
   | 'users'
   | 'audit'
-  | 'settings'
   | 'backup'
   | 'sync';
 
 export interface NavigationRailProps {
   activeTab: NavTabId;
   onTabChange: (tab: NavTabId) => void;
+}
+
+interface NavItem {
+  id: NavTabId;
+  label: string;
+  icon: React.ReactNode;
+  allowed: boolean;
 }
 
 export const NavigationRail: React.FC<NavigationRailProps> = ({
@@ -42,82 +57,72 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   const { t } = useI18n();
   const { hasPermission, hasRole } = useAuth();
 
-  // Primary POS tabs on top
-  const primaryTabs = [
+  const tabs: NavItem[] = [
     {
-      id: 'checkout' as NavTabId,
-      label: t('common.posTab'),
+      id: 'sales',
+      label: t('common.salesTab'),
       icon: <ShoppingCart size={22} strokeWidth={1.75} />,
-      allowed: hasPermission('pos:sale:create') || hasRole('CASHIER', 'BRANCH_MANAGER', 'OWNER'),
+      allowed:
+        hasPermission('pos:sale:create') ||
+        hasRole('CASHIER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
-      id: 'shifts' as NavTabId,
-      label: t('common.shiftTab'),
-      icon: <Clock size={22} strokeWidth={1.75} />,
-      allowed: hasPermission('pos:shift:open') || hasPermission('pos:shift:close') || hasRole('CASHIER', 'BRANCH_MANAGER', 'OWNER'),
-    },
-  ];
-
-  // Secondary store management tabs below divider
-  const secondaryTabs = [
-    {
-      id: 'inventory' as NavTabId,
-      label: t('common.inventoryTab'),
-      icon: <Package size={22} strokeWidth={1.75} />,
-      allowed: hasPermission('inventory:stock:view') || hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
+      id: 'items',
+      label: t('common.itemsTab'),
+      icon: <Tag size={22} strokeWidth={1.75} />,
+      allowed:
+        hasPermission('catalog:cost:view') ||
+        hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
-      id: 'purchasing' as NavTabId,
-      label: t('common.purchasingTab'),
+      id: 'stock',
+      label: t('common.stockTab'),
+      icon: <Archive size={22} strokeWidth={1.75} />,
+      allowed:
+        hasPermission('inventory:stock:view') ||
+        hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
+    },
+    {
+      id: 'suppliers',
+      label: t('common.suppliersTab'),
       icon: <Truck size={22} strokeWidth={1.75} />,
-      allowed: hasPermission('purchasing:grn:receive') || hasPermission('purchasing:po:create') || hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
+      allowed:
+        hasPermission('purchasing:grn:receive') ||
+        hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
-      id: 'reports' as NavTabId,
+      id: 'reports',
       label: t('common.reportsTab'),
       icon: <BarChart3 size={22} strokeWidth={1.75} />,
-      allowed: hasPermission('reports:branch:view') || hasRole('ACCOUNTANT', 'BRANCH_MANAGER', 'OWNER'),
+      allowed:
+        hasPermission('reports:branch:view') ||
+        hasRole('ACCOUNTANT', 'BRANCH_MANAGER', 'OWNER'),
     },
     {
-      id: 'sync' as NavTabId,
-      label: t('common.syncTab'),
-      icon: <RefreshCw size={22} strokeWidth={1.75} />,
-      allowed: hasRole('HQ_ADMIN', 'BRANCH_MANAGER', 'OWNER'),
+      id: 'staff',
+      label: t('common.staffTab'),
+      icon: <Users size={22} strokeWidth={1.75} />,
+      allowed:
+        hasPermission('admin:users:manage') ||
+        hasRole('BRANCH_MANAGER', 'OWNER'),
     },
     {
-      id: 'catalog' as NavTabId,
-      label: t('common.catalogTab'),
-      icon: <Tag size={20} strokeWidth={1.75} />,
-      allowed: hasPermission('catalog:cost:view') || hasRole('STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
-    },
-    {
-      id: 'stocktake' as NavTabId,
-      label: t('common.stocktakeTab'),
-      icon: <ClipboardList size={20} strokeWidth={1.75} />,
-      allowed: hasPermission('inventory:stocktake:execute') || hasRole('CASHIER', 'STOREKEEPER', 'BRANCH_MANAGER', 'OWNER'),
-    },
-    {
-      id: 'users' as NavTabId,
-      label: t('common.usersTab'),
-      icon: <Users size={20} strokeWidth={1.75} />,
-      allowed: hasPermission('admin:users:manage') || hasRole('BRANCH_MANAGER', 'OWNER'),
-    },
-    {
-      id: 'settings' as NavTabId,
+      id: 'settings',
       label: t('common.settingsTab'),
-      icon: <Settings size={20} strokeWidth={1.75} />,
+      icon: <Settings size={22} strokeWidth={1.75} />,
       allowed: hasRole('BRANCH_MANAGER', 'OWNER'),
     },
   ];
 
-  const allowedPrimary = primaryTabs.filter((t) => t.allowed);
-  const allowedSecondary = secondaryTabs.filter((t) => t.allowed);
+  const visibleTabs = tabs.filter((tab) => tab.allowed);
 
   return (
-    <nav className="w-[88px] min-w-[88px] bg-sidebar border-r border-border-subtle flex flex-col items-center py-3.5 justify-between flex-shrink-0 select-none z-20 overflow-y-auto no-scrollbar">
+    <nav
+      className="w-[88px] min-w-[88px] bg-sidebar border-r border-border-subtle flex flex-col items-center py-3.5 justify-between flex-shrink-0 select-none z-20 overflow-y-auto no-scrollbar"
+      aria-label="Main navigation"
+    >
       <div className="flex flex-col gap-1 w-full px-2">
-        {/* Top: Checkout & Shift */}
-        {allowedPrimary.map((item) => {
+        {visibleTabs.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
@@ -131,49 +136,18 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
               }`}
               title={item.label}
               aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
             >
               {isActive && (
                 <span className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-primary rounded-r-full" />
               )}
               {item.icon}
-              <span className="text-[12px] leading-tight text-center">{item.label}</span>
+              <span className="text-[11px] leading-tight text-center truncate w-full px-1">
+                {item.label}
+              </span>
             </button>
           );
         })}
-
-        {/* Thin Divider */}
-        {allowedSecondary.length > 0 && (
-          <div className="h-px bg-border-subtle my-2 mx-1.5" />
-        )}
-
-        {/* Below Divider: Inventory, Purchasing, Reports, Sync */}
-        <div className="flex flex-col gap-1 w-full">
-          {allowedSecondary.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onTabChange(item.id)}
-                className={`w-full min-h-[52px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-fast active:scale-95 cursor-pointer relative ${
-                  isActive
-                    ? 'bg-secondary text-primary font-bold shadow-xs'
-                    : 'text-text-muted hover:text-text-main hover:bg-surface-2'
-                }`}
-                title={item.label}
-                aria-label={item.label}
-              >
-                {isActive && (
-                  <span className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r-full" />
-                )}
-                {item.icon}
-                <span className="text-[12px] leading-tight text-center truncate w-full px-1">
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
       </div>
     </nav>
   );
