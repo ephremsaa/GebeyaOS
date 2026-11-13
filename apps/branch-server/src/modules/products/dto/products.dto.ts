@@ -78,6 +78,22 @@ export class CreateProductDto {
   @IsBoolean()
   @IsOptional()
   allow_discount?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  is_active?: boolean;
+
+  @IsString()
+  @IsOptional()
+  barcode?: string;
+
+  @IsString()
+  @IsOptional()
+  image_url?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  has_expiry_date?: boolean;
 }
 
 export class CreateBarcodeDto {
@@ -273,6 +289,20 @@ export class CreateCategoryDto {
   @IsUUID()
   @IsOptional()
   parent_id?: string;
+}
+
+export class UpdateCategoryDto {
+  @IsString()
+  @IsOptional()
+  code?: string;
+
+  @IsString()
+  @IsOptional()
+  name_en?: string;
+
+  @IsString()
+  @IsOptional()
+  name_am?: string;
 }
 
 export class BulkCategoryDto {

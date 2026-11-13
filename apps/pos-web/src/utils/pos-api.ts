@@ -930,6 +930,36 @@ export const posApi = {
   },
 
   /**
+   * Updates an existing category (rename or code change).
+   */
+  async updateCategory(id: string, dto: { name_en?: string; name_am?: string; code?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE}/products/categories/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dto),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to update category' }));
+      throw new Error(err.message || 'Failed to update category');
+    }
+    return await res.json();
+  },
+
+  /**
+   * Archives a category.
+   */
+  async archiveCategory(id: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/products/categories/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to archive category' }));
+      throw new Error(err.message || 'Failed to archive category');
+    }
+    return await res.json();
+  },
+
+  /**
    * Fetches price change history for a product.
    */
   async getPriceHistory(productId: string, branchId?: string): Promise<any[]> {

@@ -86,6 +86,23 @@ export const ProductCatalogView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [totalCount, setTotalCount] = useState<number>(0);
 
+  // Active View Tab on Items Page
+  const [activeViewTab, setActiveViewTab] = useState<'items' | 'categories'>('items');
+
+  // Category Management State (Inline on page)
+  const [newCatNameEn, setNewCatNameEn] = useState('');
+  const [newCatNameAm, setNewCatNameAm] = useState('');
+  const [newCatCode, setNewCatCode] = useState('');
+  const [catSaving, setCatSaving] = useState(false);
+  const [catError, setCatError] = useState<string | null>(null);
+  const [catSuccess, setCatSuccess] = useState<string | null>(null);
+
+  // Rename Category State
+  const [renamingCategory, setRenamingCategory] = useState<CategoryOption | null>(null);
+  const [renameNameEn, setRenameNameEn] = useState('');
+  const [renameNameAm, setRenameNameAm] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+
   // Filters
   const [search, setSearch] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -357,6 +374,112 @@ export const ProductCatalogView: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // Colored initial generator for items without image
+  const getInitialColor = (name: string) => {
+    const palette = [
+      { bg: 'bg-emerald-100 dark:bg-emerald-950/60', text: 'text-emerald-700 dark:text-emerald-300' },
+      { bg: 'bg-blue-100 dark:bg-blue-950/60', text: 'text-blue-700 dark:text-blue-300' },
+      { bg: 'bg-purple-100 dark:bg-purple-950/60', text: 'text-purple-700 dark:text-purple-300' },
+      { bg: 'bg-amber-100 dark:bg-amber-950/60', text: 'text-amber-700 dark:text-amber-300' },
+      { bg: 'bg-teal-100 dark:bg-teal-950/60', text: 'text-teal-700 dark:text-teal-300' },
+      { bg: 'bg-rose-100 dark:bg-rose-950/60', text: 'text-rose-700 dark:text-rose-300' },
+    ];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return palette[Math.abs(hash) % palette.length];
+  };
+
+  // Toggle active status without deleting product
+  const handleToggleActive = async (p: ProductItem) => {
+    try {
+      const nextActive = !p.is_active;
+      await posApi.updateProduct(p.id, { is_active: nextActive });
+      setProducts((prev) =>
+        prev.map((item) => (item.id === p.id ? { ...item, is_active: nextActive } : item)),
+      );
+    } catch (err: any) {
+      console.error('Failed to toggle status', err);
+    }
+  };
+
+  // Create Category (inline form on page)
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCatError(null);
+    setCatSuccess(null);
+    if (!newCatNameEn.trim()) {
+      setCatError(t('catalog.englishNameRequired'));
+      return;
+    }
+    const catCode = (newCatCode.trim() || newCatNameEn.trim().toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 16));
+    setCatSaving(true);
+    try {
+      const created = await posApi.createCategory({
+        code: catCode,
+        name_en: newCatNameEn.trim(),
+        name_am: newCatNameAm.trim() || undefined,
+      });
+      setNewCatCode('');
+      setNewCatNameEn('');
+      setNewCatNameAm('');
+      setCatSuccess(t('catalog.categoryCreated'));
+      await fetchDropdowns();
+    } catch (err: any) {
+      setCatError(err.message || 'Failed to create category');
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
+  // Archive Category (prevented if active items exist)
+  const handleArchiveCategory = async (cat: CategoryOption) => {
+    setCatError(null);
+    setCatSuccess(null);
+    const count = Number(cat.product_count || 0);
+    if (count > 0) {
+      setCatError(
+        t('catalog.cannotArchiveCategoryWithItems', {
+          name: cat.name_en,
+          count,
+        }),
+      );
+      return;
+    }
+    try {
+      await posApi.archiveCategory(cat.id);
+      setCatSuccess(`Category "${cat.name_en}" archived successfully.`);
+      await fetchDropdowns();
+    } catch (err: any) {
+      setCatError(err.message || 'Failed to archive category');
+    }
+  };
+
+  // Save Renamed Category
+  const handleSaveRename = async () => {
+    if (!renamingCategory) return;
+    setCatError(null);
+    if (!renameNameEn.trim()) {
+      setCatError(t('catalog.englishNameRequired'));
+      return;
+    }
+    setRenameSaving(true);
+    try {
+      await posApi.updateCategory(renamingCategory.id, {
+        name_en: renameNameEn.trim(),
+        name_am: renameNameAm.trim() || undefined,
+      });
+      setRenamingCategory(null);
+      setCatSuccess('Category renamed successfully.');
+      await fetchDropdowns();
+    } catch (err: any) {
+      setCatError(err.message || 'Failed to rename category');
+    } finally {
+      setRenameSaving(false);
+    }
+  };
+
   // Quick stats computed
   const activeCount = useMemo(() => products.filter((p) => p.is_active).length, [products]);
   const lowStockCount = useMemo(
@@ -368,34 +491,57 @@ export const ProductCatalogView: React.FC = () => {
     <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 overflow-hidden select-none">
       {/* 1. Header Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <Tag className="text-gebeya-600" size={24} />
-            {language === 'am' ? 'የእቃዎች ካታሎግ እና ዋጋ' : 'Product Master Catalog'}
-          </h1>
-          <p className="text-xs text-slate-500">
-            {language === 'am'
-              ? 'የእቃዎች ዝርዝር፣ የዋጋ ማስተካከያ፣ ምድቦች፣ እና የባርኮድ መለያ ማተሚያ'
-              : 'HQ-authoritative product catalog, branch overrides, category management & thermal labels.'}
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <Package className="text-emerald-600" size={24} />
+              {t('catalog.itemsPageTitle')}
+            </h1>
+            <p className="text-xs text-slate-500">
+              {t('catalog.itemsPageSubtitle')}
+            </p>
+          </div>
+
+          {/* View Tab Switcher: All Items vs Categories */}
+          <div className="flex items-center gap-1 p-1 bg-slate-200/80 dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-slate-700 self-start">
+            <button
+              type="button"
+              onClick={() => setActiveViewTab('items')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                activeViewTab === 'items'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Package size={14} className="text-emerald-600 dark:text-emerald-400" />
+              {t('catalog.itemsTab')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveViewTab('categories')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                activeViewTab === 'categories'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <FolderPlus size={14} className="text-indigo-600 dark:text-indigo-400" />
+              {t('catalog.categoriesTab')}
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 font-mono">
+                {categories.length}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Quick Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
-            onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
-          >
-            <FolderPlus size={15} className="text-gebeya-600" />
-            {t('catalog.categories')}
-          </button>
-
-          <button
             onClick={() => setIsImportModalOpen(true)}
             className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <UploadCloud size={15} className="text-indigo-600" />
-            {language === 'am' ? 'ማስመጣት (Import)' : 'Import'}
+            {t('catalog.importFromExcel')}
           </button>
 
           <button
@@ -408,7 +554,7 @@ export const ProductCatalogView: React.FC = () => {
 
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 rounded-xl bg-gebeya-600 hover:bg-gebeya-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <Plus size={16} />
             {t('catalog.addProductQuick')}
@@ -416,6 +562,8 @@ export const ProductCatalogView: React.FC = () => {
         </div>
       </div>
 
+      {activeViewTab === 'items' && (
+        <>
       {/* 2. Stats Bar & KPI Chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
@@ -752,20 +900,29 @@ export const ProductCatalogView: React.FC = () => {
                       {/* Product Name, Image & SKU */}
                       <td className="p-3.5">
                         <div className="flex items-center gap-3">
-                          {/* Image thumbnail */}
-                          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
-                            {p.image_url ? (
-                              <img
-                                src={p.image_url}
-                                alt={p.name_en}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="font-black text-xs text-slate-400">
-                                {p.name_en.slice(0, 2).toUpperCase()}
-                              </span>
-                            )}
-                          </div>
+                          {/* Image thumbnail / Colored initial */}
+                          {(() => {
+                            const initColor = getInitialColor(p.name_en || 'Product');
+                            return (
+                              <div
+                                className={`w-10 h-10 rounded-xl ${
+                                  p.image_url ? 'bg-slate-100 dark:bg-slate-800' : initColor.bg
+                                } border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 shadow-xs`}
+                              >
+                                {p.image_url ? (
+                                  <img
+                                    src={p.image_url}
+                                    alt={p.name_en}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className={`font-black text-xs ${initColor.text}`}>
+                                    {p.name_en.slice(0, 2).toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           <div>
                             <div className="font-extrabold text-xs text-slate-900 dark:text-white flex items-center gap-2">
@@ -866,17 +1023,19 @@ export const ProductCatalogView: React.FC = () => {
                         )}
                       </td>
 
-                      {/* Active Status */}
+                      {/* Active Toggle Switch */}
                       <td className="p-3.5 text-center">
-                        {p.is_active ? (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 text-[10px] font-bold">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 text-[10px] font-bold">
-                            Archived
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(p)}
+                          className={`w-11 h-6 inline-flex items-center rounded-full p-1 transition cursor-pointer ${
+                            p.is_active ? 'bg-emerald-500 justify-end' : 'bg-slate-300 dark:bg-slate-700 justify-start'
+                          }`}
+                          title={p.is_active ? 'Active (click to deactivate)' : 'Archived (click to activate)'}
+                          aria-label={p.is_active ? 'Deactivate product' : 'Activate product'}
+                        >
+                          <span className="w-4 h-4 rounded-full bg-white shadow-xs block" />
+                        </button>
                       </td>
 
                       {/* Row Action Buttons */}
@@ -957,6 +1116,213 @@ export const ProductCatalogView: React.FC = () => {
           </span>
         </div>
       </div>
+      </>
+      )}
+
+      {/* View 2: Categories Section on the same page */}
+      {activeViewTab === 'categories' && (
+        <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+          {/* Alerts */}
+          {catError && (
+            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 text-xs flex items-center gap-2 animate-in fade-in">
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{catError}</span>
+            </div>
+          )}
+          {catSuccess && (
+            <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 text-xs flex items-center gap-2 animate-in fade-in">
+              <Check size={16} className="shrink-0" />
+              <span>{catSuccess}</span>
+            </div>
+          )}
+
+          {/* Top: Add New Category Form */}
+          <form
+            onSubmit={handleCreateCategory}
+            className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-3 shadow-xs"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <FolderPlus size={15} className="text-indigo-600" />
+                {t('catalog.addNewCategory')}
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  {t('catalog.categoryNameEn')} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Dairy & Eggs"
+                  value={newCatNameEn}
+                  onChange={(e) => setNewCatNameEn(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  {t('catalog.categoryNameAm')}
+                </label>
+                <input
+                  type="text"
+                  placeholder="ለምሳሌ የወተት ተዋጽኦ"
+                  value={newCatNameAm}
+                  onChange={(e) => setNewCatNameAm(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('catalog.categoryCode')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. DAIRY"
+                    value={newCatCode}
+                    onChange={(e) => setNewCatCode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={catSaving}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0 disabled:opacity-50"
+                >
+                  {catSaving ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={14} />}
+                  {t('catalog.addNewCategory')}
+                </button>
+              </div>
+            </div>
+          </form>
+
+          {/* Categories Table */}
+          <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden flex flex-col shadow-xs">
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/75 dark:bg-slate-800/80 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                    <th className="p-3.5 pl-5">Code</th>
+                    <th className="p-3.5">Category Name (EN / AM)</th>
+                    <th className="p-3.5 text-center">{t('catalog.itemCount')}</th>
+                    <th className="p-3.5 text-right pr-5">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                  {categories.map((c) => {
+                    const count = Number(c.product_count || 0);
+                    return (
+                      <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                        <td className="p-3.5 pl-5 font-mono font-bold text-slate-600 dark:text-slate-400">
+                          {c.code}
+                        </td>
+                        <td className="p-3.5">
+                          <div className="font-bold text-slate-900 dark:text-white">{c.name_en}</div>
+                          {c.name_am && (
+                            <div className="text-[11px] text-slate-500">{c.name_am}</div>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-center">
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono ${
+                            count > 0
+                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                          }`}>
+                            {count}
+                          </span>
+                        </td>
+                        <td className="p-3.5 pr-5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRenamingCategory(c);
+                                setRenameNameEn(c.name_en);
+                                setRenameNameAm(c.name_am || '');
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1 transition"
+                            >
+                              <Edit2 size={12} />
+                              {t('catalog.renameCategory')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleArchiveCategory(c)}
+                              className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-1 transition"
+                            >
+                              <Archive size={12} />
+                              {t('catalog.archiveCategoryAction')}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Category Modal */}
+      {renamingCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 space-y-4">
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+              {t('catalog.renameCategory')} ({renamingCategory.code})
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  {t('catalog.categoryNameEn')}
+                </label>
+                <input
+                  type="text"
+                  value={renameNameEn}
+                  onChange={(e) => setRenameNameEn(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  {t('catalog.categoryNameAm')}
+                </label>
+                <input
+                  type="text"
+                  value={renameNameAm}
+                  onChange={(e) => setRenameNameAm(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setRenamingCategory(null)}
+                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={renameSaving}
+                onClick={handleSaveRename}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5"
+              >
+                {renameSaving && <RefreshCw size={13} className="animate-spin" />}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Slide-over Add/Edit Product Drawer */}
       <ProductDrawer

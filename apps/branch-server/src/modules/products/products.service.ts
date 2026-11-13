@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import {
@@ -22,6 +23,7 @@ import {
   UpdateProductDto,
   ProductQueryDto,
   CreateCategoryDto,
+  UpdateCategoryDto,
   BulkCategoryDto,
   BulkArchiveDto,
 } from './dto/products.dto';
@@ -453,11 +455,17 @@ export class ProductsService {
   }
 
   /**
-   * Retrieves categories for dropdowns.
+   * Retrieves categories for dropdowns and category management.
    */
   async getCategories(): Promise<any[]> {
     const res = await this.db.query(
-      `SELECT id, code, name_en, name_am FROM categories ORDER BY name_en ASC`,
+      `SELECT c.id, c.code, c.name_en, c.name_am, c.is_active,
+              COUNT(p.id)::int AS product_count
+       FROM categories c
+       LEFT JOIN products p ON p.category_id = c.id AND p.is_active = TRUE
+       WHERE c.is_active = TRUE
+       GROUP BY c.id, c.code, c.name_en, c.name_am, c.is_active
+       ORDER BY c.name_en ASC`,
     );
     return res.rows;
   }
@@ -613,6 +621,57 @@ export class ProductsService {
     );
 
     return res.rows[0];
+  }
+
+  /**
+   * Updates an existing category (rename, code update).
+   */
+  async updateCategory(id: string, dto: UpdateCategoryDto): Promise<any> {
+    const fields: string[] = [];
+    const params: any[] = [id];
+    let idx = 2;
+    if (dto.name_en !== undefined) {
+      fields.push(`name_en = $${idx++}`);
+      params.push(dto.name_en.trim());
+    }
+    if (dto.name_am !== undefined) {
+      fields.push(`name_am = $${idx++}`);
+      params.push(dto.name_am.trim() || null);
+    }
+    if (dto.code !== undefined) {
+      fields.push(`code = $${idx++}`);
+      params.push(dto.code.trim().toUpperCase());
+    }
+    if (fields.length === 0) {
+      const res = await this.db.query('SELECT * FROM categories WHERE id = $1', [id]);
+      return res.rows[0];
+    }
+    const res = await this.db.query(
+      `UPDATE categories SET ${fields.join(', ')}, updated_at = clock_timestamp() WHERE id = $1 RETURNING *`,
+      params,
+    );
+    return res.rows[0];
+  }
+
+  /**
+   * Archives a category. Blocked if category contains active products.
+   */
+  async archiveCategory(id: string): Promise<any> {
+    const prodCountRes = await this.db.query(
+      `SELECT COUNT(*)::int AS count FROM products WHERE category_id = $1 AND is_active = TRUE`,
+      [id],
+    );
+    const count = prodCountRes.rows[0]?.count || 0;
+    if (count > 0) {
+      throw new BadRequestException(
+        `Cannot archive category because it contains ${count} active item(s). Move items to another category first.`
+      );
+    }
+    const res = await this.db.query(
+      `UPDATE categories SET is_active = FALSE, updated_at = clock_timestamp() WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    return { success: true, archived: res.rows[0] };
   }
 
   /**

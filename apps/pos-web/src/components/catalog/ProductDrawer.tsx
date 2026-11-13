@@ -16,6 +16,7 @@ import {
   AlertCircle,
   RefreshCw,
   Archive,
+  Clock,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
@@ -44,6 +45,7 @@ export interface ProductDrawerData {
   pack_multiplier?: number;
   image_url?: string;
   stock_on_hand?: number;
+  has_expiry_date?: boolean;
 }
 
 interface ProductDrawerProps {
@@ -89,6 +91,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
   const [isActive, setIsActive] = useState(true);
   const [barcode, setBarcode] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [hasExpiryDate, setHasExpiryDate] = useState<boolean>(false);
   const [priceChangeReason, setPriceChangeReason] = useState('');
 
   // Duplicate Barcode Warning Inline state
@@ -142,6 +145,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setIsActive(product.is_active);
       setBarcode(product.barcode || '');
       setImageUrl(product.image_url || '');
+      setHasExpiryDate(Boolean(product.has_expiry_date));
       setStockOnHand(Number(product.stock_on_hand) || 0);
       setPriceChangeReason('');
     } else {
@@ -165,6 +169,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setIsActive(true);
       setBarcode('');
       setImageUrl('');
+      setHasExpiryDate(false);
       setStockOnHand(0);
       setPriceChangeReason('');
 
@@ -244,14 +249,14 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
     setFormError(null);
     setFormSuccess(null);
 
-    if (!nameEn.trim()) {
-      setFormError(t('catalog.englishNameRequired'));
+    const effectiveNameEn = nameEn.trim() || nameAm.trim();
+    const effectiveNameAm = nameAm.trim() || undefined;
+
+    if (!effectiveNameEn) {
+      setFormError(t('catalog.nameRequired'));
       return;
     }
-    if (!sku.trim()) {
-      setFormError('Please enter a product SKU.');
-      return;
-    }
+    const finalSku = sku.trim() || (barcode.trim() ? `SKU-${barcode.trim().slice(-6)}` : `SKU-${Date.now().toString().slice(-6)}`);
     if (basePrice < 0) {
       setFormError('Selling price cannot be negative.');
       return;
@@ -282,9 +287,9 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
     setSaving(true);
     try {
       const payload: any = {
-        sku: sku.trim(),
-        name_en: nameEn.trim(),
-        name_am: nameAm.trim() || undefined,
+        sku: finalSku,
+        name_en: effectiveNameEn,
+        name_am: effectiveNameAm,
         category_id: categoryId || categories[0]?.id,
         uom_code: uomCode,
         base_price: Number(basePrice),
@@ -299,6 +304,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
         is_active: isActive,
         barcode: barcode.trim() || undefined,
         image_url: imageUrl.trim() || undefined,
+        has_expiry_date: hasExpiryDate,
       };
 
       let resultProduct: any;
@@ -444,15 +450,15 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   <button
                     type="button"
                     onClick={handleGenerateEan}
-                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gebeya-50 hover:text-gebeya-600 text-[10px] font-bold flex items-center gap-1 transition"
+                    className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-[10px] font-bold flex items-center gap-1 transition"
                   >
-                    <Sparkles size={11} className="text-gebeya-500" />
-                    + Gen EAN-13
+                    <Sparkles size={11} className="text-emerald-600 dark:text-emerald-400" />
+                    {t('catalog.makeCodeForMe')}
                   </button>
                   <button
                     type="button"
                     onClick={handleGenerateCode128}
-                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gebeya-50 hover:text-gebeya-600 text-[10px] font-bold transition"
+                    className="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 text-[10px] font-bold transition"
                   >
                     + Code128
                   </button>
@@ -806,7 +812,30 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
               </div>
             </div>
 
-            {/* 8. Active vs Archived Status with Stock Warning */}
+            {/* 8. Expiry Date Tracking */}
+            <div className="p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <Clock size={16} className="text-amber-500" />
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      {t('catalog.hasExpiryDate')}
+                    </span>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {t('catalog.hasExpiryDateDesc')}
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={hasExpiryDate}
+                  onChange={(e) => setHasExpiryDate(e.target.checked)}
+                  className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                />
+              </label>
+            </div>
+
+            {/* 9. Active vs Archived Status with Stock Warning */}
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

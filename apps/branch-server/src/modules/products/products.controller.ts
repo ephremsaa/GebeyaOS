@@ -3,6 +3,8 @@ import {
   Get,
   Post,
   Put,
+  Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -19,6 +21,7 @@ import {
   UpdateProductDto,
   ProductQueryDto,
   CreateCategoryDto,
+  UpdateCategoryDto,
   BulkCategoryDto,
   BulkArchiveDto,
 } from './dto/products.dto';
@@ -45,6 +48,16 @@ export class ProductsController {
   @HttpCode(HttpStatus.CREATED)
   async createCategory(@Body() dto: CreateCategoryDto) {
     return this.productsService.createCategory(dto);
+  }
+
+  @Patch('categories/:id')
+  async updateCategory(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    return this.productsService.updateCategory(id, dto);
+  }
+
+  @Delete('categories/:id')
+  async archiveCategory(@Param('id') id: string) {
+    return this.productsService.archiveCategory(id);
   }
 
   @Get('uoms')
