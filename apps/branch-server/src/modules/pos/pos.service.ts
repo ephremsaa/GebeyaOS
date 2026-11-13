@@ -90,7 +90,7 @@ export class PosService {
   async openShift(
     branchId: string,
     cashierId: string,
-    dto: OpenShiftDto,
+    dto: OpenShiftDto | Partial<OpenShiftDto>,
   ): Promise<Shift> {
     await this.verifyTenantLicense();
     const termId = dto.getResolvedTerminalId ? dto.getResolvedTerminalId() : (dto.terminalId || (dto as any).terminal_id);
@@ -355,7 +355,7 @@ export class PosService {
   async closeShift(
     branchId: string,
     shiftId: string,
-    dto: CloseShiftDto,
+    dto: CloseShiftDto | Partial<CloseShiftDto>,
   ): Promise<ZReportSummary> {
     return this.db.withTransaction(async (client) => {
       const shiftRes = await client.query<any>(

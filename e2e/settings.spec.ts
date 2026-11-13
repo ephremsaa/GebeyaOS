@@ -1,96 +1,129 @@
+/**
+ * e2e/settings.spec.ts
+ * Step 7 — Consolidated Settings page with 5 clean sections (#settings).
+ */
 import { test, expect } from '@playwright/test';
 
-test.describe('Settings Page UI/UX and Persistence', () => {
-  test('Dark mode color matching and settings save verification', async ({ page }) => {
-    // 0. Disable tour hints and set dark mode in localStorage
-    await page.addInitScript(() => {
-      localStorage.setItem('gebeya_theme', 'dark');
-      const tabs = ['checkout', 'shift', 'inventory', 'purchasing', 'reports', 'settings', 'catalog', 'stocktake'];
-      for (const t of tabs) {
-        localStorage.setItem(`gebeyaos_hints_dismissed_anon_${t}`, 'true');
-        localStorage.setItem(`gebeyaos_hints_dismissed_01a19309-1e78-7e91-a0a7-56edac4beb90_${t}`, 'true');
-      }
-    });
+const BASE = 'http://localhost:3000';
 
-    // 1. Visit root page
-    await page.goto('/');
-
-    // 2. Step 1: Supermarket Company Code
-    const companyInput = page.locator('input[placeholder*="Company" i], input[placeholder*="KEROD" i]').first();
-    if (await companyInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await companyInput.fill('kerod');
-      await companyInput.press('Enter');
-      await expect(companyInput).toBeHidden({ timeout: 10000 });
+async function loginAsManager(page: any) {
+  await page.addInitScript(() => {
+    localStorage.setItem('gebeyaos_company_code', 'kerod');
+    const tabs = [
+      'checkout', 'sales', 'shifts', 'shift', 'inventory', 'stock',
+      'purchasing', 'suppliers', 'reports', 'settings', 'catalog',
+      'items', 'stocktake', 'staff', 'users',
+    ];
+    for (const t of tabs) {
+      localStorage.setItem(`gebeyaos_hints_dismissed_anon_${t}`, 'true');
+      localStorage.setItem(`gebeyaos_hints_dismissed_01a19309-1e78-7e91-a0a7-56edac4beb90_${t}`, 'true');
     }
+  });
 
-    // 3. Step 2: Cashier / Owner Authentication
-    const passwordInput = page.locator('input[type="password"]').first();
-    await expect(passwordInput).toBeVisible({ timeout: 10000 });
-    const usernameInput = page.locator('input[placeholder*="admin" i], input[type="text"]').first();
-    await usernameInput.fill('kerodpos');
-    await passwordInput.fill('Kerod2026!');
-    await page.click('button[type="submit"]');
+  await page.goto(`${BASE}/#settings`);
 
-    // 4. Verify successful login: main navigation visible
-    const checkoutButton = page.getByRole('button', { name: 'Checkout' });
-    await expect(checkoutButton).toBeVisible({ timeout: 15000 });
+  const companyInput = page.locator('input[placeholder*="Company" i], input[placeholder*="KEROD" i]').first();
+  const passwordInput = page.locator('input[type="password"]').first();
 
-    // 5. Ensure dark mode class is on html
-    await page.evaluate(() => {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('gebeya_theme', 'dark');
-    });
-    await expect(page.locator('html')).toHaveClass(/dark/);
+  await Promise.race([
+    companyInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => null),
+    passwordInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => null),
+  ]);
 
-    // 6. Navigate to Settings via sidebar navigation rail
-    const settingsNavBtn = page.locator('nav button:has-text("Settings"), nav button:has-text("ቅንብሮች")').first();
-    await expect(settingsNavBtn).toBeVisible({ timeout: 10000 });
-    await settingsNavBtn.click();
+  if (await companyInput.isVisible()) {
+    await companyInput.fill('kerod');
+    await page.locator('button[type="submit"]').first().click();
+    await expect(companyInput).toBeHidden({ timeout: 10000 });
+  }
 
-    // 7. Verify Settings Page loaded
-    const pageHeader = page.locator('h1');
-    await expect(pageHeader).toBeVisible({ timeout: 10000 });
-    await expect(pageHeader).toContainText(/Settings|ቅንብሮች/i);
+  await expect(passwordInput).toBeVisible({ timeout: 10000 });
+  const usernameInput = page.locator('input[placeholder*="admin" i], input[type="text"]').first();
+  await usernameInput.fill('kerodpos');
+  await passwordInput.fill('Kerod2026!');
+  await page.click('button[type="submit"]');
+  await page.waitForTimeout(1000);
+}
 
-    // 8. Inspect the sub-navigation background color in dark mode
-    // It must NOT be pure white rgb(255, 255, 255)
-    const branchTabBtn = page.locator('button:has-text("Branch Details"), button:has-text("የቅርንጫፍ ዝርዝር")').first();
-    await expect(branchTabBtn).toBeVisible();
-    const subNavParent = branchTabBtn.locator('xpath=./../..');
-    const subNavBg = await subNavParent.evaluate((el) => {
-      let node: HTMLElement | null = el as HTMLElement;
-      while (node && (window.getComputedStyle(node).backgroundColor === 'rgba(0, 0, 0, 0)' || window.getComputedStyle(node).backgroundColor === 'transparent')) {
-        node = node.parentElement;
-      }
-      return node ? window.getComputedStyle(node).backgroundColor : '';
-    });
-    console.log('Sub-navigation background color in dark mode:', subNavBg);
-    expect(subNavBg).not.toBe('rgb(255, 255, 255)');
-
-    // 9. Test Data Modification & Saving
-    const storeNameInput = page.locator('input[placeholder*="Kerod Supermarket" i], input[placeholder*="ሱቅ" i]').first();
-    await expect(storeNameInput).toBeVisible();
-
-    const testStoreName = `Gebeya Supermarket ${Date.now()}`;
-    await storeNameInput.fill(testStoreName);
-
-    // Click Save Button
-    const saveBtn = page.locator('button:has-text("Save Branch Details"), button:has-text("የቅርንጫፍ መረጃ አስቀምጥ")').first();
-    await expect(saveBtn).toBeEnabled();
-    await saveBtn.click();
-
-    // 10. Assert Success Toast
-    const toast = page.locator('div:has-text("saved successfully"), div:has-text("ተቀምጧል")').first();
-    await expect(toast).toBeVisible({ timeout: 5000 });
-
-    // 11. Reload page and assert saved value persists
-    await page.reload();
+test.describe('Step 7 – Consolidated Settings Page (5 Sections)', () => {
+  test('Renders Settings header, 5 sections, and Business details', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#settings`);
     await page.waitForTimeout(1000);
-    const reloadedSettingsBtn = page.locator('nav button:has-text("Settings"), nav button:has-text("ቅንብሮች")').first();
-    await expect(reloadedSettingsBtn).toBeVisible();
-    await reloadedSettingsBtn.click();
 
-    const reloadedStoreNameInput = page.locator('input[placeholder*="Kerod Supermarket" i], input[placeholder*="ሱቅ" i]').first();
-    await expect(reloadedStoreNameInput).toHaveValue(testStoreName);
+    // Header title
+    await expect(page.locator('h1').first()).toContainText(/Settings|ቅንብር/i);
+
+    // 5 Sections visible on left rail
+    const nav = page.locator('[data-testid="settings-nav"]');
+    await expect(nav.locator('button:has-text("Business"), button:has-text("የንግድ ድርጅት")').first()).toBeVisible();
+    await expect(nav.locator('button:has-text("Sales"), button:has-text("ሽያጭ")').first()).toBeVisible();
+    await expect(nav.locator('button:has-text("Stock"), button:has-text("ክምችት")').first()).toBeVisible();
+    await expect(nav.locator('button:has-text("Data & Backups"), button:has-text("መረጃ እና ቅጂ")').first()).toBeVisible();
+    await expect(nav.locator('button:has-text("Account"), button:has-text("መለያ")').first()).toBeVisible();
+  });
+
+  test('Section navigation: Sales and Stock sections render expected fields', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#settings`);
+    await page.waitForTimeout(1000);
+
+    const nav = page.locator('[data-testid="settings-nav"]');
+
+    // Navigate to Sales section
+    await nav.locator('button:has-text("Sales"), button:has-text("ሽያጭ")').first().click();
+    await page.waitForTimeout(400);
+    await expect(page.locator('select').first()).toBeVisible(); // default payment method
+    await expect(page.locator('text=Allow Credit Sales').or(page.locator('text=የብድር ሽያጭ')).first()).toBeVisible();
+
+    // Navigate to Stock section
+    await nav.locator('button:has-text("Stock"), button:has-text("ክምችት")').first().click();
+    await page.waitForTimeout(400);
+    await expect(page.locator('text=Default Low Stock Alert').or(page.locator('text=ዝቅተኛ የክምችት')).first()).toBeVisible();
+  });
+
+  test('Data & Backups section displays Backup, Restore, Sync, and dangerous Reset modal', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#settings`);
+    await page.waitForTimeout(1000);
+
+    const nav = page.locator('[data-testid="settings-nav"]');
+
+    // Navigate to Data & Backups section
+    await nav.locator('button:has-text("Data & Backups"), button:has-text("መረጃ እና ቅጂ")').first().click();
+    await page.waitForTimeout(400);
+
+    // Actions visible
+    await expect(page.locator('button:has-text("Backup Now"), button:has-text("አሁን ቅጂ")').first()).toBeVisible();
+    await expect(page.locator('button:has-text("Restore Database"), button:has-text("ቅጂ መልስ")').first()).toBeVisible();
+    await expect(page.locator('button:has-text("Sync Now"), button:has-text("አሁን አመሳስል")').first()).toBeVisible();
+
+    // Reset All Data button triggers dangerous modal
+    const resetBtn = page.locator('button:has-text("Reset All Data"), button:has-text("ሁሉንም መረጃ አጥፋ")').first();
+    await expect(resetBtn).toBeVisible();
+    await resetBtn.click();
+    await page.waitForTimeout(400);
+
+    // Modal is visible
+    await expect(page.locator('text=Reset Supermarket Data').or(page.locator('text=የሱፐርማርኬት መረጃን')).first()).toBeVisible();
+
+    // Close modal
+    await page.locator('button:has-text("Cancel"), button:has-text("ሰርዝ")').first().click();
+  });
+
+  test('Account section displays profile card and credential action triggers', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#settings`);
+    await page.waitForTimeout(1000);
+
+    const nav = page.locator('[data-testid="settings-nav"]');
+
+    // Navigate to Account section
+    await nav.locator('button:has-text("Account"), button:has-text("መለያ")').first().click();
+    await page.waitForTimeout(400);
+
+    // Profile details & change credential buttons
+    await expect(page.locator('text=Change Password').or(page.locator('text=የይለፍ ቃል ቀይር')).first()).toBeVisible();
+    await expect(page.locator('text=Change Quick PIN').or(page.locator('text=ፈጣን ፒን ቀይር')).first()).toBeVisible();
+    await expect(page.locator('text=Log Out').or(page.locator('text=ውጣ')).first()).toBeVisible();
   });
 });

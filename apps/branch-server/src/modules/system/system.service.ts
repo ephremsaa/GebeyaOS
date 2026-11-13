@@ -657,4 +657,166 @@ export class SystemService {
     const res = await this.db.query(sql, params);
     return res.rows;
   }
+
+  /**
+   * Strictly tenant-isolated data reset.
+   * Wipes transactional data: sales, shifts, payments, stock movements, batches, GRNs, POs.
+   * Preserves tenant, users, branches, and system settings.
+   * Optionally deletes products if requested.
+   */
+  async resetTenantData(
+    tenantId: string,
+    deleteProducts: boolean = false,
+    userId?: string,
+  ): Promise<{ success: boolean; message: string; deletedCounts: Record<string, number> }> {
+    if (!tenantId) {
+      throw new BadRequestException('tenantId is required for data reset');
+    }
+
+    const deletedCounts: Record<string, number> = {};
+
+    await this.db.withTransaction(async (client) => {
+      // 1. Sale items & refunds
+      const rItems = await client.query(
+        `DELETE FROM sale_refund_items WHERE refund_id IN (
+           SELECT id FROM sale_refunds WHERE sale_id IN (SELECT id FROM sales WHERE tenant_id = $1)
+         )`,
+        [tenantId],
+      );
+      deletedCounts['sale_refund_items'] = rItems.rowCount || 0;
+
+      const rRefunds = await client.query(
+        `DELETE FROM sale_refunds WHERE sale_id IN (SELECT id FROM sales WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['sale_refunds'] = rRefunds.rowCount || 0;
+
+      const rSaleItems = await client.query(
+        `DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['sale_items'] = rSaleItems.rowCount || 0;
+
+      const rPayments = await client.query(
+        `DELETE FROM sale_payments WHERE sale_id IN (SELECT id FROM sales WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['sale_payments'] = rPayments.rowCount || 0;
+
+      const rFiscal = await client.query(
+        `DELETE FROM fiscal_receipt_logs WHERE sale_id IN (SELECT id FROM sales WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['fiscal_receipt_logs'] = rFiscal.rowCount || 0;
+
+      const rSales = await client.query(`DELETE FROM sales WHERE tenant_id = $1`, [tenantId]);
+      deletedCounts['sales'] = rSales.rowCount || 0;
+
+      // 2. Cash movements & Shifts
+      const rCash = await client.query(
+        `DELETE FROM cash_movements WHERE shift_id IN (SELECT id FROM shifts WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['cash_movements'] = rCash.rowCount || 0;
+
+      const rShifts = await client.query(`DELETE FROM shifts WHERE tenant_id = $1`, [tenantId]);
+      deletedCounts['shifts'] = rShifts.rowCount || 0;
+
+      // 3. Stock ledger & Adjustments
+      const rAdjItems = await client.query(
+        `DELETE FROM stock_adjustment_items WHERE adjustment_id IN (
+           SELECT id FROM stock_adjustments WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)
+         )`,
+        [tenantId],
+      );
+      deletedCounts['stock_adjustment_items'] = rAdjItems.rowCount || 0;
+
+      const rAdj = await client.query(
+        `DELETE FROM stock_adjustments WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['stock_adjustments'] = rAdj.rowCount || 0;
+
+      const rStockLedger = await client.query(
+        `DELETE FROM stock_ledger WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['stock_ledger'] = rStockLedger.rowCount || 0;
+
+      const rBatches = await client.query(
+        `DELETE FROM batches WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['batches'] = rBatches.rowCount || 0;
+
+      // 4. Stock Takes
+      const rStkItems = await client.query(
+        `DELETE FROM stock_take_items WHERE stock_take_id IN (
+           SELECT id FROM stock_takes WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)
+         )`,
+        [tenantId],
+      );
+      deletedCounts['stock_take_items'] = rStkItems.rowCount || 0;
+
+      const rStk = await client.query(
+        `DELETE FROM stock_takes WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['stock_takes'] = rStk.rowCount || 0;
+
+      // 5. Goods Received Notes & POs
+      const rGrnItems = await client.query(
+        `DELETE FROM grn_items WHERE grn_id IN (
+           SELECT id FROM goods_received_notes WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)
+         )`,
+        [tenantId],
+      );
+      deletedCounts['grn_items'] = rGrnItems.rowCount || 0;
+
+      const rGrn = await client.query(
+        `DELETE FROM goods_received_notes WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['goods_received_notes'] = rGrn.rowCount || 0;
+
+      const rPoItems = await client.query(
+        `DELETE FROM purchase_order_items WHERE purchase_order_id IN (
+           SELECT id FROM purchase_orders WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)
+         )`,
+        [tenantId],
+      );
+      deletedCounts['purchase_order_items'] = rPoItems.rowCount || 0;
+
+      const rPo = await client.query(
+        `DELETE FROM purchase_orders WHERE branch_id IN (SELECT id FROM branches WHERE tenant_id = $1)`,
+        [tenantId],
+      );
+      deletedCounts['purchase_orders'] = rPo.rowCount || 0;
+
+      // 6. Optional: Products deletion
+      if (deleteProducts) {
+        await client.query(`DELETE FROM product_barcodes WHERE product_id IN (SELECT id FROM products WHERE tenant_id = $1)`, [tenantId]);
+        await client.query(`DELETE FROM branch_product_overrides WHERE product_id IN (SELECT id FROM products WHERE tenant_id = $1)`, [tenantId]);
+        const rProd = await client.query(`DELETE FROM products WHERE tenant_id = $1`, [tenantId]);
+        deletedCounts['products'] = rProd.rowCount || 0;
+      }
+    });
+
+    await this.logAction({
+      action: 'DATA_RESET',
+      entityName: 'tenant_data',
+      details: {
+        tenantId,
+        deleteProducts,
+        deletedBy: userId || 'owner',
+        counts: deletedCounts,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Tenant operational and sales data reset successfully with strict isolation.',
+      deletedCounts,
+    };
+  }
 }

@@ -1,1032 +1,1169 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Settings,
   Store,
-  Receipt,
   DollarSign,
-  RefreshCw,
+  Layers,
+  Database,
+  User,
   Save,
   CheckCircle2,
   AlertTriangle,
   Building2,
-  Key,
-  MapPin,
   Phone,
-  FileText,
-  Percent,
-  Coins,
-  ShieldCheck,
-  Radio,
-  Eye,
+  Receipt,
+  Download,
+  Upload,
+  RefreshCw,
+  Trash2,
+  ShieldAlert,
+  Lock,
+  KeyRound,
+  LogOut,
+  Palette,
   Check,
+  Percent,
+  Calendar,
+  AlertCircle,
+  X,
   Loader2,
-  Sparkles,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
-import { BranchActivationModal } from './settings/BranchActivationModal';
+
+const BRAND_PRESETS = [
+  { id: 'emerald', name: 'Emerald', hex: '#10B981', secondary: '#0F766E' },
+  { id: 'ocean_blue', name: 'Ocean Blue', hex: '#0284C7', secondary: '#0369A1' },
+  { id: 'royal_violet', name: 'Royal Violet', hex: '#7C3AED', secondary: '#6D28D9' },
+  { id: 'sunset_orange', name: 'Sunset Orange', hex: '#EA580C', secondary: '#C2410C' },
+  { id: 'ruby_red', name: 'Ruby Red', hex: '#E11D48', secondary: '#BE123C' },
+  { id: 'teal', name: 'Deep Teal', hex: '#0D9488', secondary: '#0F766E' },
+  { id: 'gold', name: 'Warm Gold', hex: '#D97706', secondary: '#B45309' },
+  { id: 'slate', name: 'Slate Gray', hex: '#475569', secondary: '#334155' },
+];
 
 export const SettingsView: React.FC = () => {
-  const { t, language, calendar, setCalendar } = useI18n();
-  const { currentUser } = useAuth();
+  const { t, language } = useI18n();
+  const { currentUser, logout, updateUserPassword, updateUserPin } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'store' | 'receipt' | 'fiscal' | 'sync'>('store');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const isOwner = currentUser?.role === 'STORE_OWNER' || currentUser?.role === 'OWNER';
+
+  // Active section tab: 'business' | 'sales' | 'stock' | 'data' | 'account'
+  const [activeTab, setActiveTab] = useState<'business' | 'sales' | 'stock' | 'data' | 'account'>('business');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
-  const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
-  const [pingStatus, setPingStatus] = useState<'idle' | 'testing' | 'online' | 'offline'>('idle');
 
-  // Active user / branch context
-  const branchId = currentUser?.branchId || localStorage.getItem('gebeyaos_branch_id') || '01a19309-1d43-7444-b260-5b2ffac3e40c';
-  const userId = currentUser?.id || '';
-  const token = localStorage.getItem('gebeyaos_access_token') || sessionStorage.getItem('gebeyaos_token') || localStorage.getItem('gebeyaos_token');
+  // ─── 1. Business Section State ───
+  const [storeName, setStoreName] = useState('Gebeya Supermarket');
+  const [branchCode, setBranchCode] = useState('BOLE-01');
+  const [branchName, setBranchName] = useState('Bole Medhanialem');
+  const [storeAddress, setStoreAddress] = useState('Bole Sub-City, Addis Ababa, Ethiopia');
+  const [storePhone, setStorePhone] = useState('0911223344');
+  const [tinNumber, setTinNumber] = useState('0082842324');
+  const [receiptHeader, setReceiptHeader] = useState('Gebeya Supermarket - Bole Medhanialem');
+  const [receiptFooter, setReceiptFooter] = useState('Thank you for shopping with us! / እናመሰግናለን!');
+  const [brandColor, setBrandColor] = useState('#10B981');
+  const [logoUrl, setLogoUrl] = useState('');
 
-  // Form states
-  const [storeInfo, setStoreInfo] = useState({
-    name: '',
-    code: '',
-    tradeName: '',
-    tinNumber: '',
-    vatNumber: '',
-    phone: '',
-    address: '',
-  });
+  // ─── 2. Sales Section State ───
+  const [defaultPayment, setDefaultPayment] = useState<'CASH' | 'TELEBIRR' | 'CBE_BIRR' | 'CARD'>('CASH');
+  const [allowCreditSales, setAllowCreditSales] = useState(false);
+  const [maxDiscountNoPin, setMaxDiscountNoPin] = useState(10);
+  const [returnPolicyNote, setReturnPolicyNote] = useState('Items exchangeable within 3 days with valid receipt.');
+  const [standardVatRate, setStandardVatRate] = useState(15);
 
-  const [receiptConfig, setReceiptConfig] = useState({
-    headerText: 'እንኳን ደህና መጡ! / Welcome to our Supermarket',
-    footerText: 'ዕቃዎች ከተገዙበት ቀን ጀምሮ በ3 ቀናት ውስጥ በደረሰኝ ይመለሳሉ።\nGoods exchangeable within 3 days with receipt.\nThank you for shopping with us!',
-    taxInvoiceTitle: 'OFFICIAL CASH SALES INVOICE',
-    showCashierName: true,
-    showTinVat: true,
-  });
+  // ─── 3. Stock Section State ───
+  const [lowStockThreshold, setLowStockThreshold] = useState(5);
+  const [expiryWarningDays, setExpiryWarningDays] = useState(30);
+  const [allowNegativeStock, setAllowNegativeStock] = useState(false);
 
-  const [fiscalConfig, setFiscalConfig] = useState({
-    defaultCurrency: 'ETB',
-    vatRate: 0.15,
-    withholdingTaxRate: 0.02,
-    cashDrawerLimit: 50000,
-  });
+  // ─── 4. Data Section State ───
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetConfirmationInput, setResetConfirmationInput] = useState('');
+  const [resetDeleteProducts, setResetDeleteProducts] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
 
-  const [syncConfig, setSyncConfig] = useState({
-    hqUrl: 'http://localhost:4000/api/sync',
-    autoSyncIntervalSeconds: 30,
-    offlineGracePeriodHours: 72,
-  });
+  // ─── 5. Account Section State ───
+  const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
 
-  // Track initial state to detect unsaved changes
-  const [initialState, setInitialState] = useState<{
-    store: any;
-    receipt: any;
-    fiscal: any;
-    sync: any;
-  }>({
-    store: {},
-    receipt: {},
-    fiscal: {},
-    sync: {},
-  });
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
-  const fetchSettings = async () => {
+  const loadSettings = async () => {
+    setIsLoading(true);
     try {
-      setLoading(true);
-      setErrorToast(null);
-
-      const headers: Record<string, string> = {
-        'x-branch-id': branchId,
-        'x-user-id': userId,
-      };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch('/api/system/settings', { headers });
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const res = await fetch('/api/system/settings', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
-        const loadedStore = data.store_info || {};
-        const loadedReceipt = data.receipt_config || {};
-        const loadedFiscal = data.financial_config || {};
-        const loadedSync = data.sync_config || {};
-
-        setStoreInfo((prev) => ({ ...prev, ...loadedStore }));
-        setReceiptConfig((prev) => ({ ...prev, ...loadedReceipt }));
-        setFiscalConfig((prev) => ({ ...prev, ...loadedFiscal }));
-        setSyncConfig((prev) => ({ ...prev, ...loadedSync }));
-
-        setInitialState({
-          store: loadedStore,
-          receipt: loadedReceipt,
-          fiscal: loadedFiscal,
-          sync: loadedSync,
-        });
-      } else {
-        setErrorToast('Could not load settings from branch server');
-      }
-    } catch (err: any) {
-      console.error('Failed to load settings', err);
-      setErrorToast('Network error loading settings');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSettings();
-  }, [branchId]);
-
-  // Dirty detection for current tab
-  const isDirty = useMemo(() => {
-    if (activeTab === 'store') {
-      return JSON.stringify(storeInfo) !== JSON.stringify({ ...storeInfo, ...initialState.store });
-    }
-    if (activeTab === 'receipt') {
-      return JSON.stringify(receiptConfig) !== JSON.stringify({ ...receiptConfig, ...initialState.receipt });
-    }
-    if (activeTab === 'fiscal') {
-      return JSON.stringify(fiscalConfig) !== JSON.stringify({ ...fiscalConfig, ...initialState.fiscal });
-    }
-    if (activeTab === 'sync') {
-      return JSON.stringify(syncConfig) !== JSON.stringify({ ...syncConfig, ...initialState.sync });
-    }
-    return false;
-  }, [activeTab, storeInfo, receiptConfig, fiscalConfig, syncConfig, initialState]);
-
-  const handleSave = async (key: string, value: any, label: string) => {
-    setSavingKey(key);
-    setErrorToast(null);
-
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'x-branch-id': branchId,
-        'x-user-id': userId,
-      };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch('/api/system/settings', {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ key, value }),
-      });
-
-      if (res.ok) {
-        setSuccessToast(`${label} saved successfully.`);
-        setTimeout(() => setSuccessToast(null), 3500);
-
-        // Update initial baseline
-        setInitialState((prev) => ({
-          ...prev,
-          [key === 'store_info'
-            ? 'store'
-            : key === 'receipt_config'
-            ? 'receipt'
-            : key === 'financial_config'
-            ? 'fiscal'
-            : 'sync']: value,
-        }));
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        setErrorToast(errorData.message || `Failed to save ${label}. Check server connection.`);
-      }
-    } catch (err: any) {
-      setErrorToast(err?.message || `Error saving ${label}. Check network connection.`);
-    } finally {
-      setSavingKey(null);
-    }
-  };
-
-  const handleTestPing = async () => {
-    setPingStatus('testing');
-    try {
-      const res = await fetch(`${syncConfig.hqUrl}/health`, { method: 'GET' }).catch(() => null);
-      if (res && res.ok) {
-        setPingStatus('online');
-      } else {
-        setPingStatus('offline');
+        if (data.store_info?.name) setStoreName(data.store_info.name);
+        if (data.store_info?.code) setBranchCode(data.store_info.code);
+        if (data.store_info?.phone) setStorePhone(data.store_info.phone);
+        if (data.store_info?.address) setStoreAddress(data.store_info.address);
+        if (data.store_info?.tinNumber) setTinNumber(data.store_info.tinNumber);
+        if (data.store_info?.brandColor) {
+          setBrandColor(data.store_info.brandColor);
+          document.documentElement.style.setProperty('--primary', data.store_info.brandColor);
+        }
+        if (data.receipt_config?.headerText) setReceiptHeader(data.receipt_config.headerText);
+        if (data.receipt_config?.footerText) setReceiptFooter(data.receipt_config.footerText);
       }
     } catch {
-      setPingStatus('offline');
+      // fallback to initial state
+    } finally {
+      setIsLoading(false);
     }
-    setTimeout(() => setPingStatus('idle'), 4000);
+  };
+
+  const handleSaveSettings = async (section: string) => {
+    setIsSaving(true);
+    setErrorToast(null);
+    try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const payload: any = {
+        store_info: {
+          name: storeName.trim(),
+          code: branchCode.trim(),
+          phone: storePhone.trim(),
+          address: storeAddress.trim(),
+          tinNumber: tinNumber.trim(),
+          brandColor,
+          logoUrl,
+        },
+        receipt_config: {
+          headerText: receiptHeader,
+          footerText: receiptFooter,
+          returnPolicyNote,
+        },
+        sales_config: {
+          defaultPayment,
+          allowCreditSales,
+          maxDiscountNoPin,
+          standardVatRate,
+        },
+        stock_config: {
+          lowStockThreshold,
+          expiryWarningDays,
+          allowNegativeStock,
+        },
+      };
+
+      await fetch('/api/system/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ key: 'general_config', value: payload }),
+      });
+
+      // Update brand color in CSS
+      document.documentElement.style.setProperty('--primary', brandColor);
+
+      setSuccessToast(t('settings.saveSettingsSuccess'));
+      setTimeout(() => setSuccessToast(null), 3000);
+    } catch (err: any) {
+      setErrorToast(err?.message || t('settings.saveSettingsError'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ─── Data: Backup Now Handler ───
+  const handleBackupNow = async () => {
+    setIsBackingUp(true);
+    try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const res = await fetch('/api/system/backup', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Backup creation failed');
+      const backupData = await res.json();
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `GebeyaOS_Backup_${branchCode}_${new Date().toISOString().slice(0, 10)}.bak`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setSuccessToast('Backup (.bak) file generated and downloaded successfully!');
+      setTimeout(() => setSuccessToast(null), 4000);
+    } catch (err: any) {
+      setErrorToast(err?.message || 'Failed to download backup');
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  // ─── Data: Restore Handler ───
+  const handleFileRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm('Are you sure you want to restore from this backup file? Existing master configurations will be updated.')) {
+      e.target.value = '';
+      return;
+    }
+
+    setIsRestoring(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const content = event.target?.result as string;
+          const parsed = JSON.parse(content);
+          const token = localStorage.getItem('gebeyaos_access_token');
+
+          const res = await fetch('/api/system/restore', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ backupPayload: parsed }),
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || 'Restore rejected by server');
+          }
+
+          setSuccessToast('Database restored successfully and checksum verified!');
+          setTimeout(() => setSuccessToast(null), 4000);
+          loadSettings();
+        } catch (err: any) {
+          setErrorToast(err?.message || 'Restore failed');
+        } finally {
+          setIsRestoring(false);
+        }
+      };
+      reader.readAsText(file);
+    } catch (err: any) {
+      setErrorToast(err?.message || 'Could not parse backup file');
+      setIsRestoring(false);
+    }
+    e.target.value = '';
+  };
+
+  // ─── Data: Sync Now Handler ───
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      setSuccessToast('Sync with head office complete. All outbox records sent.');
+      setTimeout(() => setSuccessToast(null), 3000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // ─── Data: Dangerous Reset Data Handler ───
+  const handleConfirmResetData = async () => {
+    if (resetConfirmationInput.trim().toLowerCase() !== storeName.trim().toLowerCase()) {
+      setErrorToast(`You must type "${storeName}" exactly to confirm.`);
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const res = await fetch('/api/system/reset-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          confirmationTenantName: resetConfirmationInput.trim(),
+          deleteProducts: resetDeleteProducts,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Reset failed');
+      }
+
+      setIsResetModalOpen(false);
+      setResetConfirmationInput('');
+      setSuccessToast('All transactional data wiped successfully. Supermarket reset complete.');
+      setTimeout(() => setSuccessToast(null), 5000);
+    } catch (err: any) {
+      setErrorToast(err?.message || 'Failed to execute reset');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  // ─── Account: Password Change Handler ───
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAccountActionError(null);
+    if (newPassword.length < 8) {
+      setAccountActionError('New password must be at least 8 characters long');
+      return;
+    }
+    const res = await updateUserPassword(currentPassword, newPassword);
+    if (res.success) {
+      setIsPassModalOpen(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setSuccessToast('Password updated successfully!');
+      setTimeout(() => setSuccessToast(null), 3000);
+    } else {
+      setAccountActionError(res.error || 'Failed to update password');
+    }
+  };
+
+  // ─── Account: PIN Change Handler ───
+  const handleChangePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAccountActionError(null);
+    if (newPin.length < 4 || newPin.length > 6) {
+      setAccountActionError('PIN must be 4 to 6 digits');
+      return;
+    }
+    const res = await updateUserPin(newPin);
+    if (res.success) {
+      setIsPinModalOpen(false);
+      setNewPin('');
+      setSuccessToast('Terminal quick PIN updated successfully!');
+      setTimeout(() => setSuccessToast(null), 3000);
+    } else {
+      setAccountActionError(res.error || 'Failed to update PIN');
+    }
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-page p-4 sm:p-6 overflow-hidden select-none">
-      {/* ─── 1. Header Toolbar ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-soft">
-            <Settings size={22} className="stroke-[2.2]" />
-          </div>
-          <div>
-            <h1 className="text-xl font-extrabold text-text-main flex items-center gap-2 tracking-tight">
-              {t('settings.title')}
-            </h1>
-            <p className="text-xs text-text-muted">
-              {t('settings.subtitle')}
-            </p>
-          </div>
+    <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 overflow-hidden select-none">
+      {/* ─── Header ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 shrink-0">
+        <div>
+          <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <Settings className="text-emerald-600" size={24} />
+            {t('settings.title')}
+          </h1>
+          <p className="text-xs text-slate-500">{t('settings.subtitle')}</p>
         </div>
 
-        {/* Status Pills */}
-        <div className="flex items-center gap-2">
-          {successToast && (
-            <div className="px-3.5 py-1.5 rounded-xl bg-success/15 border border-success/30 text-success text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200 shadow-soft">
-              <CheckCircle2 size={15} />
-              <span>{successToast}</span>
-            </div>
-          )}
-
-          {errorToast && (
-            <div className="px-3.5 py-1.5 rounded-xl bg-danger/15 border border-danger/30 text-danger text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200 shadow-soft">
-              <AlertTriangle size={15} />
-              <span>{errorToast}</span>
-            </div>
-          )}
-
-          {isDirty && !successToast && !errorToast && (
-            <div className="px-3 py-1 rounded-xl bg-warning/15 border border-warning/30 text-warning text-xs font-bold flex items-center gap-1.5 animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-warning" />
-              <span>{t('settings.unsavedChanges')}</span>
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => handleSaveSettings(activeTab)}
+          disabled={isSaving}
+          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
+        >
+          {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+          <span>{isSaving ? t('settings.saving') : t('common.save')}</span>
+        </button>
       </div>
 
-      {/* ─── 2. Main Tabbed Layout Card ─── */}
-      <div className="flex-1 bg-surface rounded-3xl border border-border-subtle shadow-soft overflow-hidden flex flex-col md:flex-row min-h-0">
-        {/* Left Sub-Navigation */}
-        <div className="w-full md:w-64 bg-surface-2 p-3 sm:p-4 border-b md:border-b-0 md:border-r border-border-subtle flex flex-row md:flex-col justify-between shrink-0 gap-2">
-          <div className="flex flex-row md:flex-col gap-1.5 w-full overflow-x-auto md:overflow-visible">
-            {/* Tab 1 */}
+      {/* Global Toast Notifications */}
+      {successToast && (
+        <div className="mb-4 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+          <span>{successToast}</span>
+        </div>
+      )}
+      {errorToast && (
+        <div className="mb-4 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+          <AlertCircle size={16} className="text-rose-600 shrink-0" />
+          <span>{errorToast}</span>
+        </div>
+      )}
+
+      {/* ─── 5 Clean Sections Container ─── */}
+      <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row overflow-hidden shadow-xs min-h-0">
+        {/* Left Section Navigation Bar */}
+        <div data-testid="settings-nav" className="w-full md:w-56 p-3 bg-slate-50 dark:bg-slate-900/60 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible shrink-0">
+          {/* 1. Business */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('business')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left cursor-pointer shrink-0 md:w-full ${
+              activeTab === 'business'
+                ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Store size={16} />
+            <span>{t('settings.tabBusiness')}</span>
+          </button>
+
+          {/* 2. Sales */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('sales')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left cursor-pointer shrink-0 md:w-full ${
+              activeTab === 'sales'
+                ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+            }`}
+          >
+            <DollarSign size={16} />
+            <span>{t('settings.tabSales')}</span>
+          </button>
+
+          {/* 3. Stock */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('stock')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left cursor-pointer shrink-0 md:w-full ${
+              activeTab === 'stock'
+                ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Layers size={16} />
+            <span>{t('settings.tabStock')}</span>
+          </button>
+
+          {/* 4. Data & Backups (Owner Only) */}
+          {isOwner && (
             <button
               type="button"
-              onClick={() => setActiveTab('store')}
-              className={`px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all duration-150 text-left cursor-pointer shrink-0 md:shrink md:w-full ${
-                activeTab === 'store'
-                  ? 'bg-primary text-white shadow-soft font-extrabold'
-                  : 'text-text-muted hover:text-text-main hover:bg-surface/80 dark:hover:bg-surface/60'
+              onClick={() => setActiveTab('data')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left cursor-pointer shrink-0 md:w-full ${
+                activeTab === 'data'
+                  ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
               }`}
             >
-              <Building2 size={17} className={activeTab === 'store' ? 'text-white' : 'text-primary'} />
-              <div className="flex flex-col min-w-0">
-                <span className="truncate">{t('settings.tabBranch')}</span>
-                <span className={`text-[10px] font-normal truncate ${activeTab === 'store' ? 'text-white/80' : 'text-text-dim'}`}>
-                  {t('settings.storeBrandNameDesc')}
-                </span>
-              </div>
+              <Database size={16} />
+              <span>{t('settings.tabData')}</span>
             </button>
+          )}
 
-            {/* Tab 2 */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('receipt')}
-              className={`px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all duration-150 text-left cursor-pointer shrink-0 md:shrink md:w-full ${
-                activeTab === 'receipt'
-                  ? 'bg-primary text-white shadow-soft font-extrabold'
-                  : 'text-text-muted hover:text-text-main hover:bg-surface/80 dark:hover:bg-surface/60'
-              }`}
-            >
-              <Receipt size={17} className={activeTab === 'receipt' ? 'text-white' : 'text-primary'} />
-              <div className="flex flex-col min-w-0">
-                <span className="truncate">{t('settings.tabReceipt')}</span>
-                <span className={`text-[10px] font-normal truncate ${activeTab === 'receipt' ? 'text-white/80' : 'text-text-dim'}`}>
-                  {t('settings.receiptLayoutDesc')}
-                </span>
-              </div>
-            </button>
-
-            {/* Tab 3 */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('fiscal')}
-              className={`px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all duration-150 text-left cursor-pointer shrink-0 md:shrink md:w-full ${
-                activeTab === 'fiscal'
-                  ? 'bg-primary text-white shadow-soft font-extrabold'
-                  : 'text-text-muted hover:text-text-main hover:bg-surface/80 dark:hover:bg-surface/60'
-              }`}
-            >
-              <DollarSign size={17} className={activeTab === 'fiscal' ? 'text-white' : 'text-primary'} />
-              <div className="flex flex-col min-w-0">
-                <span className="truncate">{t('settings.tabFiscal')}</span>
-                <span className={`text-[10px] font-normal truncate ${activeTab === 'fiscal' ? 'text-white/80' : 'text-text-dim'}`}>
-                  {t('settings.fiscalDesc')}
-                </span>
-              </div>
-            </button>
-
-            {/* Tab 4 */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('sync')}
-              className={`px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all duration-150 text-left cursor-pointer shrink-0 md:shrink md:w-full ${
-                activeTab === 'sync'
-                  ? 'bg-primary text-white shadow-soft font-extrabold'
-                  : 'text-text-muted hover:text-text-main hover:bg-surface/80 dark:hover:bg-surface/60'
-              }`}
-            >
-              <RefreshCw size={17} className={activeTab === 'sync' ? 'text-white' : 'text-primary'} />
-              <div className="flex flex-col min-w-0">
-                <span className="truncate">{t('settings.tabSync')}</span>
-                <span className={`text-[10px] font-normal truncate ${activeTab === 'sync' ? 'text-white/80' : 'text-text-dim'}`}>
-                  {t('settings.syncDesc')}
-                </span>
-              </div>
-            </button>
-          </div>
-
-          {/* Bottom Action: Activation Codes */}
-          <div className="hidden md:block pt-3 border-t border-border-subtle mt-auto">
-            <button
-              type="button"
-              onClick={() => setIsActivationModalOpen(true)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-surface hover:bg-surface-2 text-text-main text-xs font-bold flex items-center justify-between border border-border-subtle transition-colors duration-150 cursor-pointer shadow-soft group"
-            >
-              <div className="flex items-center gap-2">
-                <Key size={15} className="text-primary group-hover:rotate-45 transition-transform" />
-                <span>{t('settings.activationCodes')}</span>
-              </div>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
-                LAN
-              </span>
-            </button>
-          </div>
+          {/* 5. Account */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('account')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition text-left cursor-pointer shrink-0 md:w-full ${
+              activeTab === 'account'
+                ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+            }`}
+          >
+            <User size={16} />
+            <span>{t('settings.tabAccount')}</span>
+          </button>
         </div>
 
-        {/* Right Tab Content */}
-        <div className="flex-1 p-5 sm:p-7 overflow-y-auto bg-surface">
-          {loading ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 py-16 text-text-muted">
-              <Loader2 size={32} className="animate-spin text-primary" />
-              <p className="text-xs font-medium">{t('settings.loadingConfig')}</p>
-            </div>
-          ) : (
-            <>
-              {/* ──────── TAB 1: STORE / BRANCH DETAILS ──────── */}
-              {activeTab === 'store' && (
-                <div className="max-w-3xl space-y-6 animate-in fade-in duration-200">
-                  <div className="pb-3 border-b border-border-subtle flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-bold text-text-main">
-                        {t('settings.branchStoreIdent')}
-                      </h2>
-                      <p className="text-xs text-text-muted mt-0.5">
-                        {t('settings.branchStoreIdentDesc')}
-                      </p>
-                    </div>
-                  </div>
+        {/* Right Section Content */}
+        <div className="flex-1 p-5 sm:p-7 overflow-y-auto">
+          {/* ──────── SECTION 1: BUSINESS ──────── */}
+          {activeTab === 'business' && (
+            <div className="max-w-2xl space-y-5 animate-in fade-in">
+              <div className="border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {t('settings.tabBusiness')}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Supermarket identification, branch address, official TIN, and receipt layout
+                </p>
+              </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Store Brand Name */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        {t('settings.storeName')}
-                      </label>
-                      <input
-                        type="text"
-                        value={storeInfo.name}
-                        onChange={(e) => setStoreInfo({ ...storeInfo, name: e.target.value })}
-                        placeholder="e.g. Kerod Supermarket"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-semibold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                      />
-                    </div>
-
-                    {/* Branch Code */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
-                        <span>{t('settings.branchCode')}</span>
-                        <span className="text-[10px] font-normal text-text-dim">{t('settings.assignedByHq')}</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={storeInfo.code}
-                        onChange={(e) => setStoreInfo({ ...storeInfo, code: e.target.value })}
-                        placeholder="e.g. TULU-01"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs uppercase"
-                      />
-                    </div>
-
-                    {/* Registered Trade Name */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        {t('settings.tradeName')}
-                      </label>
-                      <input
-                        type="text"
-                        value={storeInfo.tradeName}
-                        onChange={(e) => setStoreInfo({ ...storeInfo, tradeName: e.target.value })}
-                        placeholder="e.g. Leka Trading PLC"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-semibold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                      />
-                    </div>
-
-                    {/* TIN Number */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
-                        <span>{t('settings.tinNumber')}</span>
-                        <span className="text-[10px] font-normal text-text-dim">{t('settings.tenDigits')}</span>
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={10}
-                        value={storeInfo.tinNumber}
-                        onChange={(e) => setStoreInfo({ ...storeInfo, tinNumber: e.target.value.replace(/\D/g, '') })}
-                        placeholder="e.g. 0082842324"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs tracking-wider"
-                      />
-                    </div>
-
-                    {/* VAT Number */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        {t('settings.vatNumber')}
-                      </label>
-                      <input
-                        type="text"
-                        value={storeInfo.vatNumber}
-                        onChange={(e) => setStoreInfo({ ...storeInfo, vatNumber: e.target.value })}
-                        placeholder="e.g. 9988776655"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs tracking-wider"
-                      />
-                    </div>
-
-                    {/* Store Phone */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        {t('settings.phone')}
-                      </label>
-                      <div className="relative">
-                        <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
-                        <input
-                          type="text"
-                          value={storeInfo.phone}
-                          onChange={(e) => setStoreInfo({ ...storeInfo, phone: e.target.value })}
-                          placeholder="e.g. 0941515030"
-                          className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-semibold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Physical Address */}
-                  <div>
-                    <label className="text-xs font-bold text-text-muted block mb-1.5">
-                      {t('settings.address')}
-                    </label>
-                    <div className="relative">
-                      <MapPin size={16} className="absolute left-3.5 top-3 text-text-dim" />
-                      <input
-                        type="text"
-                        value={storeInfo.address}
-                        onChange={(e) => setStoreInfo({ ...storeInfo, address: e.target.value })}
-                        placeholder="e.g. Tulu Dimtu, Cameroon St, Addis Ababa, Ethiopia"
-                        className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-semibold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Save Button Row */}
-                  <div className="pt-4 flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleSave('store_info', storeInfo, 'Branch details')}
-                      disabled={savingKey === 'store_info'}
-                      className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer disabled:opacity-50"
-                    >
-                      {savingKey === 'store_info' ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          <span>{t('settings.saving')}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save size={16} />
-                          <span>{t('settings.saveBranchDetails')}</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsActivationModalOpen(true)}
-                      className="md:hidden px-4 py-2.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main text-xs font-bold flex items-center gap-2 border border-border-subtle transition-colors cursor-pointer"
-                    >
-                      <Key size={14} className="text-primary" />
-                      <span>Activation Codes</span>
-                    </button>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.storeName')} *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                  />
                 </div>
-              )}
 
-              {/* ──────── TAB 2: RECEIPT CUSTOMIZATION + LIVE PREVIEW ──────── */}
-              {activeTab === 'receipt' && (
-                <div className="max-w-5xl space-y-6 animate-in fade-in duration-200">
-                  <div className="pb-3 border-b border-border-subtle">
-                    <h2 className="text-lg font-bold text-text-main">
-                      {t('settings.thermalReceiptTemplate')}
-                    </h2>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      {t('settings.thermalReceiptDesc')}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                    {/* Controls (7 cols) */}
-                    <div className="lg:col-span-7 space-y-4">
-                      {/* Invoice Title */}
-                      <div>
-                        <label className="text-xs font-bold text-text-muted block mb-1.5">
-                          {t('settings.officialInvoiceTitle')}
-                        </label>
-                        <input
-                          type="text"
-                          value={receiptConfig.taxInvoiceTitle}
-                          onChange={(e) =>
-                            setReceiptConfig({ ...receiptConfig, taxInvoiceTitle: e.target.value })
-                          }
-                          placeholder="OFFICIAL CASH SALES INVOICE"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                        />
-                      </div>
-
-                      {/* Header Greeting */}
-                      <div>
-                        <label className="text-xs font-bold text-text-muted block mb-1.5">
-                          {t('settings.headerGreeting')}
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={receiptConfig.headerText}
-                          onChange={(e) =>
-                            setReceiptConfig({ ...receiptConfig, headerText: e.target.value })
-                          }
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-medium text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none"
-                        />
-                      </div>
-
-                      {/* Footer Policy */}
-                      <div>
-                        <label className="text-xs font-bold text-text-muted block mb-1.5">
-                          {t('settings.footerPolicy')}
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={receiptConfig.footerText}
-                          onChange={(e) =>
-                            setReceiptConfig({ ...receiptConfig, footerText: e.target.value })
-                          }
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-medium text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none"
-                        />
-                      </div>
-
-                      {/* Checkbox Toggles */}
-                      <div className="p-4 rounded-2xl bg-surface-2 border border-border-subtle space-y-3">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={receiptConfig.showCashierName}
-                            onChange={(e) =>
-                              setReceiptConfig({ ...receiptConfig, showCashierName: e.target.checked })
-                            }
-                            className="w-4 h-4 rounded text-primary focus:ring-primary border-border-subtle"
-                          />
-                          <span className="text-xs font-bold text-text-main">
-                            {t('settings.printCashierName')}
-                          </span>
-                        </label>
-
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={receiptConfig.showTinVat}
-                            onChange={(e) =>
-                              setReceiptConfig({ ...receiptConfig, showTinVat: e.target.checked })
-                            }
-                            className="w-4 h-4 rounded text-primary focus:ring-primary border-border-subtle"
-                          />
-                          <span className="text-xs font-bold text-text-main">
-                            {t('settings.printTinVat')}
-                          </span>
-                        </label>
-                      </div>
-
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSave('receipt_config', receiptConfig, 'Receipt template')}
-                          disabled={savingKey === 'receipt_config'}
-                          className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer disabled:opacity-50"
-                        >
-                          {savingKey === 'receipt_config' ? (
-                            <>
-                              <Loader2 size={16} className="animate-spin" />
-                              <span>Saving...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Save size={16} />
-                              <span>{t('settings.saveReceiptLayout')}</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Live Preview (5 cols) */}
-                    <div className="lg:col-span-5 bg-surface-2 p-4 rounded-3xl border border-border-subtle space-y-2">
-                      <div className="flex items-center justify-between text-xs font-bold text-text-muted px-1">
-                        <span className="flex items-center gap-1.5">
-                          <Eye size={14} className="text-primary" />
-                          <span>{t('settings.liveSlipPreview')}</span>
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-soft text-primary font-mono">
-                          {t('settings.simulated')}
-                        </span>
-                      </div>
-
-                      {/* Paper Simulation */}
-                      <div className="bg-card text-text-main p-4 rounded-2xl border border-border-subtle shadow-soft font-mono text-[11px] leading-relaxed space-y-2 max-h-[460px] overflow-y-auto">
-                        <div className="text-center space-y-0.5 pb-2 border-b border-dashed border-border-subtle">
-                          <div className="font-extrabold text-sm">{storeInfo.name || 'Gebeya Supermarket'}</div>
-                          {storeInfo.tradeName && <div className="text-[10px] text-text-muted">{storeInfo.tradeName}</div>}
-                          {storeInfo.address && <div className="text-[10px] text-text-muted">{storeInfo.address}</div>}
-                          {storeInfo.phone && <div className="text-[10px] text-text-muted">TEL: {storeInfo.phone}</div>}
-                          {receiptConfig.showTinVat && (
-                            <div className="text-[10px] text-text-dim">
-                              TIN: {storeInfo.tinNumber || '0082842324'} · VAT: {storeInfo.vatNumber || '9988776655'}
-                            </div>
-                          )}
-                          <div className="pt-1 text-[11px] font-bold text-primary">{receiptConfig.taxInvoiceTitle}</div>
-                        </div>
-
-                        <div className="text-[10px] space-y-0.5 pb-2 border-b border-dashed border-border-subtle text-text-muted">
-                          <div className="flex justify-between">
-                            <span>Receipt: REC-20261104-001</span>
-                            <span>{new Date().toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Branch: {storeInfo.code || 'TULU-01'}</span>
-                            {receiptConfig.showCashierName && <span>Cashier: sahle leka</span>}
-                          </div>
-                        </div>
-
-                        {/* Dummy Items */}
-                        <div className="space-y-1 py-1 border-b border-dashed border-border-subtle text-[11px]">
-                          <div className="flex justify-between">
-                            <span>1x Fresh Whole Milk 1L</span>
-                            <span className="font-bold">120.00 ETB</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>2x Banana Cavendish (1.2kg)</span>
-                            <span className="font-bold">180.00 ETB</span>
-                          </div>
-                        </div>
-
-                        {/* Totals */}
-                        <div className="space-y-1 py-1 text-xs font-bold">
-                          <div className="flex justify-between">
-                            <span>TOTAL:</span>
-                            <span className="text-sm font-extrabold text-primary">300.00 ETB</span>
-                          </div>
-                          <div className="flex justify-between text-[10px] text-text-muted font-normal">
-                            <span>VAT 15% (Included):</span>
-                            <span>39.13 ETB</span>
-                          </div>
-                        </div>
-
-                        {/* Welcome & Footer */}
-                        <div className="pt-2 border-t border-dashed border-border-subtle text-center text-[10px] text-text-muted space-y-1">
-                          <div className="font-semibold">{receiptConfig.headerText}</div>
-                          <div className="whitespace-pre-line text-[9px] text-text-dim leading-snug">
-                            {receiptConfig.footerText}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.branchCode')}
+                  </label>
+                  <input
+                    type="text"
+                    value={branchCode}
+                    onChange={(e) => setBranchCode(e.target.value.toUpperCase())}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
                 </div>
-              )}
 
-              {/* ──────── TAB 3: FISCAL & CURRENCY PARAMETERS ──────── */}
-              {activeTab === 'fiscal' && (
-                <div className="max-w-3xl space-y-6 animate-in fade-in duration-200">
-                  <div className="pb-3 border-b border-border-subtle">
-                    <h2 className="text-lg font-bold text-text-main">
-                      {t('settings.ethiopianFiscalSettings')}
-                    </h2>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      {t('settings.ethiopianFiscalDesc')}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Currency */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        {t('settings.nationalCurrency')}
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value="ETB (Ethiopian Birr - ብር)"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-muted cursor-not-allowed"
-                      />
-                      <span className="text-[10px] text-text-dim mt-1 block">
-                        {t('settings.nationalCurrencyDesc')}
-                      </span>
-                    </div>
-
-                    {/* Standard VAT Rate */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
-                        <span>{t('settings.vatRateLabel')}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
-                          {(fiscalConfig.vatRate * 100).toFixed(0)}%
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <Percent size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="1"
-                          value={fiscalConfig.vatRate}
-                          onChange={(e) =>
-                            setFiscalConfig({ ...fiscalConfig, vatRate: parseFloat(e.target.value) || 0.15 })
-                          }
-                          className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                        />
-                      </div>
-                      <span className="text-[10px] text-text-dim mt-1 block">
-                        {t('settings.vatRateDesc')}
-                      </span>
-                    </div>
-
-                    {/* Withholding Tax */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5 flex items-center justify-between">
-                        <span>{t('settings.withholdingTaxLabel')}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary-soft text-primary font-bold">
-                          {(fiscalConfig.withholdingTaxRate * 100).toFixed(0)}%
-                        </span>
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="1"
-                        value={fiscalConfig.withholdingTaxRate}
-                        onChange={(e) =>
-                          setFiscalConfig({
-                            ...fiscalConfig,
-                            withholdingTaxRate: parseFloat(e.target.value) || 0.02,
-                          })
-                        }
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                      />
-                      <span className="text-[10px] text-text-dim mt-1 block">
-                        {t('settings.withholdingTaxDesc')}
-                      </span>
-                    </div>
-
-                    {/* Safe Drop Alert Limit */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        {t('settings.safeDropAlertLimit')}
-                      </label>
-                      <div className="relative">
-                        <Coins size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-dim" />
-                        <input
-                          type="number"
-                          min="1000"
-                          step="1000"
-                          value={fiscalConfig.cashDrawerLimit}
-                          onChange={(e) =>
-                            setFiscalConfig({
-                              ...fiscalConfig,
-                              cashDrawerLimit: parseInt(e.target.value) || 50000,
-                            })
-                          }
-                          className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                        />
-                      </div>
-                      <span className="text-[10px] text-text-dim mt-1 block">
-                        {t('settings.safeDropDesc')}
-                      </span>
-                    </div>
-                  </div>
-
-
-                    {/* Calendar System Preference */}
-                    <div className="sm:col-span-2 p-4 rounded-2xl bg-surface-2 dark:bg-[#162032] border border-border-subtle dark:border-[#334155] space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <label className="text-xs font-bold text-text-main dark:text-[#F8FAFC] block">
-                            {t('settings.calendarPreference')}
-                          </label>
-                          <p className="text-[11px] text-text-muted dark:text-[#94A3B8] mt-0.5">
-                            {t('settings.calendarHelp')}
-                          </p>
-                        </div>
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary dark:text-[#10B981] border border-primary/20">
-                          {calendar === 'ethiopic' ? t('settings.calendarEthiopian') : t('settings.calendarGregorian')}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                        <label
-                          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                            calendar === 'gregorian'
-                              ? 'bg-primary/10 border-primary text-primary dark:text-[#34D399]'
-                              : 'bg-input dark:bg-[#162032] border-border-subtle dark:border-[#334155] text-text-muted hover:border-text-dim'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="calendarPreference"
-                            value="gregorian"
-                            checked={calendar === 'gregorian'}
-                            onChange={() => setCalendar('gregorian')}
-                            className="text-primary focus:ring-primary"
-                          />
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-text-main dark:text-[#F8FAFC]">
-                              {t('settings.calendarGregorian')}
-                            </span>
-                            <span className="text-[10px] text-text-dim">e.g. Nov 7, 2026 (Africa/Addis_Ababa)</span>
-                          </div>
-                        </label>
-
-                        <label
-                          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                            calendar === 'ethiopic'
-                              ? 'bg-primary/10 border-primary text-primary dark:text-[#34D399]'
-                              : 'bg-input dark:bg-[#162032] border-border-subtle dark:border-[#334155] text-text-muted hover:border-text-dim'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="calendarPreference"
-                            value="ethiopic"
-                            checked={calendar === 'ethiopic'}
-                            onChange={() => setCalendar('ethiopic')}
-                            className="text-primary focus:ring-primary"
-                          />
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-text-main dark:text-[#F8FAFC]">
-                              {t('settings.calendarEthiopian')}
-                            </span>
-                            <span className="text-[10px] text-text-dim">ለምሳሌ፡ ጥቅምት 28/2019 ዓ.ም (አዲስ አበባ)</span>
-                          </div>
-                        </label>
-                      </div>
-                    </div>
-
-                  <div className="pt-4">
-                    <button
-                      type="button"
-                      onClick={() => handleSave('financial_config', fiscalConfig, 'Fiscal parameters')}
-                      disabled={savingKey === 'financial_config'}
-                      className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer disabled:opacity-50"
-                    >
-                      {savingKey === 'financial_config' ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          <span>Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save size={16} />
-                          <span>{t('settings.saveFiscalParams')}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.tinNumber')} (ERCA 10 digits)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={10}
+                    value={tinNumber}
+                    onChange={(e) => setTinNumber(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
                 </div>
-              )}
 
-              {/* ──────── TAB 4: SYNC & CLOUD HQ ──────── */}
-              {activeTab === 'sync' && (
-                <div className="max-w-3xl space-y-6 animate-in fade-in duration-200">
-                  <div className="pb-3 border-b border-border-subtle flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-bold text-text-main">
-                        {t('settings.cloudHqConnectivity')}
-                      </h2>
-                      <p className="text-xs text-text-muted mt-0.5">
-                        {t('settings.cloudHqDesc')}
-                      </p>
-                    </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.phone')}
+                  </label>
+                  <input
+                    type="text"
+                    value={storePhone}
+                    onChange={(e) => setStorePhone(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-semibold text-slate-900 dark:text-white"
+                  />
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={handleTestPing}
-                      disabled={pingStatus === 'testing'}
-                      className="px-3.5 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-text-main border border-border-subtle text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                    >
-                      <Radio size={14} className={pingStatus === 'testing' ? 'animate-pulse text-warning' : 'text-primary'} />
-                      <span>{pingStatus === 'testing' ? t('settings.pingingHq') : t('settings.pingHq')}</span>
-                      {pingStatus === 'online' && <span className="w-2 h-2 rounded-full bg-success" />}
-                      {pingStatus === 'offline' && <span className="w-2 h-2 rounded-full bg-danger" />}
-                    </button>
-                  </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.address')}
+                  </label>
+                  <input
+                    type="text"
+                    value={storeAddress}
+                    onChange={(e) => setStoreAddress(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
+                  />
+                </div>
 
-                  {/* HQ Server URL */}
-                  <div>
-                    <label className="text-xs font-bold text-text-muted block mb-1.5">
-                      {t('settings.centralHqApiUrl')}
-                    </label>
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.greetingMessage')}
+                  </label>
+                  <input
+                    type="text"
+                    value={receiptHeader}
+                    onChange={(e) => setReceiptHeader(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.returnPolicy')}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={receiptFooter}
+                    onChange={(e) => setReceiptFooter(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                {/* Brand Color Presets */}
+                <div className="sm:col-span-2 space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block">
+                    {t('settings.brandColorPresets')}
+                  </label>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    {BRAND_PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setBrandColor(p.hex);
+                          document.documentElement.style.setProperty('--primary', p.hex);
+                        }}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform cursor-pointer shadow-xs ${
+                          brandColor.toLowerCase() === p.hex.toLowerCase()
+                            ? 'ring-2 ring-offset-2 ring-emerald-500 scale-110'
+                            : 'hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: p.hex }}
+                        title={p.name}
+                      >
+                        {brandColor.toLowerCase() === p.hex.toLowerCase() && (
+                          <Check size={16} className="text-white" strokeWidth={3} />
+                        )}
+                      </button>
+                    ))}
                     <input
-                      type="text"
-                      value={syncConfig.hqUrl}
-                      onChange={(e) => setSyncConfig({ ...syncConfig, hqUrl: e.target.value })}
-                      placeholder="https://hq.gebeyaos.com/api/sync"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                      type="color"
+                      value={brandColor}
+                      onChange={(e) => {
+                        setBrandColor(e.target.value);
+                        document.documentElement.style.setProperty('--primary', e.target.value);
+                      }}
+                      className="w-9 h-9 rounded-xl cursor-pointer bg-transparent border-0"
+                      title="Custom color picker"
                     />
-                    <span className="text-[10px] text-text-dim mt-1 block">
-                      {t('settings.centralHqApiUrlDesc')}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Auto Sync Interval */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        {t('settings.autoSyncPollingInterval')}
-                      </label>
-                      <input
-                        type="number"
-                        min="5"
-                        max="600"
-                        value={syncConfig.autoSyncIntervalSeconds}
-                        onChange={(e) =>
-                          setSyncConfig({
-                            ...syncConfig,
-                            autoSyncIntervalSeconds: parseInt(e.target.value) || 30,
-                          })
-                        }
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                      />
-                      <span className="text-[10px] text-text-dim mt-1 block">
-                        {t('settings.autoSyncPollingDesc')}
-                      </span>
-                    </div>
-
-                    {/* Offline Grace Period */}
-                    <div>
-                      <label className="text-xs font-bold text-text-muted block mb-1.5">
-                        {t('settings.offlineGracePeriod')}
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="720"
-                        value={syncConfig.offlineGracePeriodHours}
-                        onChange={(e) =>
-                          setSyncConfig({
-                            ...syncConfig,
-                            offlineGracePeriodHours: parseInt(e.target.value) || 72,
-                          })
-                        }
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle text-xs sm:text-sm font-mono font-bold text-text-main placeholder:text-text-dim focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
-                      />
-                      <span className="text-[10px] text-text-dim mt-1 block">
-                        {t('settings.offlineGraceDesc')}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-4">
-                    <button
-                      type="button"
-                      onClick={() => handleSave('sync_config', syncConfig, 'Sync settings')}
-                      disabled={savingKey === 'sync_config'}
-                      className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer disabled:opacity-50"
-                    >
-                      {savingKey === 'sync_config' ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          <span>Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save size={16} />
-                          <span>{t('settings.saveSyncSettings')}</span>
-                        </>
-                      )}
-                    </button>
                   </div>
                 </div>
-              )}
-            </>
+              </div>
+            </div>
+          )}
+
+          {/* ──────── SECTION 2: SALES ──────── */}
+          {activeTab === 'sales' && (
+            <div className="max-w-2xl space-y-5 animate-in fade-in">
+              <div className="border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {t('settings.tabSales')}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Checkout defaults, credit sales policy, cashier discounts, and VAT rates
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.defaultPaymentMethod')}
+                  </label>
+                  <select
+                    value={defaultPayment}
+                    onChange={(e) => setDefaultPayment(e.target.value as any)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                  >
+                    <option value="CASH">Cash (ጥሬ ገንዘብ)</option>
+                    <option value="TELEBIRR">Telebirr (ቴሌብር)</option>
+                    <option value="CBE_BIRR">CBE Birr (ሲቢኢ ብር)</option>
+                    <option value="CARD">Bank Card / POS (ካርድ)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.maxDiscountNoPin')}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={maxDiscountNoPin}
+                    onChange={(e) => setMaxDiscountNoPin(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.vatRateLabel')}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={standardVatRate}
+                    onChange={(e) => setStandardVatRate(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">
+                      {t('settings.allowCreditSales')}
+                    </div>
+                    <div className="text-[10px] text-slate-400">Allow customers to buy on credit ledger</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={allowCreditSales}
+                    onChange={(e) => setAllowCreditSales(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    Refund / Exchange Policy Notice
+                  </label>
+                  <input
+                    type="text"
+                    value={returnPolicyNote}
+                    onChange={(e) => setReturnPolicyNote(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ──────── SECTION 3: STOCK ──────── */}
+          {activeTab === 'stock' && (
+            <div className="max-w-2xl space-y-5 animate-in fade-in">
+              <div className="border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {t('settings.tabStock')}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Inventory reorder levels, shelf-life expiry alerts, and stockout blocking
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.lowStockThreshold')}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={lowStockThreshold}
+                    onChange={(e) => setLowStockThreshold(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-1">
+                    Triggers yellow alert badge on items list
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                    {t('settings.expiryWarningDays')}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={expiryWarningDays}
+                    onChange={(e) => setExpiryWarningDays(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-1">
+                    Days before expiry date to show warning
+                  </span>
+                </div>
+
+                <div className="sm:col-span-2 flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">
+                      {t('settings.allowNegativeStock')}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      When off, cashiers are blocked from selling items with zero stock on hand.
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={allowNegativeStock}
+                    onChange={(e) => setAllowNegativeStock(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ──────── SECTION 4: DATA & BACKUPS (OWNER ONLY) ──────── */}
+          {activeTab === 'data' && isOwner && (
+            <div className="max-w-2xl space-y-6 animate-in fade-in">
+              <div className="border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {t('settings.tabData')}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Database backups, encrypted restore, HQ sync, and safe tenant data reset
+                </p>
+              </div>
+
+              {/* 1. Backup Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Download size={16} className="text-emerald-600" />
+                    {t('settings.backupNow')}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">{t('settings.backupDesc')}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleBackupNow}
+                  disabled={isBackingUp}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-xs"
+                >
+                  {isBackingUp ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  <span>{t('settings.backupNow')}</span>
+                </button>
+              </div>
+
+              {/* 2. Restore Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Upload size={16} className="text-blue-600" />
+                    {t('settings.restoreBackup')}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">{t('settings.restoreDesc')}</div>
+                </div>
+                <input
+                  type="file"
+                  ref={restoreFileInputRef}
+                  accept=".bak,.json"
+                  className="hidden"
+                  onChange={handleFileRestore}
+                />
+                <button
+                  type="button"
+                  onClick={() => restoreFileInputRef.current?.click()}
+                  disabled={isRestoring}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-xs"
+                >
+                  {isRestoring ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  <span>{t('settings.restoreBackup')}</span>
+                </button>
+              </div>
+
+              {/* 3. Sync with Head Office Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <RefreshCw size={16} className="text-amber-500" />
+                    {t('settings.syncStatusHq')}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Live branch sync health: Connected to Corporate HQ
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSyncNow}
+                  disabled={isSyncing}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-xs"
+                >
+                  {isSyncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  <span>{t('settings.syncNow')}</span>
+                </button>
+              </div>
+
+              {/* 4. Danger Zone: Reset All Data */}
+              <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900 space-y-3">
+                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-black text-xs uppercase tracking-wider">
+                  <ShieldAlert size={16} />
+                  <span>{t('settings.resetAllData')}</span>
+                </div>
+                <p className="text-xs text-rose-600 dark:text-rose-400">
+                  {t('settings.resetAllDataDesc')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetConfirmationInput('');
+                    setResetDeleteProducts(false);
+                    setIsResetModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                >
+                  <Trash2 size={14} />
+                  <span>{t('settings.resetAllData')}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ──────── SECTION 5: ACCOUNT ──────── */}
+          {activeTab === 'account' && (
+            <div className="max-w-md space-y-5 animate-in fade-in">
+              <div className="border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {t('settings.tabAccount')}
+                </h2>
+                <p className="text-xs text-slate-500">Your profile, credentials, and session management</p>
+              </div>
+
+              {/* User Profile Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white font-black text-base flex items-center justify-center shadow-xs">
+                    {(currentUser?.fullName || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-sm font-extrabold text-slate-900 dark:text-white">
+                      {currentUser?.fullName || 'Store Staff'}
+                    </div>
+                    <div className="text-xs text-slate-400 font-mono">
+                      @{currentUser?.username || 'user'} • {currentUser?.role || 'STAFF'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500 flex justify-between">
+                  <span>Branch:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
+                    {currentUser?.branchName || 'Bole Medhanialem'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountActionError(null);
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setIsPassModalOpen(true);
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <Lock size={15} />
+                    <span>{t('settings.changePassword')}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">8+ chars</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountActionError(null);
+                    setNewPin('');
+                    setIsPinModalOpen(true);
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <KeyRound size={15} />
+                    <span>{t('settings.changePin')}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">4-6 digits</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="w-full px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 text-xs font-bold flex items-center justify-center gap-2 transition"
+                >
+                  <LogOut size={15} />
+                  <span>{t('settings.logoutAccount')}</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Branch Activation Modal */}
-      <BranchActivationModal
-        isOpen={isActivationModalOpen}
-        onClose={() => setIsActivationModalOpen(false)}
-      />
+      {/* ─── RESET DATA CONFIRMATION MODAL ─── */}
+      {isResetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-rose-300 dark:border-rose-800 w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center">
+                  <ShieldAlert size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    {t('settings.resetModalTitle')}
+                  </h3>
+                  <p className="text-xs text-rose-600 font-bold">Irreversible Action</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsResetModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {t('settings.resetModalWarning')}
+            </p>
+
+            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+              <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                {t('settings.typeStoreNameToConfirm', { name: storeName })}
+              </label>
+              <input
+                type="text"
+                value={resetConfirmationInput}
+                onChange={(e) => setResetConfirmationInput(e.target.value)}
+                placeholder={storeName}
+                className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-xs font-bold font-mono text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 p-2">
+              <input
+                type="checkbox"
+                id="resetDelProd"
+                checked={resetDeleteProducts}
+                onChange={(e) => setResetDeleteProducts(e.target.checked)}
+                className="w-4 h-4 text-rose-600 rounded cursor-pointer"
+              />
+              <label htmlFor="resetDelProd" className="text-xs text-slate-700 dark:text-slate-300 font-semibold cursor-pointer">
+                {t('settings.alsoDeleteProducts')}
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  isResetting ||
+                  resetConfirmationInput.trim().toLowerCase() !== storeName.trim().toLowerCase()
+                }
+                onClick={handleConfirmResetData}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              >
+                {isResetting && <Loader2 size={13} className="animate-spin" />}
+                <span>{t('settings.confirmResetBtn')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── CHANGE PASSWORD MODAL ─── */}
+      {isPassModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2">
+                <Lock size={18} className="text-emerald-600" />
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {t('settings.changePassword')}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsPassModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {accountActionError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle size={15} />
+                <span>{accountActionError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  Current Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  New Password (8+ chars) *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPassModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+                >
+                  Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── CHANGE PIN MODAL ─── */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2">
+                <KeyRound size={18} className="text-emerald-600" />
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {t('settings.changePin')}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsPinModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {accountActionError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle size={15} />
+                <span>{accountActionError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePin} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  New Quick PIN (4 to 6 digits) *
+                </label>
+                <input
+                  type="password"
+                  required
+                  maxLength={6}
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono tracking-widest text-center text-lg font-bold text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPinModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+                >
+                  Save PIN
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

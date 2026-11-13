@@ -87,6 +87,17 @@ export class SystemController {
     return this.systemService.restoreBackup(dto, userIdHeader);
   }
 
+  @Post('reset-data')
+  @HttpCode(HttpStatus.OK)
+  async resetTenantData(
+    @Body() dto: { confirmationTenantName: string; deleteProducts?: boolean },
+    @Headers('x-tenant-id') tenantIdHeader?: string,
+    @Headers('x-user-id') userIdHeader?: string,
+  ) {
+    const tenantId = tenantIdHeader || '01900000-0000-7000-8000-000000000001';
+    return this.systemService.resetTenantData(tenantId, dto.deleteProducts, userIdHeader);
+  }
+
   @Get('terminals')
   async listTerminals(@Headers('x-branch-id') branchIdHeader?: string) {
     return this.systemService.listTerminals(branchIdHeader);
