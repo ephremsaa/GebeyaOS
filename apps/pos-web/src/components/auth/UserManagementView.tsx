@@ -153,7 +153,7 @@ export const GRANULAR_PERMISSIONS_LIST: GranularPermissionDef[] = [
 ];
 
 export const UserManagementView: React.FC = () => {
-  const { hasPermission } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
   const { t, language } = useI18n();
 
   // Active top-level tab: 'staff' | 'roles' | 'audit'
@@ -171,6 +171,36 @@ export const UserManagementView: React.FC = () => {
   // Feedback notifications
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [copiedPin, setCopiedPin] = useState(false);
+
+  const handleCopyPin = (pin: string) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(pin);
+    }
+    setCopiedPin(true);
+    setTimeout(() => setCopiedPin(false), 2000);
+  };
+
+  const handleOpenAddModal = () => {
+    const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+    setNewPin(randomPin);
+    setNewFullName('');
+    setNewPhone('+251 9');
+    setNewUsername('');
+    setNewEmail('');
+    setNewRole('CASHIER');
+    setNewBranchCode(currentUser?.branchCode || 'BOLE-01');
+    setNewInitialPass('Gebeya@2026');
+    setForcePassChange(true);
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenResetPin = (user: StaffUser) => {
+    setSelectedUserForModal(user);
+    const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+    setResetPinValue(randomPin);
+    setIsResetPinModalOpen(true);
+  };
 
   // Modals & Drawer State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -365,9 +395,14 @@ export const UserManagementView: React.FC = () => {
       return;
     }
 
+    const createdPin = newPin;
     setIsAddModalOpen(false);
-    setSuccessMsg(t('staff.staffCreatedSuccess'));
-    setTimeout(() => setSuccessMsg(null), 4000);
+    setSuccessMsg(
+      language === 'am'
+        ? `ሰራተኛው በተሳካ ሁኔታ ተመዝግቧል! የመግቢያ ፒን (PIN): ${createdPin} (አንድ ጊዜ ብቻ የሚታይ)`
+        : `Staff created! Initial PIN: ${createdPin} (Shown once - give to employee).`
+    );
+    setTimeout(() => setSuccessMsg(null), 8000);
 
     // Reset inputs for next quick staff creation
     setNewFullName('');
@@ -375,7 +410,7 @@ export const UserManagementView: React.FC = () => {
     setNewUsername('');
     setNewEmail('');
     setNewRole('CASHIER');
-    setNewPin('1234');
+    setNewPin('');
     setNewInitialPass('Gebeya@2026');
   };
 
@@ -878,7 +913,7 @@ export const UserManagementView: React.FC = () => {
           {/* Add Staff Button (< 1 Minute UX) */}
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-soft transition-all duration-150 active:scale-98 cursor-pointer"
             title={t('staff.quickAddTooltip')}
           >
@@ -1166,11 +1201,7 @@ export const UserManagementView: React.FC = () => {
                             {/* Reset PIN */}
                             <button
                               type="button"
-                              onClick={() => {
-                                setSelectedUserForModal(user);
-                                setResetPinValue('1234');
-                                setIsResetPinModalOpen(true);
-                              }}
+                              onClick={() => handleOpenResetPin(user)}
                               className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors cursor-pointer"
                               title={t('staff.resetPinTooltip')}
                             >
@@ -1812,11 +1843,18 @@ export const UserManagementView: React.FC = () => {
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value)}
                   >
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.name}>
-                        {r.name} {r.isSystem ? '' : '(Custom)'}
-                      </option>
-                    ))}
+                    {roles
+                      .filter((r) => {
+                        if (currentUser?.role === 'BRANCH_MANAGER') {
+                          return !['OWNER', 'BRANCH_MANAGER', 'HQ_ADMIN'].includes(r.name.toUpperCase());
+                        }
+                        return true;
+                      })
+                      .map((r) => (
+                        <option key={r.id} value={r.name}>
+                          {r.name} {r.isSystem ? '' : '(Custom)'}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -1827,24 +1865,38 @@ export const UserManagementView: React.FC = () => {
                     className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main focus:outline-none focus:border-primary transition-colors cursor-pointer"
                     value={newBranchCode}
                     onChange={(e) => setNewBranchCode(e.target.value)}
+                    disabled={currentUser?.role === 'BRANCH_MANAGER'}
                   >
                     <option value="BOLE-01">BOLE-01 — Bole Medhanialem</option>
                     <option value="HQ-MAIN">HQ-MAIN — Corporate Headquarters</option>
                   </select>
                 </div>
 
-                {/* 5. Terminal Quick PIN (4-6 digits) */}
+                {/* 5. Terminal Quick PIN (Auto-generated 4 digits, shown once) */}
                 <div>
-                  <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.pinLabel')}</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-text-muted block">{t('staff.pinLabel')}</label>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPin(newPin)}
+                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedPin ? <Check size={12} /> : null}
+                      {copiedPin ? 'Copied!' : 'Copy PIN'}
+                    </button>
+                  </div>
                   <input
-                    type="password"
+                    type="text"
                     required
                     maxLength={6}
-                    placeholder="4-6 digits"
+                    placeholder="4 digits"
                     className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle font-mono tracking-widest text-center font-bold text-base text-text-main focus:outline-none focus:border-primary transition-colors"
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
                   />
+                  <p className="text-[10px] text-text-muted mt-1">
+                    Auto-generated 4-digit PIN. Give this to employee (shown once).
+                  </p>
                 </div>
 
                 {/* Username */}
@@ -2084,15 +2136,28 @@ export const UserManagementView: React.FC = () => {
 
             <form onSubmit={handleAdminResetPin} className="flex flex-col gap-3">
               <div>
-                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.quickPinInputLabel')}</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-text-muted">{t('staff.quickPinInputLabel')}</label>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPin(resetPinValue)}
+                    className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedPin ? <Check size={12} /> : null}
+                    {copiedPin ? 'Copied!' : 'Copy PIN'}
+                  </button>
+                </div>
                 <input
-                  type="password"
+                  type="text"
                   required
                   maxLength={6}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle font-mono tracking-widest text-center text-xl font-bold text-text-main focus:outline-none focus:border-primary transition-colors"
                   value={resetPinValue}
                   onChange={(e) => setResetPinValue(e.target.value.replace(/\D/g, ''))}
                 />
+                <p className="text-[10px] text-text-muted mt-1">
+                  New auto-generated 4-digit PIN. Give this to the employee.
+                </p>
               </div>
 
               <div className="flex gap-2.5 mt-2">
