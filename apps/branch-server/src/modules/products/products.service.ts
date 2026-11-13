@@ -437,7 +437,8 @@ export class ProductsService {
         c.name_en as category_name,
         c.name_am as category_name_am,
         COALESCE(SUM(l.quantity_change), 0) as stock_on_hand,
-        COALESCE(ARRAY_AGG(DISTINCT b.barcode) FILTER (WHERE b.barcode IS NOT NULL), '{}') as barcodes
+        COALESCE(ARRAY_AGG(DISTINCT b.barcode) FILTER (WHERE b.barcode IS NOT NULL), '{}') as barcodes,
+        (SELECT MIN(bt.expiry_date) FROM batches bt WHERE bt.product_id = p.id AND bt.current_quantity > 0) as nearest_expiry
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN stock_ledger l ON p.id = l.product_id AND l.branch_id = $1

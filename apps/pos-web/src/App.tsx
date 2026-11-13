@@ -19,7 +19,7 @@ import { RegisterApplicationPage } from './components/auth/RegisterApplicationPa
 // ── The 7 pages ──
 import { PosCheckout } from './components/PosCheckout';        // Sales (checkout + day control)
 import { ProductCatalogView } from './components/catalog/ProductCatalogView'; // Items
-import { InventoryView } from './components/InventoryView';     // Stock & Expiry (wrapper TBD in Step 4)
+import { StockAndExpiryView } from './components/StockAndExpiryView'; // Stock & Expiry
 import { PurchasingView } from './components/PurchasingView';  // Suppliers (wrapper TBD in Step 5)
 import { ReportsView } from './components/ReportsView';        // Reports
 import { UserManagementView } from './components/auth/UserManagementView'; // Staff
@@ -237,8 +237,8 @@ const MainApp: React.FC = () => {
           {/* PAGE 2 — Items (catalog: products + categories) */}
           {activeTab === 'items' && <ProductCatalogView />}
 
-          {/* PAGE 3 — Stock & Expiry (full wrapper added in Step 4; InventoryView used now) */}
-          {activeTab === 'stock' && <InventoryView />}
+          {/* PAGE 3 — Stock & Expiry */}
+          {activeTab === 'stock' && <StockAndExpiryView />}
 
           {/* PAGE 4 — Suppliers (wrapper added in Step 5; PurchasingView used now) */}
           {activeTab === 'suppliers' && <PurchasingView />}
