@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Scale, AlertTriangle, RefreshCw, Layers, PackageX } from 'lucide-react';
+import { Scale, AlertTriangle, RefreshCw, Layers, PackageX, Sun } from 'lucide-react';
 import {
   BarcodeParser,
   round2,
@@ -15,7 +15,7 @@ import { BasketPanel } from './BasketPanel';
 import { WeightModal } from './WeightModal';
 import { PaymentModal, CompleteSaleDetails } from './PaymentModal';
 import { ReceiptModal } from './ReceiptModal';
-import { OpenShiftModal } from './checkout/OpenShiftModal';
+import { DayControlBar } from './DayControlBar';
 import { DiscountModal } from './checkout/DiscountModal';
 import { HeldBasketsDrawer } from './checkout/HeldBasketsDrawer';
 import { RefundModal } from './checkout/RefundModal';
@@ -49,10 +49,10 @@ export const PosCheckout: React.FC = () => {
     terminalId,
     terminalCode,
     branchId,
-    openShift,
   } = useShift();
   const cashierId = currentUser?.id || '01a19309-1e78-7e91-a0a7-56edac4beb90';
   const userRole = currentUser?.role || 'CASHIER';
+  const [isStartDayRequested, setIsStartDayRequested] = useState<boolean>(false);
 
   // State: Cart & Held Baskets
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -130,6 +130,10 @@ export const PosCheckout: React.FC = () => {
         searchInputRef.current?.focus();
       } else if (e.key === 'F4') {
         e.preventDefault();
+        if (!isShiftOpen) {
+          setIsStartDayRequested(true);
+          return;
+        }
         if (cart.length > 0 && !isPaymentOpen) {
           setIsPaymentOpen(true);
         }
@@ -148,6 +152,10 @@ export const PosCheckout: React.FC = () => {
 
   // Add Item to Cart with sound and visual feedback
   const addToCart = (product: PosCatalogItem, quantity: number = 1, scaleWeightGrams?: number) => {
+    if (!isShiftOpen) {
+      setIsStartDayRequested(true);
+      return;
+    }
     playScanBeep();
     setRecentlyAddedId(product.id);
     setTimeout(() => setRecentlyAddedId(null), 300);
@@ -207,6 +215,10 @@ export const PosCheckout: React.FC = () => {
   };
 
   const handleProductCardClick = (product: PosCatalogItem) => {
+    if (!isShiftOpen) {
+      setIsStartDayRequested(true);
+      return;
+    }
     if (product.stockOnHand <= 0) return;
 
     if (product.isWeighed) {
@@ -219,6 +231,11 @@ export const PosCheckout: React.FC = () => {
   const handleBarcodeSubmit = () => {
     const code = searchQuery.trim();
     if (!code) return;
+
+    if (!isShiftOpen) {
+      setIsStartDayRequested(true);
+      return;
+    }
 
     // Check for EAN-13 scale or price barcode (prefix 20, 02, 21)
     if (code.startsWith('20') || code.startsWith('02') || code.startsWith('21')) {
@@ -398,13 +415,6 @@ export const PosCheckout: React.FC = () => {
     }
   };
 
-  // Open Shift Handler
-  const handleOpenShift = async (openingCashFloat: number, notes?: string) => {
-    const res = await openShift(openingCashFloat, notes);
-    if (!res.success) {
-      alert(res.error || 'Failed to open shift');
-    }
-  };
 
   // Discount Handlers
   const handleOpenLineDiscount = (index: number) => {
@@ -551,10 +561,43 @@ export const PosCheckout: React.FC = () => {
   const finalCartTotal = Math.max(0, round2(cartGross - (basketDiscount?.amount || 0)));
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden bg-page text-text-main relative">
-      {/* 1. Left (flexible): Search field 52px, Category pills 44px, Product Grid */}
-      <div className="flex-1 flex flex-col p-6 overflow-hidden min-w-0">
-        {/* Search Field (52px high, search icon, F2 hint, clear button) */}
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-page text-text-main relative">
+      {/* Sales Header: Day Control Strip (Start Day / End Day / 24h warning) */}
+      <DayControlBar
+        onDayStarted={refreshCatalog}
+        openStartRequested={isStartDayRequested}
+        onStartRequestedHandled={() => setIsStartDayRequested(false)}
+      />
+
+      {/* Main Workspace (Left Products + Right Basket) */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* 1. Left (flexible): Search field 52px, Category pills 44px, Product Grid */}
+        <div className="flex-1 flex flex-col p-6 overflow-hidden min-w-0">
+          {/* Friendly Start your day banner if shift is not started */}
+          {!isShiftOpen && !isLoadingShift && (
+            <div className="mb-4 p-4 rounded-2xl bg-primary-soft/30 border border-primary/25 flex items-center justify-between shadow-soft flex-shrink-0 animate-in fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0">
+                  <Sun size={20} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-text-main">{t('checkout.startDayCardTitle')}</h4>
+                  <p className="text-xs text-text-muted mt-0.5">{t('checkout.startDayCardDesc')}</p>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setIsStartDayRequested(true)}
+                className="font-bold shrink-0"
+              >
+                <Sun size={15} className="mr-1.5" />
+                {t('checkout.startDay')}
+              </Button>
+            </div>
+          )}
+
+          {/* Search Field (52px high, search icon, F2 hint, clear button) */}
         <div className="mb-3.5 flex-shrink-0 flex items-center gap-3">
           <div className="flex-1">
             <SearchInput
@@ -714,12 +757,19 @@ export const PosCheckout: React.FC = () => {
         hasHeldBasket={heldBaskets.length > 0}
         heldBasketsCount={heldBaskets.length}
         onOpenHeldBaskets={() => setIsHeldDrawerOpen(true)}
-        onOpenPayment={() => setIsPaymentOpen(true)}
+        onOpenPayment={() => {
+          if (!isShiftOpen) {
+            setIsStartDayRequested(true);
+            return;
+          }
+          setIsPaymentOpen(true);
+        }}
         onOpenLineDiscount={handleOpenLineDiscount}
         onOpenBasketDiscount={handleOpenBasketDiscount}
         onOpenRefund={() => setIsRefundModalOpen(true)}
         basketDiscount={basketDiscount}
       />
+      </div>
 
       {/* 3. Weight Entry Modal for scale items */}
       <WeightModal
@@ -759,14 +809,6 @@ export const PosCheckout: React.FC = () => {
           onReprint={handleReprintReceipt}
         />
       )}
-
-      {/* 6. Shift Gate Modal (blocks terminal until shift opened) */}
-      <OpenShiftModal
-        isOpen={!isLoadingShift && !isShiftOpen}
-        onOpenShift={handleOpenShift}
-        cashierName={currentUser?.fullName || 'Cashier'}
-        terminalCode={terminalCode}
-      />
 
       {/* 7. Line & Basket Discount Modal */}
       <DiscountModal

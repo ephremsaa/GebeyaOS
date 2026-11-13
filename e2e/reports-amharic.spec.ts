@@ -81,3 +81,4 @@ test.describe('Reports Page Complete Amharic & English Localization', () => {
     await expect(page.locator('text=Overview & Payment Mix').first()).toBeVisible();
   });
 });
+

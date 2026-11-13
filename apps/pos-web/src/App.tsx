@@ -85,6 +85,14 @@ const MainApp: React.FC = () => {
       setIsRegisterRoute(
         window.location.hash === '#register' || window.location.pathname.startsWith('/register'),
       );
+      const hashTab = resolveHashTab();
+      if (hashTab) {
+        const resolved = LEGACY_REDIRECT[hashTab] ?? hashTab;
+        setActiveTabRaw(resolved);
+        if (window.location.hash !== '#' + resolved) {
+          window.location.hash = resolved;
+        }
+      }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -106,8 +114,13 @@ const MainApp: React.FC = () => {
     if (hashTab) {
       const resolved = LEGACY_REDIRECT[hashTab] ?? hashTab;
       setActiveTabRaw(resolved);
+      if (window.location.hash !== '#' + resolved) {
+        window.location.hash = resolved;
+      }
     } else if (currentUser?.role) {
-      setActiveTabRaw(defaultTabForRole(currentUser.role));
+      const def = defaultTabForRole(currentUser.role);
+      setActiveTabRaw(def);
+      window.location.hash = def;
     }
   }, [currentUser?.role]);
 
