@@ -42,7 +42,21 @@ const calculateTaxInclusiveLineVat = (gross: number, isVat: boolean): number =>
 
 @Injectable()
 export class PosService {
-  private readonly logger = new Logger(PosService.name);
+  private mapShift(shift: any): ShiftResponseDto {
+    return {
+      id: shift.id,
+      branchId: shift.branch_id,
+      terminalId: shift.terminal_id,
+      cashierId: shift.cashier_id,
+      shiftNumber: shift.shift_number,
+      openingCashFloat: parseFloat(shift.opening_cash_float || '0'),
+      expectedCashSystem: parseFloat(shift.expected_cash_system || '0'),
+      status: shift.status,
+      notes: shift.notes,
+      openedAt: shift.opened_at instanceof Date ? shift.opened_at.toISOString() : shift.opened_at,
+      createdAt: shift.created_at instanceof Date ? shift.created_at.toISOString() : shift.created_at,
+    };
+  }
 
   constructor(
     private readonly db: DatabaseService,
@@ -102,6 +116,13 @@ export class PosService {
       );
 
       if (activeCheck.rows.length > 0) {
+        const existingRes = await client.query<ShiftRow>(
+          `SELECT * FROM shifts WHERE id = $1`,
+          [activeCheck.rows[0].id],
+        );
+        if (existingRes.rows.length > 0) {
+          return this.mapShift(existingRes.rows[0]);
+        }
         throw new BadRequestException(
           `Terminal ${dto.terminalId} already has an active open shift (${activeCheck.rows[0].id})`,
         );

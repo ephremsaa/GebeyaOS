@@ -23,6 +23,9 @@ import {
   Palette,
   Check,
   Percent,
+  Plus,
+  Clock,
+  Camera,
   Calendar,
   AlertCircle,
   X,
@@ -76,8 +79,19 @@ export const SettingsView: React.FC = () => {
 
   // ─── 3. Stock Section State ───
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
-  const [expiryWarningDays, setExpiryWarningDays] = useState(30);
+  const [expiryWarningValue, setExpiryWarningValue] = useState(3);
+  const [expiryWarningUnit, setExpiryWarningUnit] = useState<'days' | 'months'>('months');
+  const [expiryWarningDays, setExpiryWarningDays] = useState(90);
+  const [expiryStep30Days, setExpiryStep30Days] = useState(true);
+  const [expiryStep7Days, setExpiryStep7Days] = useState(true);
+  const [categoryOverrides, setCategoryOverrides] = useState<Array<{ categoryId: string; categoryName: string; days: number }>>([]);
+  const [newOverrideCatId, setNewOverrideCatId] = useState('');
+  const [newOverrideDays, setNewOverrideDays] = useState(14);
+  const [emailSummaryEnabled, setEmailSummaryEnabled] = useState(false);
+  const [smsSummaryEnabled, setSmsSummaryEnabled] = useState(false);
   const [allowNegativeStock, setAllowNegativeStock] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<Array<{ id: string; name_en: string; name_am?: string }>>([]);
+  const [photoStorageFormatted, setPhotoStorageFormatted] = useState('0.00 KB');
 
   // ─── 4. Data Section State ───
   const [isSyncing, setIsSyncing] = useState(false);
@@ -122,6 +136,27 @@ export const SettingsView: React.FC = () => {
         }
         if (data.receipt_config?.headerText) setReceiptHeader(data.receipt_config.headerText);
         if (data.receipt_config?.footerText) setReceiptFooter(data.receipt_config.footerText);
+
+        if (data.stock_config) {
+          if (data.stock_config.lowStockThreshold) setLowStockThreshold(data.stock_config.lowStockThreshold);
+          if (data.stock_config.expiryWarningDays) {
+            const rawDays = Number(data.stock_config.expiryWarningDays);
+            setExpiryWarningDays(rawDays);
+            if (data.stock_config.expiryWarningUnit === 'days') {
+              setExpiryWarningValue(rawDays);
+              setExpiryWarningUnit('days');
+            } else {
+              setExpiryWarningValue(Math.round(rawDays / 30) || 3);
+              setExpiryWarningUnit('months');
+            }
+          }
+          if (data.stock_config.expiryStep30Days !== undefined) setExpiryStep30Days(data.stock_config.expiryStep30Days);
+          if (data.stock_config.expiryStep7Days !== undefined) setExpiryStep7Days(data.stock_config.expiryStep7Days);
+          if (Array.isArray(data.stock_config.categoryOverrides)) setCategoryOverrides(data.stock_config.categoryOverrides);
+          if (data.stock_config.emailSummaryEnabled !== undefined) setEmailSummaryEnabled(data.stock_config.emailSummaryEnabled);
+          if (data.stock_config.smsSummaryEnabled !== undefined) setSmsSummaryEnabled(data.stock_config.smsSummaryEnabled);
+          if (data.stock_config.allowNegativeStock !== undefined) setAllowNegativeStock(data.stock_config.allowNegativeStock);
+        }
       }
     } catch {
       // fallback to initial state
@@ -129,6 +164,22 @@ export const SettingsView: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetch('/api/products/categories')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((cats) => {
+        if (Array.isArray(cats)) setAvailableCategories(cats);
+      })
+      .catch(() => {});
+
+    fetch('/api/media/storage-stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((stats) => {
+        if (stats?.formatted) setPhotoStorageFormatted(stats.formatted);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSaveSettings = async (section: string) => {
     setIsSaving(true);
@@ -158,7 +209,14 @@ export const SettingsView: React.FC = () => {
         },
         stock_config: {
           lowStockThreshold,
-          expiryWarningDays,
+          expiryWarningDays: expiryWarningUnit === 'months' ? expiryWarningValue * 30 : expiryWarningValue,
+          expiryWarningUnit,
+          expiryWarningValue,
+          expiryStep30Days,
+          expiryStep7Days,
+          categoryOverrides,
+          emailSummaryEnabled,
+          smsSummaryEnabled,
           allowNegativeStock,
         },
       };
@@ -182,6 +240,22 @@ export const SettingsView: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleAddCategoryOverride = () => {
+    if (!newOverrideCatId) return;
+    const cat = availableCategories.find((c) => c.id === newOverrideCatId);
+    const catName = (language === 'am' && cat?.name_am) || cat?.name_en || 'Category';
+    const filtered = categoryOverrides.filter((c) => c.categoryId !== newOverrideCatId);
+    setCategoryOverrides([
+      ...filtered,
+      { categoryId: newOverrideCatId, categoryName: catName, days: Number(newOverrideDays) || 14 },
+    ]);
+    setNewOverrideCatId('');
+  };
+
+  const handleRemoveCategoryOverride = (catId: string) => {
+    setCategoryOverrides(categoryOverrides.filter((c) => c.categoryId !== catId));
   };
 
   // ─── Data: Backup Now Handler ───
@@ -858,18 +932,20 @@ export const SettingsView: React.FC = () => {
             </div>
           )}
 
-          {/* ──────── SECTION 3: STOCK ──────── */}
+          {/* ──────── SECTION 3: STOCK & EXPIRY ALERTS ──────── */}
           {activeTab === 'stock' && (
-            <div className="max-w-2xl space-y-5 animate-in fade-in">
+            <div className="max-w-2xl space-y-6 animate-in fade-in">
               <div className="border-b border-slate-200 dark:border-slate-700 pb-3">
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
-                  {t('settings.tabStock')}
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Layers size={18} className="text-emerald-600" />
+                  <span>{t('settings.tabStock')}</span>
                 </h2>
                 <p className="text-xs text-slate-500">
                   Inventory reorder levels, shelf-life expiry alerts, and stockout blocking
                 </p>
               </div>
 
+              {/* 1. Low Stock & Negative Stock Controls */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
@@ -887,29 +963,13 @@ export const SettingsView: React.FC = () => {
                   </span>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    {t('settings.expiryWarningDays')}
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={expiryWarningDays}
-                    onChange={(e) => setExpiryWarningDays(Number(e.target.value))}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
-                  />
-                  <span className="text-[10px] text-slate-400 block mt-1">
-                    Days before expiry date to show warning
-                  </span>
-                </div>
-
-                <div className="sm:col-span-2 flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
                   <div>
                     <div className="text-xs font-bold text-slate-900 dark:text-white">
                       {t('settings.allowNegativeStock')}
                     </div>
                     <div className="text-[10px] text-slate-400">
-                      When off, cashiers are blocked from selling items with zero stock on hand.
+                      When off, sales with 0 stock are blocked.
                     </div>
                   </div>
                   <input
@@ -918,6 +978,202 @@ export const SettingsView: React.FC = () => {
                     onChange={(e) => setAllowNegativeStock(e.target.checked)}
                     className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
                   />
+                </div>
+              </div>
+
+              {/* 2. Expiry Alerts Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 space-y-4">
+                <div className="border-b border-slate-200 dark:border-slate-700/60 pb-3">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                    <Calendar size={16} className="text-amber-600" />
+                    <span>{t('settings.expiryAlertsTitle')}</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {t('settings.expiryAlertsDesc')}
+                  </p>
+                </div>
+
+                {/* Primary Threshold: default 3 months (90 days) with Days/Months switch */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    {t('settings.startWarningBeforeExpiry')} *
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={3650}
+                      value={expiryWarningValue}
+                      onChange={(e) => {
+                        const val = Math.max(1, Number(e.target.value));
+                        setExpiryWarningValue(val);
+                        setExpiryWarningDays(expiryWarningUnit === 'months' ? val * 30 : val);
+                      }}
+                      className="w-32 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                    />
+                    <select
+                      value={expiryWarningUnit}
+                      onChange={(e) => {
+                        const unit = e.target.value as 'days' | 'months';
+                        setExpiryWarningUnit(unit);
+                        setExpiryWarningDays(unit === 'months' ? expiryWarningValue * 30 : expiryWarningValue);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white cursor-pointer"
+                    >
+                      <option value="months">{t('settings.expiryWarningUnitMonths')} (30d/mo)</option>
+                      <option value="days">{t('settings.expiryWarningUnitDays')}</option>
+                    </select>
+                    <span className="text-[11px] font-medium text-slate-400">
+                      = {expiryWarningUnit === 'months' ? expiryWarningValue * 30 : expiryWarningValue} {t('settings.expiryWarningUnitDays').toLowerCase()}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-800 dark:bg-yellow-950/70 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-800">
+                      <Clock size={11} />
+                      Yellow Alert Stage: {expiryWarningUnit === 'months' ? `${expiryWarningValue} months` : `${expiryWarningValue} days`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Intermediate Warning Steps */}
+                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                    {t('settings.extraAlertSteps')}
+                  </label>
+                  <label className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={expiryStep30Days}
+                      onChange={(e) => setExpiryStep30Days(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                    />
+                    <span className="font-medium">{t('settings.step30Days')}</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={expiryStep7Days}
+                      onChange={(e) => setExpiryStep7Days(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                    />
+                    <span className="font-medium">{t('settings.step7Days')}</span>
+                  </label>
+                </div>
+
+                {/* Per-Category Overrides */}
+                <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                      {t('settings.categoryOverrides')}
+                    </label>
+                    <p className="text-[10px] text-slate-400">
+                      {t('settings.categoryOverridesDesc')}
+                    </p>
+                  </div>
+
+                  {categoryOverrides.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {categoryOverrides.map((ov) => (
+                        <div
+                          key={ov.categoryId}
+                          className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs"
+                        >
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {ov.categoryName}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                              {ov.days} {t('settings.expiryWarningUnitDays').toLowerCase()}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCategoryOverride(ov.categoryId)}
+                              className="text-slate-400 hover:text-rose-600 transition"
+                              title={t('settings.removeOverride')}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic">
+                      {t('settings.noCategoryOverrides')}
+                    </p>
+                  )}
+
+                  {/* Add Category Override Row */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <select
+                      value={newOverrideCatId}
+                      onChange={(e) => setNewOverrideCatId(e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white"
+                    >
+                      <option value="">{t('settings.selectCategory')}</option>
+                      {availableCategories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {language === 'am' && c.name_am ? c.name_am : c.name_en}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        value={newOverrideDays}
+                        onChange={(e) => setNewOverrideDays(Number(e.target.value))}
+                        className="w-20 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                        placeholder="Days"
+                      />
+                      <span className="text-[10px] text-slate-400">d</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddCategoryOverride}
+                      disabled={!newOverrideCatId}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1 transition"
+                    >
+                      <Plus size={13} />
+                      <span>{t('settings.addCategoryOverride')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Owner Daily Summary Alert */}
+                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                      {t('settings.dailySummaryAlert')}
+                    </label>
+                    <p className="text-[10px] text-slate-400">
+                      {t('settings.dailySummaryAlertDesc')}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={emailSummaryEnabled}
+                        onChange={(e) => setEmailSummaryEnabled(e.target.checked)}
+                        className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                      />
+                      <span>{t('settings.enableEmailSummary')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={smsSummaryEnabled}
+                        onChange={(e) => setSmsSummaryEnabled(e.target.checked)}
+                        className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                      />
+                      <span>{t('settings.enableSmsSummary')}</span>
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-slate-400 italic">
+                    {t('settings.dailySummaryDisabledNote')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1004,7 +1260,21 @@ export const SettingsView: React.FC = () => {
                 </button>
               </div>
 
-              {/* 4. Danger Zone: Reset All Data */}
+              {/* 4. Product Photo Storage Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Camera size={16} className="text-purple-600" />
+                    <span>{t('settings.photoStorageUsed')}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">{t('settings.photoStorageDesc')}</div>
+                </div>
+                <div className="px-3.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-mono text-xs font-bold shrink-0">
+                  {photoStorageFormatted || '0.00 KB'}
+                </div>
+              </div>
+
+              {/* 5. Danger Zone: Reset All Data */}
               <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900 space-y-3">
                 <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-black text-xs uppercase tracking-wider">
                   <ShieldAlert size={16} />

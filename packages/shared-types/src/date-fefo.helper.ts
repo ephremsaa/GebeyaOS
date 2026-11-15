@@ -9,18 +9,43 @@
  *  - Expiring today = daysLeft === 0.
  */
 
-export type ExpiryTier = 'EXPIRED' | 'TODAY' | 'CRITICAL' | 'WARNING' | 'GOOD' | 'NO_EXPIRY';
+export type ExpiryTier =
+  | 'EXPIRED'
+  | 'TODAY'
+  | 'CRITICAL'
+  | 'WARNING'
+  | 'ALERT_90D'
+  | 'GOOD'
+  | 'NO_EXPIRY';
+
+export type ExpiryStage = 'EXPIRED' | '7D' | '30D' | '90D' | 'OK' | 'NO_EXPIRY';
 
 export interface ExpiryStatusDetails {
   tier: ExpiryTier;
+  stage: ExpiryStage;
   daysLeft: number | null;
   badgeColor: 'red' | 'orange' | 'yellow' | 'green' | 'slate';
   badgeClass: string;
   labelEn: string;
   labelAm: string;
+  statusBadgeEn: string;
+  statusBadgeAm: string;
+  daysTextEn: string;
+  daysTextAm: string;
   iconName: 'AlertOctagon' | 'Clock' | 'AlertTriangle' | 'Calendar' | 'CheckCircle2' | 'HelpCircle';
   isExpired: boolean;
   isUrgent: boolean;
+}
+
+export interface ExpiryAlertSettings {
+  startWarningDays: number;
+  warningUnit: 'days' | 'months';
+  step30Days: boolean;
+  step7Days: boolean;
+  categoryOverrides?: Record<string, number>;
+  productOverrides?: Record<string, number>;
+  emailSummaryEnabled?: boolean;
+  smsSummaryEnabled?: boolean;
 }
 
 /**
@@ -72,12 +97,83 @@ export function computeDaysLeftInAddis(
 }
 
 /**
+ * Formats calendar days difference into a human-readable string in English or Amharic.
+ * Handles:
+ *  - past dates: "Expired 5 days ago" / "ከ5 ቀናት በፊት አልፏል"
+ *  - today: "Today" / "ዛሬ"
+ *  - single/multiple days: "1 day" / "1 ቀን", "12 days" / "12 ቀናት"
+ *  - long ranges (>30 days): "3 months 2 weeks" / "3 ወራት ከ2 ሳምንት", "2 months" / "2 ወራት"
+ */
+export function formatDaysLeftHuman(days: number | null, lang: 'en' | 'am' = 'en'): string {
+  if (days === null || isNaN(days)) {
+    return lang === 'am' ? 'ማለቂያ የለውም' : 'No Expiry';
+  }
+
+  if (days < 0) {
+    const abs = Math.abs(days);
+    if (lang === 'am') {
+      return abs === 1 ? 'ከ1 ቀን በፊት አልፏል' : `ከ${abs} ቀናት በፊት አልፏል`;
+    }
+    return abs === 1 ? 'Expired 1 day ago' : `Expired ${abs} days ago`;
+  }
+
+  if (days === 0) {
+    return lang === 'am' ? 'ዛሬ' : 'Today';
+  }
+
+  if (days <= 30) {
+    if (lang === 'am') {
+      return days === 1 ? '1 ቀን' : `${days} ቀናት`;
+    }
+    return days === 1 ? '1 day' : `${days} days`;
+  }
+
+  // Long range (> 30 days): e.g. "3 months 2 weeks"
+  const months = Math.floor(days / 30);
+  const remDays = days % 30;
+  const weeks = Math.floor(remDays / 7);
+
+  if (weeks > 0) {
+    if (lang === 'am') {
+      return `${months} ወራት ከ${weeks} ሳምንት`;
+    }
+    return `${months} month${months > 1 ? 's' : ''} ${weeks} week${weeks > 1 ? 's' : ''}`;
+  }
+
+  if (lang === 'am') {
+    return `${months} ወራት`;
+  }
+  return `${months} month${months > 1 ? 's' : ''}`;
+}
+
+/**
+ * Resolves effective warning days threshold considering category and item overrides.
+ */
+export function resolveEffectiveWarningDays(
+  defaultWarningDays = 90,
+  categoryId?: string | null,
+  productId?: string | null,
+  overrides?: {
+    categoryOverrides?: Record<string, number>;
+    productOverrides?: Record<string, number>;
+  },
+): number {
+  if (productId && overrides?.productOverrides && overrides.productOverrides[productId] !== undefined) {
+    return Number(overrides.productOverrides[productId]);
+  }
+  if (categoryId && overrides?.categoryOverrides && overrides.categoryOverrides[categoryId] !== undefined) {
+    return Number(overrides.categoryOverrides[categoryId]);
+  }
+  return defaultWarningDays;
+}
+
+/**
  * Evaluates the full expiry status badge and details using the configured warning window.
- * Default warning window: 30 days.
+ * Default warning window: 90 days (3 months).
  */
 export function getExpiryStatus(
   expiryDateStr: string | null | undefined,
-  warningDays = 30,
+  warningDays = 90,
   todayStr: string = getAddisTodayString(),
 ): ExpiryStatusDetails {
   const days = computeDaysLeftInAddis(expiryDateStr, todayStr);
@@ -85,11 +181,16 @@ export function getExpiryStatus(
   if (days === null) {
     return {
       tier: 'NO_EXPIRY',
+      stage: 'NO_EXPIRY',
       daysLeft: null,
       badgeColor: 'slate',
-      badgeClass: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300',
+      badgeClass: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 font-semibold',
       labelEn: 'No Expiry',
       labelAm: 'ማለቂያ የለውም',
+      statusBadgeEn: 'No Expiry',
+      statusBadgeAm: 'ማለቂያ የለውም',
+      daysTextEn: 'No Expiry',
+      daysTextAm: 'ማለቂያ የለውም',
       iconName: 'HelpCircle',
       isExpired: false,
       isUrgent: false,
@@ -98,13 +199,20 @@ export function getExpiryStatus(
 
   if (days < 0) {
     const absDays = Math.abs(days);
+    const daysEn = absDays === 1 ? 'Expired 1 day ago' : `Expired ${absDays} days ago`;
+    const daysAm = absDays === 1 ? 'ከ1 ቀን በፊት አልፏል' : `ከ${absDays} ቀናት በፊት አልፏል`;
     return {
       tier: 'EXPIRED',
+      stage: 'EXPIRED',
       daysLeft: days,
       badgeColor: 'red',
-      badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border-rose-300 dark:border-rose-800',
-      labelEn: absDays === 1 ? 'Expired 1 day ago' : `Expired ${absDays} days ago`,
-      labelAm: absDays === 1 ? 'ከ1 ቀን በፊት አልፏል' : `ከ${absDays} ቀናት በፊት አልፏል`,
+      badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border-rose-300 dark:border-rose-800 font-semibold',
+      labelEn: daysEn,
+      labelAm: daysAm,
+      statusBadgeEn: 'Expired',
+      statusBadgeAm: 'ያለፈበት',
+      daysTextEn: daysEn,
+      daysTextAm: daysAm,
       iconName: 'AlertOctagon',
       isExpired: true,
       isUrgent: true,
@@ -114,11 +222,16 @@ export function getExpiryStatus(
   if (days === 0) {
     return {
       tier: 'TODAY',
+      stage: 'EXPIRED',
       daysLeft: 0,
       badgeColor: 'red',
       badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border-rose-300 dark:border-rose-800 font-bold animate-pulse',
       labelEn: 'Expires Today',
       labelAm: 'ዛሬ ያበቃል',
+      statusBadgeEn: 'Expired',
+      statusBadgeAm: 'ያለፈበት',
+      daysTextEn: 'Today',
+      daysTextAm: 'ዛሬ',
       iconName: 'Clock',
       isExpired: true, // Expiring today is treated as expired / do not sell
       isUrgent: true,
@@ -126,40 +239,82 @@ export function getExpiryStatus(
   }
 
   if (days <= 7) {
+    const daysEn = days === 1 ? '1 day left' : `${days} days left`;
+    const daysAm = days === 1 ? '1 ቀን ይቀራል' : `${days} ቀናት ይቀራሉ`;
     return {
       tier: 'CRITICAL',
+      stage: '7D',
       daysLeft: days,
       badgeColor: 'orange',
-      badgeClass: 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border-amber-300 dark:border-amber-800',
-      labelEn: days === 1 ? '1 day left' : `${days} days left`,
-      labelAm: days === 1 ? '1 ቀን ይቀራል' : `${days} ቀናት ይቀራሉ`,
+      badgeClass: 'bg-orange-100 text-orange-800 dark:bg-orange-950/70 dark:text-orange-300 border-orange-300 dark:border-orange-800 font-semibold',
+      labelEn: daysEn,
+      labelAm: daysAm,
+      statusBadgeEn: 'Expires within 7 days',
+      statusBadgeAm: 'በ7 ቀናት ውስጥ ያበቃል',
+      daysTextEn: days === 1 ? '1 day' : `${days} days`,
+      daysTextAm: days === 1 ? '1 ቀን' : `${days} ቀናት`,
       iconName: 'AlertTriangle',
       isExpired: false,
       isUrgent: true,
     };
   }
 
-  if (days <= warningDays) {
+  if (days <= 30) {
+    const daysEn = `${days} days left`;
+    const daysAm = `${days} ቀናት ይቀራሉ`;
     return {
       tier: 'WARNING',
+      stage: '30D',
       daysLeft: days,
-      badgeColor: 'yellow',
-      badgeClass: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-950/60 dark:text-yellow-300 border-yellow-300 dark:border-yellow-800',
-      labelEn: `${days} days left`,
-      labelAm: `${days} ቀናት ይቀራሉ`,
+      badgeColor: 'orange',
+      badgeClass: 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-semibold',
+      labelEn: daysEn,
+      labelAm: daysAm,
+      statusBadgeEn: 'Within 30 days',
+      statusBadgeAm: 'በ30 ቀናት ውስጥ',
+      daysTextEn: `${days} days`,
+      daysTextAm: `${days} ቀናት`,
       iconName: 'Calendar',
       isExpired: false,
       isUrgent: false,
     };
   }
 
+  if (days <= warningDays) {
+    const humanEn = formatDaysLeftHuman(days, 'en');
+    const humanAm = formatDaysLeftHuman(days, 'am');
+    return {
+      tier: 'ALERT_90D',
+      stage: '90D',
+      daysLeft: days,
+      badgeColor: 'yellow',
+      badgeClass: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-950/60 dark:text-yellow-300 border-yellow-300 dark:border-yellow-800 font-semibold',
+      labelEn: `${humanEn} left`,
+      labelAm: `${humanAm} ይቀራል`,
+      statusBadgeEn: 'Within 3 months',
+      statusBadgeAm: 'በ3 ወራት ውስጥ',
+      daysTextEn: humanEn,
+      daysTextAm: humanAm,
+      iconName: 'Calendar',
+      isExpired: false,
+      isUrgent: false,
+    };
+  }
+
+  const humanEn = formatDaysLeftHuman(days, 'en');
+  const humanAm = formatDaysLeftHuman(days, 'am');
   return {
     tier: 'GOOD',
+    stage: 'OK',
     daysLeft: days,
     badgeColor: 'green',
-    badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800',
+    badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 font-semibold',
     labelEn: `${days} days left`,
     labelAm: `${days} ቀናት ይቀራሉ`,
+    statusBadgeEn: 'OK',
+    statusBadgeAm: 'ደህና',
+    daysTextEn: humanEn,
+    daysTextAm: humanAm,
     iconName: 'CheckCircle2',
     isExpired: false,
     isUrgent: false,

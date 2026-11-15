@@ -8,6 +8,8 @@ import {
   parseExcelExpiryDate,
   allocateFEFO,
   FEFOBatchCandidate,
+  formatDaysLeftHuman,
+  resolveEffectiveWarningDays,
 } from '../src';
 
 describe('date-fefo.helper.ts – Complete Timezone and Expiry Engine', () => {
@@ -92,26 +94,50 @@ describe('date-fefo.helper.ts – Complete Timezone and Expiry Engine', () => {
       expect(status7.labelEn).toBe('7 days left');
     });
 
-    it('calculates 8-30 days left as Warning (Yellow badge)', () => {
+    it('calculates 8-30 days left as Warning (Orange badge, stage 30D)', () => {
       expect(computeDaysLeftInAddis('2026-11-22', today)).toBe(8);
       expect(computeDaysLeftInAddis('2026-12-14', today)).toBe(30);
 
-      const status8 = getExpiryStatus('2026-11-22', 30, today);
+      const status8 = getExpiryStatus('2026-11-22', 90, today);
       expect(status8.tier).toBe('WARNING');
-      expect(status8.badgeColor).toBe('yellow');
+      expect(status8.stage).toBe('30D');
+      expect(status8.badgeColor).toBe('orange');
+      expect(status8.statusBadgeEn).toBe('Within 30 days');
+      expect(status8.statusBadgeAm).toBe('በ30 ቀናት ውስጥ');
 
-      const status30 = getExpiryStatus('2026-12-14', 30, today);
+      const status30 = getExpiryStatus('2026-12-14', 90, today);
       expect(status30.tier).toBe('WARNING');
-      expect(status30.badgeColor).toBe('yellow');
+      expect(status30.stage).toBe('30D');
+      expect(status30.badgeColor).toBe('orange');
     });
 
-    it('calculates > 30 days left as Good (Green badge)', () => {
+    it('calculates 31-90 days left as Alert 3 Months (Yellow badge, stage 90D)', () => {
       expect(computeDaysLeftInAddis('2026-12-15', today)).toBe(31);
+      expect(computeDaysLeftInAddis('2027-02-12', today)).toBe(90);
 
-      const status31 = getExpiryStatus('2026-12-15', 30, today);
-      expect(status31.tier).toBe('GOOD');
-      expect(status31.badgeColor).toBe('green');
-      expect(status31.isExpired).toBe(false);
+      const status31 = getExpiryStatus('2026-12-15', 90, today);
+      expect(status31.tier).toBe('ALERT_90D');
+      expect(status31.stage).toBe('90D');
+      expect(status31.badgeColor).toBe('yellow');
+      expect(status31.statusBadgeEn).toBe('Within 3 months');
+      expect(status31.statusBadgeAm).toBe('በ3 ወራት ውስጥ');
+
+      const status90 = getExpiryStatus('2027-02-12', 90, today);
+      expect(status90.tier).toBe('ALERT_90D');
+      expect(status90.stage).toBe('90D');
+      expect(status90.badgeColor).toBe('yellow');
+    });
+
+    it('calculates > 90 days left as Good (Green badge, stage OK)', () => {
+      expect(computeDaysLeftInAddis('2027-02-13', today)).toBe(91);
+
+      const status91 = getExpiryStatus('2027-02-13', 90, today);
+      expect(status91.tier).toBe('GOOD');
+      expect(status91.stage).toBe('OK');
+      expect(status91.badgeColor).toBe('green');
+      expect(status91.statusBadgeEn).toBe('OK');
+      expect(status91.statusBadgeAm).toBe('ደህና');
+      expect(status91.isExpired).toBe(false);
     });
 
     it('returns null/No Expiry for empty, null, or invalid strings', () => {
@@ -284,6 +310,70 @@ describe('date-fefo.helper.ts – Complete Timezone and Expiry Engine', () => {
       expect(result.totalAllocated).toBe(5);
       expect(result.allocations[0].batchId).toBe('b-expired'); // Takes expired with override
       expect(result.expiredBatchesBlocked).toHaveLength(0);
+    });
+  });
+
+  describe('formatDaysLeftHuman – Bilingual formatting for days left', () => {
+    it('formats expired dates in English and Amharic', () => {
+      expect(formatDaysLeftHuman(-1, 'en')).toBe('Expired 1 day ago');
+      expect(formatDaysLeftHuman(-1, 'am')).toBe('ከ1 ቀን በፊት አልፏል');
+      expect(formatDaysLeftHuman(-5, 'en')).toBe('Expired 5 days ago');
+      expect(formatDaysLeftHuman(-5, 'am')).toBe('ከ5 ቀናት በፊት አልፏል');
+    });
+
+    it('formats today (0) in English and Amharic', () => {
+      expect(formatDaysLeftHuman(0, 'en')).toBe('Today');
+      expect(formatDaysLeftHuman(0, 'am')).toBe('ዛሬ');
+    });
+
+    it('formats 1-30 days in English and Amharic', () => {
+      expect(formatDaysLeftHuman(1, 'en')).toBe('1 day');
+      expect(formatDaysLeftHuman(1, 'am')).toBe('1 ቀን');
+      expect(formatDaysLeftHuman(12, 'en')).toBe('12 days');
+      expect(formatDaysLeftHuman(12, 'am')).toBe('12 ቀናት');
+      expect(formatDaysLeftHuman(30, 'en')).toBe('30 days');
+      expect(formatDaysLeftHuman(30, 'am')).toBe('30 ቀናት');
+    });
+
+    it('formats long ranges (>30 days) with months and weeks in English and Amharic', () => {
+      // 104 days = 3 months and 14 days (2 weeks)
+      expect(formatDaysLeftHuman(104, 'en')).toBe('3 months 2 weeks');
+      expect(formatDaysLeftHuman(104, 'am')).toBe('3 ወራት ከ2 ሳምንት');
+
+      // 60 days = exactly 2 months
+      expect(formatDaysLeftHuman(60, 'en')).toBe('2 months');
+      expect(formatDaysLeftHuman(60, 'am')).toBe('2 ወራት');
+
+      // 90 days = 3 months
+      expect(formatDaysLeftHuman(90, 'en')).toBe('3 months');
+      expect(formatDaysLeftHuman(90, 'am')).toBe('3 ወራት');
+    });
+
+    it('handles null and undefined gracefully', () => {
+      expect(formatDaysLeftHuman(null, 'en')).toBe('No Expiry');
+      expect(formatDaysLeftHuman(null, 'am')).toBe('ማለቂያ የለውም');
+    });
+  });
+
+  describe('resolveEffectiveWarningDays – Category and Item Overrides', () => {
+    it('falls back to default 90 days when no overrides match', () => {
+      const days = resolveEffectiveWarningDays(90, 'cat-1', 'prod-1', {});
+      expect(days).toBe(90);
+    });
+
+    it('applies category override when present', () => {
+      const days = resolveEffectiveWarningDays(90, 'cat-dairy', 'prod-1', {
+        categoryOverrides: { 'cat-dairy': 14, 'cat-grains': 180 },
+      });
+      expect(days).toBe(14);
+    });
+
+    it('applies product override with highest precedence over category', () => {
+      const days = resolveEffectiveWarningDays(90, 'cat-dairy', 'prod-milk-special', {
+        categoryOverrides: { 'cat-dairy': 14 },
+        productOverrides: { 'prod-milk-special': 7 },
+      });
+      expect(days).toBe(7);
     });
   });
 });

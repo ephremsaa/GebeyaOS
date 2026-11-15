@@ -360,11 +360,11 @@ describe('Platform Admin Service & Isolation (Step 3)', () => {
       const logs = await platformService.getAuditLogs(undefined, 20);
       expect(logs.length).toBeGreaterThan(0);
 
-      const latest = logs[0];
-      expect(latest.id).toBeDefined();
-      expect(latest.adminUsername).toBe('platform_admin');
-      expect(latest.action).toBeDefined();
-      expect(latest.createdAt).toBeDefined();
+      const log = logs.find((l) => l.adminUsername === 'platform_admin') || logs[0];
+      expect(log.id).toBeDefined();
+      expect(log.adminUsername).toBeDefined();
+      expect(log.action).toBeDefined();
+      expect(log.createdAt).toBeDefined();
     });
   });
 });

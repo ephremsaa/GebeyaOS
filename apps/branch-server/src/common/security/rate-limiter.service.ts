@@ -23,7 +23,6 @@ export class RateLimiterService {
   checkIpRateLimit(ipAddress?: string): void {
     if (!ipAddress) return;
     if (
-      process.env.NODE_ENV === 'test' ||
       ipAddress === '127.0.0.1' ||
       ipAddress === '::1' ||
       ipAddress === '::ffff:127.0.0.1' ||
