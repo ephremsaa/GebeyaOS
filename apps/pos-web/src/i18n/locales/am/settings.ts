@@ -123,5 +123,17 @@ export const settingsAm = {
   "userProfile": "የተጠቃሚ መረጃ",
   "changePassword": "የይለፍ ቃል ቀይር",
   "changePin": "ፈጣን ፒን ቀይር",
-  "logoutAccount": "ውጣ"
+  "logoutAccount": "ውጣ",
+  "tabAppearance": "ገጽታ እና ጽሁፍ",
+  "textSize": "የጽሁፍ መጠን",
+  "textSizeDesc": "ለመደብር ሰራተኞች እና ገንዘብ ተቀባዮች ምቹ እንዲሆን በመተግበሪያው ላይ የጽሁፍ መጠኑን ያስተካክሉ።",
+  "textSizeMedium": "መካከለኛ (16px መደበኛ)",
+  "textSizeLarge": "ትልቅ (18px)",
+  "textSizeXLarge": "በጣም ትልቅ (20px)",
+  "themeMode": "የቀለም ገጽታ",
+  "themeLight": "ቀላል ገጽታ (Light)",
+  "themeDark": "ጨለማ ገጽታ (Dark)",
+  "previewTextTitle": "የናሙና እቃ ስም፡ አንከር ወተት 500ሚሊ",
+  "previewTextBody": "የመሸጫ ዋጋ 15% ተ.እ.ታ ተጨምሮበት። በግልጽ የሚነበብ ደማቅ ጽሁፍ።",
+  "previewPrice": "145.00 ብር"
 };

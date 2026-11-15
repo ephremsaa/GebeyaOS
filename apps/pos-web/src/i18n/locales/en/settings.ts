@@ -123,5 +123,17 @@ export const settingsEn = {
   "userProfile": "User Profile",
   "changePassword": "Change Password",
   "changePin": "Change Quick PIN",
-  "logoutAccount": "Log Out"
+  "logoutAccount": "Log Out",
+  "tabAppearance": "Appearance",
+  "textSize": "Text Size",
+  "textSizeDesc": "Adjust base text size across the entire application for optimal cashier readability.",
+  "textSizeMedium": "Medium (16px base, default)",
+  "textSizeLarge": "Large (18px base)",
+  "textSizeXLarge": "Extra large (20px base)",
+  "themeMode": "Theme Mode",
+  "themeLight": "Light Mode",
+  "themeDark": "Dark Mode",
+  "previewTextTitle": "Sample Item Title: Anchor Milk 500ml",
+  "previewTextBody": "Shelf price with 15% VAT included. High contrast readable typography.",
+  "previewPrice": "145.00 ETB"
 };

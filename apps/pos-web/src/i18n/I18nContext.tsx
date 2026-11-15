@@ -5,6 +5,7 @@ import { formatMoney } from '@gebeyaos/shared-types';
 
 export type Language = SupportedLanguage;
 export type CalendarType = 'gregorian' | 'ethiopic';
+export type TextSizeType = 'medium' | 'large' | 'xlarge';
 
 export interface FormatDateOptions {
   includeTime?: boolean;
@@ -17,6 +18,8 @@ export interface I18nContextType {
   setLanguage: (lang: Language) => void;
   calendar: CalendarType;
   setCalendar: (cal: CalendarType) => void;
+  textSize: TextSizeType;
+  setTextSize: (size: TextSizeType) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   tError: (codeOrMsg?: string | null, fallback?: string) => string;
   formatDate: (dateInput: Date | string | number | null | undefined, options?: FormatDateOptions) => string;
@@ -79,6 +82,21 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Text size preference (medium: 16px, large: 18px, xlarge: 20px)
+  const [textSize, setTextSizeState] = useState<TextSizeType>(() => {
+    return (localStorage.getItem('gebeyaos_text_size') as TextSizeType) || 'medium';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gebeyaos_text_size', textSize);
+    document.documentElement.classList.remove('text-size-medium', 'text-size-large', 'text-size-xlarge');
+    document.documentElement.classList.add(`text-size-${textSize}`);
+  }, [textSize]);
+
+  const setTextSize = (size: TextSizeType) => {
+    setTextSizeState(size);
+  };
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
@@ -286,6 +304,8 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLanguage,
         calendar,
         setCalendar,
+        textSize,
+        setTextSize,
         t,
         tError,
         formatDate,

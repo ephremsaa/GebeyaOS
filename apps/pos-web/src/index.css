@@ -35,8 +35,8 @@
     --card-gradient: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
 
     --text-main: #0F172A;
-    --text-muted: #64748B;
-    --text-dim: #94A3B8;
+    --text-muted: #475569;
+    --text-dim: #4B5563;
 
     --border-subtle: #E4E8EE;
     --border-strong: #CBD5E1;
@@ -97,8 +97,8 @@
     --card-gradient: linear-gradient(180deg, #121A2B 0%, #151F33 100%);
 
     --text-main: #F1F5F9;
-    --text-muted: #94A3B8;
-    --text-dim: #64748B;
+    --text-muted: #CBD5E1;
+    --text-dim: #94A3B8;
 
     --border-subtle: #243049;
     --border-strong: #334155;
@@ -124,13 +124,29 @@
     --shadow-modal: 0 25px 35px -5px rgba(0, 0, 0, 0.75), 0 12px 15px -6px rgba(0, 0, 0, 0.5);
   }
 
+  /* Root font-size scaling tokens for Settings > Appearance */
+  :root,
+  html,
+  html.text-size-medium {
+    font-size: 16px;
+  }
+
+  html.text-size-large {
+    font-size: 18px;
+  }
+
+  html.text-size-xlarge {
+    font-size: 20px;
+  }
+
   /* Base Typography & Defaults */
   body {
     font-family: var(--font-sans);
     background-color: var(--bg-page);
     color: var(--text-main);
     min-height: 100vh;
-    font-size: 15px;
+    font-size: 1rem;
+    font-weight: 500;
     line-height: 1.5;
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
@@ -143,9 +159,8 @@
   html[lang="am"],
   [lang="am"] {
     font-family: var(--font-ethiopic);
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.5;
-    font-size: 15px;
   }
 
   html[lang="am"] h1,
@@ -158,7 +173,58 @@
   [lang="am"] h3,
   [lang="am"] h4,
   [lang="am"] strong {
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  /* Table cell text 16px weight 500; table headers 14-15px weight 700 */
+  table th {
+    font-size: 0.9375rem;
+    font-weight: 700;
+  }
+  table td {
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  /* Form labels 15-16px weight 600 */
+  label, .field-label {
+    font-size: 0.9375rem;
     font-weight: 600;
+  }
+
+  /* Buttons 16px weight 600 (primary 17px weight 700) */
+  button, .btn, .btn-secondary {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .btn-primary {
+    font-size: 1.0625rem;
+    font-weight: 700;
+  }
+
+  /* Page titles 28-30px weight 800; section titles 20px weight 700 */
+  h1, .page-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+  }
+  h2, .section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  /* Prices, totals, and quantities 18-20px weight 700 with tabular numbers */
+  .tabular, .font-mono, [class*="price"], [class*="total"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Absolute minimum across app is 14px weight >= 500 (no 10-12px unreadable text) */
+  .text-\[10px\],
+  .text-\[11px\],
+  .text-\[12px\],
+  .text-xs {
+    font-size: 0.875rem !important;
+    font-weight: 500;
   }
 
   * {

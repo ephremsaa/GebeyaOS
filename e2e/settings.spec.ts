@@ -126,4 +126,46 @@ test.describe('Step 7 – Consolidated Settings Page (5 Sections)', () => {
     await expect(page.locator('text=Change Quick PIN').or(page.locator('text=ፈጣን ፒን ቀይር')).first()).toBeVisible();
     await expect(page.locator('text=Log Out').or(page.locator('text=ውጣ')).first()).toBeVisible();
   });
+
+  test('Appearance section allows switching text scaling (Medium, Large, Extra Large)', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#settings`);
+    await page.waitForTimeout(1000);
+
+    const nav = page.locator('[data-testid="settings-nav"]');
+
+    // Navigate to Appearance section
+    const appearanceBtn = nav.locator('button:has-text("Appearance"), button:has-text("ገጽታ")').first();
+    await expect(appearanceBtn).toBeVisible();
+    await appearanceBtn.click();
+    await page.waitForTimeout(400);
+
+    // Verify text size buttons exist
+    const largeBtn = page.locator('button:has-text("Large (18px"), button:has-text("ትልቅ (18px")').first();
+    await expect(largeBtn).toBeVisible();
+    await largeBtn.click();
+    await page.waitForTimeout(300);
+
+    // Verify html element has class text-size-large
+    const htmlClass = await page.evaluate(() => document.documentElement.className);
+    expect(htmlClass).toContain('text-size-large');
+
+    // Switch to Extra large
+    const xlargeBtn = page.locator('button:has-text("Extra Large (20px"), button:has-text("Extra large (20px"), button:has-text("በጣም ትልቅ (20px")').first();
+    await expect(xlargeBtn).toBeVisible();
+    await xlargeBtn.click();
+    await page.waitForTimeout(300);
+
+    const htmlClassXl = await page.evaluate(() => document.documentElement.className);
+    expect(htmlClassXl).toContain('text-size-xlarge');
+
+    // Reset back to Medium
+    const mediumBtn = page.locator('button:has-text("Medium (16px"), button:has-text("መካከለኛ (16px")').first();
+    await expect(mediumBtn).toBeVisible();
+    await mediumBtn.click();
+    await page.waitForTimeout(300);
+
+    const htmlClassMed = await page.evaluate(() => document.documentElement.className);
+    expect(htmlClassMed).toContain('text-size-medium');
+  });
 });
