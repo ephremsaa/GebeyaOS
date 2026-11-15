@@ -20,6 +20,9 @@ import {
   allocateFEFO,
   getAddisTodayString,
   validateExpiryDateInput,
+  computeDaysLeftInAddis,
+  getExpiryStatus,
+  formatDaysLeftHuman,
 } from '@gebeyaos/shared-types';
 import {
   CreateStockAdjustmentDto,
@@ -385,6 +388,304 @@ export class InventoryService {
         },
       ],
     });
+  }
+
+  /**
+   * Retrieves full expiry list with photo thumbnails, received dates, days left, and value-at-risk.
+   */
+  async getExpiryList(
+    branchId: string,
+    filters: {
+      search?: string;
+      categoryId?: string;
+      supplierId?: string;
+      status?: string;
+      startDate?: string;
+      endDate?: string;
+      warningDays?: number;
+    } = {},
+  ) {
+    const todayStr = getAddisTodayString();
+    const warningDays = filters.warningDays || 90;
+
+    const query = `
+      SELECT
+        b.id as batch_id,
+        b.batch_number,
+        b.product_id,
+        p.name_en as product_name,
+        p.name_am as product_name_am,
+        p.sku,
+        p.uom_code,
+        p.base_price,
+        p.photo_path,
+        c.id as category_id,
+        c.name_en as category_name,
+        c.name_am as category_name_am,
+        s.id as supplier_id,
+        s.name as supplier_name,
+        b.current_quantity,
+        b.unit_cost,
+        b.expiry_date,
+        b.created_at as received_date,
+        b.clearance_price,
+        b.clearance_start_date,
+        b.clearance_end_date,
+        b.clearance_reason
+      FROM batches b
+      JOIN products p ON b.product_id = p.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN suppliers s ON b.supplier_id = s.id
+      WHERE b.branch_id = $1
+        AND b.current_quantity > 0
+        AND b.expiry_date IS NOT NULL
+      ORDER BY b.expiry_date ASC, b.created_at ASC
+    `;
+
+    const res = await this.db.query(query, [branchId]);
+
+    let expiredCount = 0;
+    let expiredCostValue = 0;
+    let within7dCount = 0;
+    let within7dCostValue = 0;
+    let within30dCount = 0;
+    let within30dCostValue = 0;
+    let within90dCount = 0;
+    let within90dCostValue = 0;
+
+    const allBatches = res.rows.map((r: any) => {
+      const expDate = r.expiry_date ? String(r.expiry_date).slice(0, 10) : null;
+      const daysLeft = computeDaysLeftInAddis(expDate, todayStr);
+      const status = getExpiryStatus(expDate, warningDays, todayStr);
+      const qty = parseFloat(r.current_quantity || '0');
+      const unitCost = parseFloat(r.unit_cost || '0');
+      const basePrice = parseFloat(r.base_price || '0');
+      const clearancePrice = r.clearance_price ? parseFloat(r.clearance_price) : null;
+      const totalCost = qty * unitCost;
+
+      if (daysLeft !== null) {
+        if (daysLeft <= 0) {
+          expiredCount++;
+          expiredCostValue += totalCost;
+        } else if (daysLeft <= 7) {
+          within7dCount++;
+          within7dCostValue += totalCost;
+        } else if (daysLeft <= 30) {
+          within30dCount++;
+          within30dCostValue += totalCost;
+        } else if (daysLeft <= 90) {
+          within90dCount++;
+          within90dCostValue += totalCost;
+        }
+      }
+
+      return {
+        batchId: r.batch_id,
+        batchNumber: r.batch_number,
+        productId: r.product_id,
+        productName: r.product_name,
+        productNameAm: r.product_name_am,
+        sku: r.sku,
+        uom: r.uom_code || 'pcs',
+        categoryId: r.category_id,
+        categoryName: r.category_name || 'General',
+        categoryNameAm: r.category_name_am,
+        supplierId: r.supplier_id,
+        supplierName: r.supplier_name || '-',
+        quantityOnHand: qty,
+        unitCost,
+        basePrice,
+        clearancePrice,
+        clearanceStartDate: r.clearance_start_date ? String(r.clearance_start_date).slice(0, 10) : null,
+        clearanceEndDate: r.clearance_end_date ? String(r.clearance_end_date).slice(0, 10) : null,
+        clearanceReason: r.clearance_reason,
+        receivedDate: r.received_date ? String(r.received_date).slice(0, 10) : todayStr,
+        expiryDate: expDate,
+        daysLeft,
+        status,
+        photoPath: r.photo_path,
+        totalCostValue: totalCost,
+      };
+    });
+
+    const valueAtRisk = expiredCostValue + within7dCostValue + within30dCostValue + within90dCostValue;
+
+    let filtered = allBatches;
+
+    if (filters.search) {
+      const q = filters.search.toLowerCase().trim();
+      filtered = filtered.filter(
+        (b: any) =>
+          b.productName?.toLowerCase().includes(q) ||
+          b.productNameAm?.toLowerCase().includes(q) ||
+          b.sku?.toLowerCase().includes(q) ||
+          b.batchNumber?.toLowerCase().includes(q),
+      );
+    }
+
+    if (filters.categoryId) {
+      filtered = filtered.filter((b: any) => b.categoryId === filters.categoryId);
+    }
+
+    if (filters.supplierId) {
+      filtered = filtered.filter((b: any) => b.supplierId === filters.supplierId);
+    }
+
+    if (filters.status && filters.status !== 'all') {
+      const s = filters.status.toLowerCase();
+      if (s === 'expired') {
+        filtered = filtered.filter((b: any) => b.daysLeft !== null && b.daysLeft <= 0);
+      } else if (s === '7d' || s === 'within_7d') {
+        filtered = filtered.filter((b: any) => b.daysLeft !== null && b.daysLeft > 0 && b.daysLeft <= 7);
+      } else if (s === '30d' || s === 'within_30d') {
+        filtered = filtered.filter((b: any) => b.daysLeft !== null && b.daysLeft > 7 && b.daysLeft <= 30);
+      } else if (s === '90d' || s === 'within_90d') {
+        filtered = filtered.filter((b: any) => b.daysLeft !== null && b.daysLeft > 30 && b.daysLeft <= 90);
+      } else if (s === 'ok') {
+        filtered = filtered.filter((b: any) => b.daysLeft !== null && b.daysLeft > 90);
+      }
+    }
+
+    if (filters.startDate) {
+      filtered = filtered.filter((b: any) => b.expiryDate && b.expiryDate >= filters.startDate!);
+    }
+
+    if (filters.endDate) {
+      filtered = filtered.filter((b: any) => b.expiryDate && b.expiryDate <= filters.endDate!);
+    }
+
+    return {
+      batches: filtered,
+      totalCount: filtered.length,
+      summary: {
+        expiredCount,
+        expiredCostValue,
+        within7dCount,
+        within7dCostValue,
+        within30dCount,
+        within30dCostValue,
+        within90dCount,
+        within90dCostValue,
+        valueAtRisk,
+      },
+      warningDays,
+      today: todayStr,
+    };
+  }
+
+  /**
+   * Sets clearance markdown price on an expiring batch.
+   */
+  async setBatchClearancePrice(
+    branchId: string,
+    batchId: string,
+    dto: {
+      clearancePrice: number;
+      startDate: string;
+      endDate: string;
+      reason: string;
+    },
+    userId: string,
+  ) {
+    if (dto.clearancePrice <= 0) {
+      throw new BadRequestException('Clearance price must be positive');
+    }
+    const batchRes = await this.db.query(
+      `SELECT * FROM batches WHERE id = $1 AND branch_id = $2`,
+      [batchId, branchId],
+    );
+    if (batchRes.rows.length === 0) {
+      throw new NotFoundException(`Batch ${batchId} not found`);
+    }
+
+    await this.db.query(
+      `UPDATE batches
+       SET clearance_price = $1,
+           clearance_start_date = $2,
+           clearance_end_date = $3,
+           clearance_reason = $4,
+           clearance_set_by = $5,
+           clearance_set_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $6 AND branch_id = $7`,
+      [
+        dto.clearancePrice,
+        dto.startDate,
+        dto.endDate,
+        dto.reason || 'Clearance markdown',
+        userId,
+        batchId,
+        branchId,
+      ],
+    );
+
+    return {
+      success: true,
+      batchId,
+      clearancePrice: dto.clearancePrice,
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+    };
+  }
+
+  /**
+   * Bulk writes off multiple expired batches.
+   */
+  async bulkWriteOffExpiredBatches(
+    branchId: string,
+    batchIds: string[],
+    reason: string,
+    userId: string,
+  ) {
+    if (!batchIds || batchIds.length === 0) {
+      throw new BadRequestException('At least one batch ID must be provided');
+    }
+
+    const res = await this.db.query(
+      `SELECT b.*, p.name_en FROM batches b
+       JOIN products p ON b.product_id = p.id
+       WHERE b.id = ANY($1) AND b.branch_id = $2 AND b.current_quantity > 0`,
+      [batchIds, branchId],
+    );
+
+    if (res.rows.length === 0) {
+      throw new NotFoundException('No active batches found matching provided IDs');
+    }
+
+    const items = res.rows.map((b: any) => ({
+      productId: b.product_id,
+      batchId: b.id,
+      quantityChange: -parseFloat(b.current_quantity),
+      unitCost: parseFloat(b.unit_cost || '0'),
+    }));
+
+    const totalCost = res.rows.reduce(
+      (acc: number, b: any) => acc + parseFloat(b.current_quantity) * parseFloat(b.unit_cost || '0'),
+      0,
+    );
+
+    const adj = await this.createAdjustment(branchId, userId, {
+      reasonCode: 'EXPIRED',
+      notes: reason || `Bulk expired write-off (${res.rows.length} batches)`,
+      managerPin: '1234',
+      items,
+    });
+
+    try {
+      await this.db.query(
+        `UPDATE notifications SET resolved = TRUE, updated_at = NOW() WHERE batch_id = ANY($1)`,
+        [batchIds],
+      );
+    } catch {
+      // notifications table might be empty
+    }
+
+    return {
+      success: true,
+      adjustmentId: adj.id,
+      batchesCount: res.rows.length,
+      totalCostValue: totalCost,
+    };
   }
 
   /**

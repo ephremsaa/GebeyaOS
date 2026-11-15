@@ -1426,6 +1426,89 @@ export const posApi = {
     }
     return await res.json();
   },
+
+  /**
+   * Retrieves full expiry list with summaries, stages, and days left.
+   */
+  async getExpiryList(params: {
+    warningDays?: number;
+    search?: string;
+    categoryId?: string;
+    supplierId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+  } = {}): Promise<any> {
+    const q = new URLSearchParams();
+    if (params.warningDays) q.append('warningDays', String(params.warningDays));
+    if (params.search) q.append('search', params.search);
+    if (params.categoryId) q.append('categoryId', params.categoryId);
+    if (params.supplierId) q.append('supplierId', params.supplierId);
+    if (params.status) q.append('status', params.status);
+    if (params.startDate) q.append('startDate', params.startDate);
+    if (params.endDate) q.append('endDate', params.endDate);
+
+    const headers: Record<string, string> = {};
+    if (params.branchId) headers['x-branch-id'] = params.branchId;
+
+    const res = await fetch(`${API_BASE}/inventory/expiry-list?${q.toString()}`, { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to fetch expiry list' }));
+      throw new Error(err.message || 'Failed to fetch expiry list');
+    }
+    return await res.json();
+  },
+
+  /**
+   * Sets clearance markdown price on a specific batch.
+   */
+  async setBatchClearancePrice(
+    batchId: string,
+    dto: { clearancePrice: number; startDate?: string; endDate?: string; reason?: string },
+    branchId?: string,
+    userId?: string,
+  ): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (branchId) headers['x-branch-id'] = branchId;
+    if (userId) headers['x-user-id'] = userId;
+
+    const res = await fetch(`${API_BASE}/inventory/batches/${batchId}/clearance`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(dto),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to set clearance price' }));
+      throw new Error(err.message || 'Failed to set clearance price');
+    }
+    return await res.json();
+  },
+
+  /**
+   * Bulk writes off expired batches creating stock adjustments and resolving alerts.
+   */
+  async bulkWriteOffExpiredBatches(
+    batchIds: string[],
+    reason: string,
+    branchId?: string,
+    userId?: string,
+  ): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (branchId) headers['x-branch-id'] = branchId;
+    if (userId) headers['x-user-id'] = userId;
+
+    const res = await fetch(`${API_BASE}/inventory/batches/bulk-write-off`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ batchIds, reason }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to bulk write off batches' }));
+      throw new Error(err.message || 'Failed to bulk write off batches');
+    }
+    return await res.json();
+  },
 };
 
 

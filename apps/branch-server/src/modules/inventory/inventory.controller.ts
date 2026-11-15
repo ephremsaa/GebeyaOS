@@ -81,6 +81,54 @@ export class InventoryController {
     return this.inventoryService.writeOffExpiredBatch(branchId, batchId, reason, userId);
   }
 
+  @Get('expiry-list')
+  async getExpiryList(
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('warningDays') warningDays?: string,
+    @Headers('x-branch-id') branchIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    return this.inventoryService.getExpiryList(branchId, {
+      search,
+      categoryId,
+      supplierId,
+      status,
+      startDate,
+      endDate,
+      warningDays: warningDays ? parseInt(warningDays, 10) : undefined,
+    });
+  }
+
+  @Post('batches/:id/clearance')
+  @HttpCode(HttpStatus.OK)
+  async setBatchClearancePrice(
+    @Param('id') batchId: string,
+    @Body() dto: { clearancePrice: number; startDate: string; endDate: string; reason: string },
+    @Headers('x-branch-id') branchIdHeader?: string,
+    @Headers('x-user-id') userIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const userId = userIdHeader || '00000000-0000-0000-0000-000000000000';
+    return this.inventoryService.setBatchClearancePrice(branchId, batchId, dto, userId);
+  }
+
+  @Post('batches/bulk-write-off')
+  @HttpCode(HttpStatus.OK)
+  async bulkWriteOffExpiredBatches(
+    @Body() body: { batchIds: string[]; reason: string },
+    @Headers('x-branch-id') branchIdHeader?: string,
+    @Headers('x-user-id') userIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const userId = userIdHeader || '00000000-0000-0000-0000-000000000000';
+    return this.inventoryService.bulkWriteOffExpiredBatches(branchId, body.batchIds, body.reason, userId);
+  }
+
   @Post('movements')
   @HttpCode(HttpStatus.CREATED)
   async recordMovement(
