@@ -1024,6 +1024,64 @@ export const posApi = {
   },
 
   /**
+   * Persists a stock batch with expiry date and logs to append-only stock ledger.
+   */
+  async createBatch(
+    payload: {
+      productId: string;
+      batchNumber?: string;
+      expiryDate?: string | null;
+      unitCost?: number;
+      initialQuantity: number;
+      supplierId?: string | null;
+    },
+    branchId?: string,
+    userId?: string,
+  ): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (branchId) headers['x-branch-id'] = branchId;
+    if (userId) headers['x-user-id'] = userId;
+
+    const res = await fetch(`${API_BASE}/inventory/batches`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to create batch' }));
+      throw new Error(err.message || 'Failed to create batch');
+    }
+    return await res.json();
+  },
+
+  /**
+   * Writes off an expired batch with mandatory reason and ledger adjustment.
+   */
+  async writeOffExpiredBatch(
+    batchId: string,
+    reason: string,
+    branchId?: string,
+    userId?: string,
+  ): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (branchId) headers['x-branch-id'] = branchId;
+    if (userId) headers['x-user-id'] = userId;
+
+    const res = await fetch(`${API_BASE}/inventory/batches/${encodeURIComponent(batchId)}/write-off`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ reason }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Write-off failed' }));
+      throw new Error(err.message || 'Write-off failed');
+    }
+    return await res.json();
+  },
+
+  /**
    * Creates a stock adjustment / write-off with audit logging.
    */
   async createStockAdjustment(payload: any, branchId?: string, userId?: string): Promise<any> {

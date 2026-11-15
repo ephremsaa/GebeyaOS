@@ -47,7 +47,7 @@ export class PosService {
   constructor(
     private readonly db: DatabaseService,
     private readonly inventoryService: InventoryService,
-  ) {}
+  ) { }
 
   /**
    * License verification & Grace Period Enforcement for Suspended Tenants
@@ -93,36 +93,18 @@ export class PosService {
     dto: OpenShiftDto | Partial<OpenShiftDto>,
   ): Promise<Shift> {
     await this.verifyTenantLicense();
-    const termId = dto.getResolvedTerminalId ? dto.getResolvedTerminalId() : (dto.terminalId || (dto as any).terminal_id);
-    const floatAmt = dto.getResolvedOpeningCashFloat ? dto.getResolvedOpeningCashFloat() : (dto.openingCashFloat ?? (dto as any).opening_cash_float ?? 0);
     return this.db.withTransaction(async (client) => {
       // 1. Check for existing open shift on this terminal
       const activeCheck = await client.query<{ id: string }>(
         `SELECT id FROM shifts
          WHERE branch_id = $1 AND terminal_id = $2 AND status = 'OPEN'`,
-        [branchId, termId],
+        [branchId, dto.terminalId],
       );
 
       if (activeCheck.rows.length > 0) {
-        const existing = await client.query<any>(
-          `SELECT * FROM shifts WHERE id = $1`,
-          [activeCheck.rows[0].id],
+        throw new BadRequestException(
+          `Terminal ${dto.terminalId} already has an active open shift (${activeCheck.rows[0].id})`,
         );
-        const shift = existing?.rows?.[0] || activeCheck.rows[0];
-        this.logger.log(`Idempotent openShift: Returning existing active shift ${shift.id} for terminal ${termId}`);
-        return {
-          id: shift.id,
-          branchId: shift.branch_id || branchId,
-          terminalId: shift.terminal_id || termId,
-          cashierId: shift.cashier_id || cashierId,
-          shiftNumber: shift.shift_number ? Number(shift.shift_number) : 1,
-          openingCashFloat: parseFloat(shift.opening_cash_float || '0'),
-          expectedCashSystem: parseFloat(shift.expected_cash_system || '0'),
-          status: shift.status || 'OPEN',
-          notes: shift.notes || null,
-          openedAt: shift.opened_at ? new Date(shift.opened_at).toISOString() : new Date().toISOString(),
-          createdAt: shift.created_at ? new Date(shift.created_at).toISOString() : new Date().toISOString(),
-        };
       }
 
       // 2. Next shift number for this terminal
@@ -130,7 +112,7 @@ export class PosService {
         `SELECT COALESCE(MAX(shift_number), 0) + 1 as next_shift
          FROM shifts
          WHERE branch_id = $1 AND terminal_id = $2`,
-        [branchId, termId],
+        [branchId, dto.terminalId],
       );
       const shiftNumber = parseInt(shiftNumRes.rows[0].next_shift, 10);
 
@@ -142,10 +124,10 @@ export class PosService {
          RETURNING *`,
         [
           branchId,
-          termId,
+          dto.terminalId,
           cashierId,
           shiftNumber,
-          floatAmt,
+          dto.openingCashFloat,
           dto.notes || null,
         ],
       );
@@ -156,7 +138,7 @@ export class PosService {
         `INSERT INTO cash_movements (
            shift_id, branch_id, movement_type, amount, reason, authorized_by
          ) VALUES ($1, $2, 'FLOAT_IN', $3, 'Opening cash float', $4)`,
-        [shift.id, branchId, floatAmt, cashierId],
+        [shift.id, branchId, dto.openingCashFloat, cashierId],
       );
 
       return {
@@ -221,34 +203,6 @@ export class PosService {
       authorizedBy: row.authorized_by,
       createdAt: row.created_at.toISOString(),
     };
-  }
-
-  /**
-   * Retrieves all cash movements recorded for a shift.
-   */
-  async getShiftMovements(branchId: string, shiftId: string): Promise<any[]> {
-    const res = await this.db.query<any>(
-      `SELECT
-         id,
-         shift_id as "shiftId",
-         shift_id,
-         branch_id as "branchId",
-         movement_type as "movementType",
-         movement_type,
-         amount::numeric as amount,
-         reason,
-         authorized_by as "authorizedBy",
-         created_at as "createdAt",
-         created_at
-       FROM cash_movements
-       WHERE shift_id = $1 AND branch_id = $2
-       ORDER BY created_at ASC`,
-      [shiftId, branchId],
-    );
-    return res.rows.map((r: any) => ({
-      ...r,
-      amount: parseFloat(r.amount),
-    }));
   }
 
   /**
@@ -373,7 +327,9 @@ export class PosService {
 
       const xReport = await this.getXReport(branchId, shiftId);
       const expectedCash = xReport.expectedCashInDrawer;
-      const counted = dto.getResolvedClosingCash ? dto.getResolvedClosingCash() : (dto.closingCashCounted ?? (dto as any).closing_cash_counted ?? 0);
+      const counted = dto.getResolvedClosingCash
+        ? dto.getResolvedClosingCash()
+        : (dto.closingCashCounted ?? (dto as any).closing_cash_counted ?? 0);
       const variance = Math.round((counted - expectedCash + Number.EPSILON) * 100) / 100;
 
       await client.query(
@@ -631,7 +587,23 @@ export class PosService {
           item.quantity,
           allowNegativeStock,
           client,
+          Boolean(dto.managerOverrideExpired),
         );
+
+        if (
+          alloc.expiredBatchesBlocked &&
+          alloc.expiredBatchesBlocked.length > 0 &&
+          !alloc.fullyAllocated &&
+          !dto.managerOverrideExpired
+        ) {
+          throw new BadRequestException({
+            statusCode: 400,
+            error: 'EXPIRED_STOCK_BLOCKED',
+            message: `Cannot sell expired batch for product '${prod.name_en}'. Manager override required.`,
+            messageAm: `ለ '${prod.name_am || prod.name_en}' ጊዜው ያለፈበት ባች መሸጥ አይቻልም። የአስተዳዳሪ ማረጋገጫ ያስፈልጋል።`,
+            expiredBatches: alloc.expiredBatchesBlocked,
+          });
+        }
 
         const primaryBatchId = alloc.allocations.length > 0 ? alloc.allocations[0].batchId : null;
 
@@ -1130,14 +1102,6 @@ export class PosService {
   /**
    * Retrieves active open shift for a terminal.
    */
-  async resolveTerminalId(branchId: string): Promise<string | null> {
-    const res = await this.db.query<{ id: string }>(
-      `SELECT id FROM terminals WHERE branch_id = $1 AND is_active = true ORDER BY created_at ASC LIMIT 1`,
-      [branchId],
-    );
-    return res.rows[0]?.id || null;
-  }
-
   async getCurrentShift(branchId: string, terminalId: string): Promise<{ open: boolean; shift: Shift | null }> {
     const res = await this.db.query<any>(
       `SELECT * FROM shifts 
@@ -1165,6 +1129,22 @@ export class PosService {
         createdAt: s.created_at.toISOString(),
       },
     };
+  }
+
+  async resolveTerminalId(branchId: string): Promise<string> {
+    const res = await this.db.query<{ id: string }>(
+      `SELECT id FROM terminals WHERE branch_id = $1 AND is_active = TRUE ORDER BY terminal_code ASC LIMIT 1`,
+      [branchId],
+    );
+    return res.rows[0]?.id || '00000000-0000-0000-0000-000000000010';
+  }
+
+  async getShiftMovements(branchId: string, shiftId: string): Promise<any[]> {
+    const res = await this.db.query(
+      `SELECT * FROM cash_movements WHERE branch_id = $1 AND shift_id = $2 ORDER BY created_at ASC`,
+      [branchId, shiftId],
+    );
+    return res.rows;
   }
 
   /**
@@ -1379,7 +1359,7 @@ export class PosService {
                VALUES (gen_random_uuid(), (SELECT tenant_id FROM branches WHERE id = $1), $1, $2, 'MANAGER_PIN_VERIFIED', 'pos_override', $3, 'SUCCESS')`,
               [branchId, user.id, JSON.stringify({ role: user.role_name, actionRequired: dto.actionRequired })],
             );
-          } catch {}
+          } catch { }
           return {
             authorized: true,
             authorizedBy: user.id,

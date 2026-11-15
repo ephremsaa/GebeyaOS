@@ -81,6 +81,10 @@ export class CreateProductDto {
 
   @IsBoolean()
   @IsOptional()
+  has_expiry_date?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
   is_active?: boolean;
 
   @IsString()
@@ -90,10 +94,6 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   image_url?: string;
-
-  @IsBoolean()
-  @IsOptional()
-  has_expiry_date?: boolean;
 }
 
 export class CreateBarcodeDto {
@@ -232,6 +232,10 @@ export class UpdateProductDto {
   @IsBoolean()
   @IsOptional()
   allow_discount?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  has_expiry_date?: boolean;
 
   @IsBoolean()
   @IsOptional()

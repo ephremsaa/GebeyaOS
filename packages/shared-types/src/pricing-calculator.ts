@@ -236,3 +236,87 @@ export function calculateBasketFinancials(lines: BasketLineInput[]): BasketFinan
   };
 }
 
+export interface ItemVatBreakdownInput {
+  typedPrice: number; // The amount entered in the input field
+  priceIncludesVat: boolean; // true = typedPrice is Gross; false = typedPrice is Net
+  isVatApplicable: boolean; // true = 15% standard rate; false = Exempt (0%)
+  vatRate?: number; // defaults to 0.15
+  costPrice?: number; // optional cost price
+}
+
+export interface ItemVatBreakdownResult {
+  netPrice: number; // in ETB (rounded to 2 decimal places)
+  vatAmount: number; // in ETB (rounded to 2 decimal places)
+  grossPrice: number; // in ETB (rounded to 2 decimal places)
+  netCents: number;
+  vatCents: number;
+  grossCents: number;
+  costPrice: number;
+  profitMarginBirr: number;
+  profitMarginPercent: number;
+  isNegativeMargin: boolean;
+  isSellingBelowCost: boolean;
+}
+
+/**
+ * Calculates bidirectional VAT breakdown and profit margin for item catalog creation & editing.
+ * Guarantees that in minor units (cents):
+ * netCents + vatCents === grossCents (exact cent integrity, no rounding drift).
+ */
+export function calculateItemVatBreakdown(input: ItemVatBreakdownInput): ItemVatBreakdownResult {
+  const { typedPrice, priceIncludesVat, isVatApplicable, vatRate = 0.15, costPrice = 0 } = input;
+  const safeTyped = Math.max(0, isNaN(typedPrice) ? 0 : typedPrice);
+  const safeCost = Math.max(0, isNaN(costPrice) ? 0 : costPrice);
+  const costCents = Math.round(safeCost * 100);
+
+  let netCents = 0;
+  let vatCents = 0;
+  let grossCents = 0;
+
+  if (!isVatApplicable || vatRate <= 0) {
+    // Exempt item (0%): VAT is 0, Net === Gross
+    const cents = Math.round(safeTyped * 100);
+    netCents = cents;
+    vatCents = 0;
+    grossCents = cents;
+  } else if (priceIncludesVat) {
+    // Price includes VAT: user types shelf price (Gross)
+    // Net = Gross / (1 + vatRate)
+    grossCents = Math.round(safeTyped * 100);
+    netCents = Math.round(grossCents / (1 + vatRate));
+    // Exact minor-unit identity: vat = gross - net
+    vatCents = grossCents - netCents;
+  } else {
+    // Price excludes VAT: user types net price (Net)
+    // VAT = Net * vatRate
+    netCents = Math.round(safeTyped * 100);
+    vatCents = Math.round(netCents * vatRate);
+    // Exact minor-unit identity: gross = net + vat
+    grossCents = netCents + vatCents;
+  }
+
+  const netPrice = round2(netCents / 100);
+  const vatAmount = round2(vatCents / 100);
+  const grossPrice = round2(grossCents / 100);
+  const cost = round2(costCents / 100);
+
+  const profitMarginBirr = round2(netPrice - cost);
+  const profitMarginPercent = netPrice > 0 ? round2(((netPrice - cost) / netPrice) * 100) : 0;
+  const isSellingBelowCost = cost > netPrice && grossPrice > 0;
+  const isNegativeMargin = profitMarginBirr < 0;
+
+  return {
+    netPrice,
+    vatAmount,
+    grossPrice,
+    netCents,
+    vatCents,
+    grossCents,
+    costPrice: cost,
+    profitMarginBirr,
+    profitMarginPercent,
+    isNegativeMargin,
+    isSellingBelowCost,
+  };
+}
+

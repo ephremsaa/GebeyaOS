@@ -167,4 +167,5 @@ export interface FEFOAllocationResult {
   totalAllocated: number;
   unallocatedQuantity: number;
   fullyAllocated: boolean;
+  expiredBatchesBlocked?: FEFOBatchCandidate[];
 }

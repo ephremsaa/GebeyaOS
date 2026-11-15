@@ -11,6 +11,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  AlertOctagon,
+  Trash2,
   FileEdit,
   ClipboardList,
   Eye,
@@ -23,7 +25,12 @@ import {
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
 import { posApi } from '../utils/pos-api';
-import { StockAdjustmentReasonCode } from '@gebeyaos/shared-types';
+import {
+  StockAdjustmentReasonCode,
+  computeDaysLeftInAddis,
+  getExpiryStatus,
+  formatEthiopianDisplayDate,
+} from '@gebeyaos/shared-types';
 import { AddStockChooserModal } from './inventory/AddStockChooserModal';
 import { ScanStockDrawer } from './inventory/ScanStockDrawer';
 import { ManualStockDrawer } from './inventory/ManualStockDrawer';
@@ -117,6 +124,12 @@ export const StockAndExpiryView: React.FC = () => {
   const [isLabelModalOpen, setIsLabelModalOpen] = useState<boolean>(false);
   const [selectedForLabels, setSelectedForLabels] = useState<LabelProductItem[]>([]);
 
+  // Write Off Expired Batch State
+  const [writeOffBatch, setWriteOffBatch] = useState<BatchItem | null>(null);
+  const [writeOffReason, setWriteOffReason] = useState<string>('Expired inventory disposal');
+  const [writeOffSubmitting, setWriteOffSubmitting] = useState<boolean>(false);
+  const [writeOffError, setWriteOffError] = useState<string | null>(null);
+
   const canCreateAdjustment =
     hasPermission('inventory:adjust:create') ||
     currentUser?.role === 'HQ_ADMIN' ||
@@ -177,51 +190,81 @@ export const StockAndExpiryView: React.FC = () => {
     return palette[Math.abs(hash) % palette.length];
   };
 
-  // Helper to compute days left from an expiry date
-  const computeDaysLeft = (expiryDateStr: string | null | undefined): number | null => {
-    if (!expiryDateStr) return null;
-    const target = new Date(expiryDateStr);
-    if (isNaN(target.getTime())) return null;
-    const now = new Date();
-    // set to start of day
-    now.setHours(0, 0, 0, 0);
-    target.setHours(0, 0, 0, 0);
-    const diffMs = target.getTime() - now.getTime();
-    return Math.round(diffMs / (1000 * 60 * 60 * 24));
-  };
+  // Batches sorted by nearest expiry date (FEFO)
+  const sortedBatches = useMemo(() => {
+    return [...batches].sort((a, b) => {
+      const daysA = computeDaysLeftInAddis(a.expiryDate) ?? a.daysUntilExpiry ?? 99999;
+      const daysB = computeDaysLeftInAddis(b.expiryDate) ?? b.daysUntilExpiry ?? 99999;
+      return daysA - daysB;
+    });
+  }, [batches]);
 
-  // KPI calculations
+  // KPI calculations (strictly matching active view tab counts)
   const kpis = useMemo(() => {
-    let expiredBatchesCount = 0;
-    let expiringIn7DaysCount = 0;
-    batches.forEach((b) => {
-      if (b.daysUntilExpiry <= 0) expiredBatchesCount++;
-      else if (b.daysUntilExpiry <= 7) expiringIn7DaysCount++;
-    });
+    if (viewMode === 'batch') {
+      let expiredCount = 0;
+      let expiring7Count = 0;
+      let expiring30Count = 0;
+      let lowStockCount = 0;
 
-    let lowStockCount = 0;
-    let inStockCount = 0;
-    products.forEach((p) => {
-      const onHand = Number(p.stock_on_hand || 0);
-      const min = Number(p.min_stock_level || 0);
-      if (onHand > 0) inStockCount++;
-      if (onHand <= min && onHand > 0) lowStockCount++;
-    });
+      sortedBatches.forEach((b) => {
+        const days = computeDaysLeftInAddis(b.expiryDate) ?? b.daysUntilExpiry;
+        if (days <= 0) expiredCount++;
+        else if (days <= 7) {
+          expiring7Count++;
+          expiring30Count++;
+        } else if (days <= 30) {
+          expiring30Count++;
+        }
+        if (b.quantityOnHand <= 5) lowStockCount++;
+      });
 
-    return {
-      expired: expiredBatchesCount,
-      expiring7: expiringIn7DaysCount,
-      lowStock: lowStockCount,
-      totalInStock: inStockCount,
-    };
-  }, [batches, products]);
+      return {
+        expired: expiredCount,
+        expiring7: expiring7Count,
+        expiring30: expiring30Count,
+        lowStock: lowStockCount,
+        total: sortedBatches.length,
+      };
+    } else {
+      let expiredCount = 0;
+      let expiring7Count = 0;
+      let expiring30Count = 0;
+      let lowStockCount = 0;
+
+      products.forEach((p) => {
+        const onHand = Number(p.stock_on_hand || 0);
+        const min = Number(p.min_stock_level || 0);
+        const days = computeDaysLeftInAddis(p.nearest_expiry);
+
+        if (days !== null) {
+          if (days <= 0) expiredCount++;
+          else if (days <= 7) {
+            expiring7Count++;
+            expiring30Count++;
+          } else if (days <= 30) {
+            expiring30Count++;
+          }
+        }
+        if (onHand <= min) lowStockCount++;
+      });
+
+      return {
+        expired: expiredCount,
+        expiring7: expiring7Count,
+        expiring30: expiring30Count,
+        lowStock: lowStockCount,
+        total: products.length,
+      };
+    }
+  }, [viewMode, sortedBatches, products]);
 
   // Filtered Products (Item View)
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const onHand = Number(p.stock_on_hand || 0);
       const min = Number(p.min_stock_level || 0);
-      const days = computeDaysLeft(p.nearest_expiry);
+      const days = computeDaysLeftInAddis(p.nearest_expiry);
 
       if (filterTab === 'low_stock') {
         return onHand <= min;
@@ -238,19 +281,20 @@ export const StockAndExpiryView: React.FC = () => {
 
   // Filtered Batches (Batch View)
   const filteredBatches = useMemo(() => {
-    return batches.filter((b) => {
+    return sortedBatches.filter((b) => {
+      const days = computeDaysLeftInAddis(b.expiryDate) ?? b.daysUntilExpiry;
       if (filterTab === 'low_stock') {
         return b.quantityOnHand <= 5;
       }
       if (filterTab === 'expiring_soon') {
-        return b.daysUntilExpiry <= 30 && b.daysUntilExpiry > 0;
+        return days <= 30 && days > 0;
       }
       if (filterTab === 'expired') {
-        return b.daysUntilExpiry <= 0;
+        return days <= 0;
       }
       return true;
     });
-  }, [batches, filterTab]);
+  }, [sortedBatches, filterTab]);
 
   // Open Adjust Modal
   const handleOpenAdjustment = (product: StockItem) => {
@@ -380,6 +424,33 @@ export const StockAndExpiryView: React.FC = () => {
     }
   };
 
+  // Submit Write-Off for Expired Batch
+  const handleConfirmWriteOff = async () => {
+    if (!writeOffBatch) return;
+    setWriteOffSubmitting(true);
+    setWriteOffError(null);
+    try {
+      await posApi.writeOffExpiredBatch(
+        writeOffBatch.batchId,
+        writeOffReason.trim() || 'Expired inventory disposal',
+        currentUser?.branchId,
+      );
+      setSuccessMsg(
+        t('inventory.writeOffSuccess', {
+          batch: writeOffBatch.batchNumber,
+          qty: writeOffBatch.quantityOnHand,
+        }),
+      );
+      setWriteOffBatch(null);
+      fetchData();
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setWriteOffError(err.message || 'Failed to write off expired batch');
+    } finally {
+      setWriteOffSubmitting(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 overflow-hidden select-none">
       {/* ─── 1. Header & Actions ─── */}
@@ -447,6 +518,28 @@ export const StockAndExpiryView: React.FC = () => {
         </div>
       )}
 
+      {/* Daily Expiration Alert Notification Banner */}
+      {(kpis.expired > 0 || kpis.expiring7 > 0) && (
+        <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs font-semibold flex items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <AlertOctagon size={18} className="text-rose-600 shrink-0" />
+            <span>
+              {t('inventory.dailyExpirationAlert', {
+                expired: kpis.expired,
+                expiring: kpis.expiring7,
+              })}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFilterTab('expired')}
+            className="px-3 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shrink-0 shadow-xs"
+          >
+            {t('inventory.expired')} ({kpis.expired})
+          </button>
+        </div>
+      )}
+
       {/* ─── 2. Top KPI Cards ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         {/* Card 1: Expired */}
@@ -454,7 +547,7 @@ export const StockAndExpiryView: React.FC = () => {
           onClick={() => setFilterTab(filterTab === 'expired' ? 'all' : 'expired')}
           className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
             filterTab === 'expired'
-              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400'
+              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 ring-2 ring-rose-400/20'
               : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-rose-300'
           }`}
         >
@@ -467,7 +560,7 @@ export const StockAndExpiryView: React.FC = () => {
             </div>
           </div>
           <div className="w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center">
-            <AlertTriangle size={18} />
+            <AlertOctagon size={18} />
           </div>
         </div>
 
@@ -476,16 +569,38 @@ export const StockAndExpiryView: React.FC = () => {
           onClick={() => setFilterTab(filterTab === 'expiring_soon' ? 'all' : 'expiring_soon')}
           className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
             filterTab === 'expiring_soon'
-              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400'
-              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-amber-300'
+              ? 'bg-orange-50 dark:bg-orange-950/40 border-orange-400 ring-2 ring-orange-400/20'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-orange-300'
           }`}
         >
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               {t('inventory.expiringIn7Days')}
             </div>
-            <div className="text-xl font-black text-amber-600 font-mono">
+            <div className="text-xl font-black text-orange-600 font-mono">
               {kpis.expiring7}
+            </div>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-950 text-orange-600 flex items-center justify-center">
+            <AlertTriangle size={18} />
+          </div>
+        </div>
+
+        {/* Card 3: Expiring in 30 Days */}
+        <div
+          onClick={() => setFilterTab(filterTab === 'expiring_soon' ? 'all' : 'expiring_soon')}
+          className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
+            filterTab === 'expiring_soon'
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/20'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-amber-300'
+          }`}
+        >
+          <div>
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              {t('inventory.expiringIn30Days')}
+            </div>
+            <div className="text-xl font-black text-amber-600 font-mono">
+              {kpis.expiring30}
             </div>
           </div>
           <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 flex items-center justify-center">
@@ -493,47 +608,25 @@ export const StockAndExpiryView: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 3: Low Stock */}
+        {/* Card 4: Low Stock */}
         <div
           onClick={() => setFilterTab(filterTab === 'low_stock' ? 'all' : 'low_stock')}
           className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
             filterTab === 'low_stock'
-              ? 'bg-orange-50 dark:bg-orange-950/40 border-orange-400'
-              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-orange-300'
+              ? 'bg-red-50 dark:bg-red-950/40 border-red-400 ring-2 ring-red-400/20'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-red-300'
           }`}
         >
           <div>
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               {t('inventory.lowStock')}
             </div>
-            <div className="text-xl font-black text-orange-600 font-mono">
+            <div className="text-xl font-black text-red-600 font-mono">
               {kpis.lowStock}
             </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-950 text-orange-600 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-red-100 dark:bg-red-950 text-red-600 flex items-center justify-center">
             <AlertCircle size={18} />
-          </div>
-        </div>
-
-        {/* Card 4: Total In Stock */}
-        <div
-          onClick={() => setFilterTab('all')}
-          className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
-            filterTab === 'all'
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400'
-              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-300'
-          }`}
-        >
-          <div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {t('inventory.trackedItems')}
-            </div>
-            <div className="text-xl font-black text-emerald-600 font-mono">
-              {products.length}
-            </div>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
-            <Package size={18} />
           </div>
         </div>
       </div>
@@ -662,29 +755,10 @@ export const StockAndExpiryView: React.FC = () => {
                     const min = Number(p.min_stock_level || 0);
                     const isLow = onHand <= min && onHand > 0;
                     const isOut = onHand <= 0;
-                    const days = computeDaysLeft(p.nearest_expiry);
+                    const days = computeDaysLeftInAddis(p.nearest_expiry);
                     const isExpired = days !== null && days <= 0;
                     const initialStyle = getInitialColor(p.name_en || 'Product');
-
-                    // Days left color badge calculation
-                    let badgeBg = 'bg-slate-100 dark:bg-slate-700 text-slate-500';
-                    let badgeText = t('inventory.noExpiry');
-
-                    if (days !== null) {
-                      if (days <= 0) {
-                        badgeBg = 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200';
-                        badgeText = days === 0 ? t('inventory.todayExpiry') : t('inventory.expiredAgo', { days: Math.abs(days) });
-                      } else if (days <= 7) {
-                        badgeBg = 'bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border border-orange-200';
-                        badgeText = t('inventory.daysRemaining', { days });
-                      } else if (days <= 30) {
-                        badgeBg = 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200';
-                        badgeText = t('inventory.daysRemaining', { days });
-                      } else {
-                        badgeBg = 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300';
-                        badgeText = t('inventory.daysRemaining', { days });
-                      }
-                    }
+                    const expStatus = getExpiryStatus(p.nearest_expiry, 30);
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
@@ -731,13 +805,30 @@ export const StockAndExpiryView: React.FC = () => {
 
                         {/* Nearest Expiry Date */}
                         <td className="p-3.5 text-center font-mono text-xs text-slate-600 dark:text-slate-400">
-                          {p.nearest_expiry ? new Date(p.nearest_expiry).toISOString().split('T')[0] : '—'}
+                          {p.nearest_expiry ? p.nearest_expiry.slice(0, 10) : '—'}
                         </td>
 
-                        {/* Days Left Badge */}
+                        {/* Days Left Badge with Icon & Text */}
                         <td className="p-3.5 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${badgeBg}`}>
-                            {badgeText}
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              expStatus.tier === 'NO_EXPIRY'
+                                ? 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                                : expStatus.tier === 'EXPIRED' || expStatus.tier === 'TODAY'
+                                ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200'
+                                : expStatus.tier === 'CRITICAL'
+                                ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200'
+                                : expStatus.tier === 'WARNING'
+                                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200'
+                                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200'
+                            }`}
+                          >
+                            {expStatus.tier === 'EXPIRED' && <AlertOctagon size={12} className="text-rose-600 shrink-0" />}
+                            {expStatus.tier === 'TODAY' && <Clock size={12} className="text-rose-600 shrink-0" />}
+                            {expStatus.tier === 'CRITICAL' && <AlertTriangle size={12} className="text-orange-600 shrink-0" />}
+                            {expStatus.tier === 'WARNING' && <Calendar size={12} className="text-amber-600 shrink-0" />}
+                            {expStatus.tier === 'GOOD' && <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />}
+                            <span>{language === 'am' ? expStatus.labelAm : expStatus.labelEn}</span>
                           </span>
                         </td>
 
@@ -745,19 +836,19 @@ export const StockAndExpiryView: React.FC = () => {
                         <td className="p-3.5 text-center">
                           {isExpired ? (
                             <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 text-[10px] font-bold">
-                              Expired
+                              {t('inventory.expired')}
                             </span>
                           ) : isOut ? (
                             <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 text-[10px] font-bold">
-                              Out of Stock
+                              {t('inventory.outOfStock')}
                             </span>
                           ) : isLow ? (
                             <span className="px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 text-[10px] font-bold">
-                              Low (≤{min})
+                              {t('inventory.lowStockThreshold', { count: min })}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 text-[10px] font-bold">
-                              In Stock
+                              {t('inventory.inStock')}
                             </span>
                           )}
                         </td>
@@ -838,18 +929,9 @@ export const StockAndExpiryView: React.FC = () => {
                   </tr>
                 ) : (
                   filteredBatches.map((b) => {
-                    const days = b.daysUntilExpiry;
-                    let badgeBg = 'bg-emerald-100 text-emerald-700';
-                    let badgeText = `${days} days`;
-
-                    if (days <= 0) {
-                      badgeBg = 'bg-rose-100 text-rose-700 border border-rose-300';
-                      badgeText = days === 0 ? 'Expires Today' : `Expired (${Math.abs(days)}d ago)`;
-                    } else if (days <= 7) {
-                      badgeBg = 'bg-orange-100 text-orange-700 border border-orange-300';
-                    } else if (days <= 30) {
-                      badgeBg = 'bg-amber-100 text-amber-700 border border-amber-300';
-                    }
+                    const days = computeDaysLeftInAddis(b.expiryDate) ?? b.daysUntilExpiry;
+                    const expStatus = getExpiryStatus(b.expiryDate, 30);
+                    const isExpired = days <= 0;
 
                     return (
                       <tr key={b.batchId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
@@ -863,27 +945,59 @@ export const StockAndExpiryView: React.FC = () => {
                           {b.quantityOnHand} <span className="text-[10px] text-slate-400">{b.uom}</span>
                         </td>
                         <td className="p-3.5 text-center font-mono">
-                          {b.expiryDate}
+                          {b.expiryDate ? b.expiryDate.slice(0, 10) : '—'}
                         </td>
                         <td className="p-3.5 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${badgeBg}`}>
-                            {badgeText}
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              expStatus.tier === 'NO_EXPIRY'
+                                ? 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                                : expStatus.tier === 'EXPIRED' || expStatus.tier === 'TODAY'
+                                ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200'
+                                : expStatus.tier === 'CRITICAL'
+                                ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200'
+                                : expStatus.tier === 'WARNING'
+                                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200'
+                                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200'
+                            }`}
+                          >
+                            {expStatus.tier === 'EXPIRED' && <AlertOctagon size={12} className="text-rose-600 shrink-0" />}
+                            {expStatus.tier === 'TODAY' && <Clock size={12} className="text-rose-600 shrink-0" />}
+                            {expStatus.tier === 'CRITICAL' && <AlertTriangle size={12} className="text-orange-600 shrink-0" />}
+                            {expStatus.tier === 'WARNING' && <Calendar size={12} className="text-amber-600 shrink-0" />}
+                            {expStatus.tier === 'GOOD' && <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />}
+                            <span>{language === 'am' ? expStatus.labelAm : expStatus.labelEn}</span>
                           </span>
                         </td>
                         <td className="p-3.5 text-right font-mono font-bold text-rose-600">
                           {b.potentialLossValue.toFixed(2)} ETB
                         </td>
                         <td className="p-3.5 pr-5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const matchingProd = products.find((p) => p.id === b.productId);
-                              if (matchingProd) handleOpenAdjustment(matchingProd);
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition"
-                          >
-                            Adjust
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isExpired && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWriteOffBatch(b);
+                                  setWriteOffReason('Expired stock disposal');
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-800 flex items-center gap-1 transition"
+                              >
+                                <Trash2 size={12} className="text-rose-600" />
+                                {t('inventory.writeOffExpired')}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const matchingProd = products.find((p) => p.id === b.productId);
+                                if (matchingProd) handleOpenAdjustment(matchingProd);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition"
+                            >
+                              {t('inventory.adjustStock')}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1167,6 +1281,86 @@ export const StockAndExpiryView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ─── 8. Write Off Expired Batch Modal ─── */}
+      {writeOffBatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    {t('inventory.writeOffExpired')}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    {writeOffBatch.productName} • Batch #{writeOffBatch.batchNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setWriteOffBatch(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {writeOffError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle size={15} />
+                <span>{writeOffError}</span>
+              </div>
+            )}
+
+            <div className="p-3.5 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-800 dark:text-rose-200 space-y-1.5">
+              <p className="font-semibold">
+                {t('inventory.writeOffConfirm', {
+                  batch: writeOffBatch.batchNumber,
+                  qty: writeOffBatch.quantityOnHand,
+                })}
+              </p>
+              <p className="text-[11px] text-slate-500 font-mono">
+                {language === 'am' ? 'የሚጣለው ዋጋ፡' : 'Potential loss value:'}{' '}
+                {writeOffBatch.potentialLossValue.toFixed(2)} ETB ({writeOffBatch.quantityOnHand} {writeOffBatch.uom})
+              </p>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                {t('inventory.writeOffReason')} *
+              </label>
+              <input
+                type="text"
+                required
+                value={writeOffReason}
+                onChange={(e) => setWriteOffReason(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setWriteOffBatch(null)}
+                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+              >
+                {language === 'am' ? 'ሰርዝ' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={writeOffSubmitting}
+                onClick={handleConfirmWriteOff}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              >
+                {writeOffSubmitting && <RefreshCw size={13} className="animate-spin" />}
+                {t('inventory.writeOffExpired')}
+              </button>
+            </div>
           </div>
         </div>
       )}

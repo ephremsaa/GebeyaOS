@@ -62,9 +62,23 @@ export class InventoryController {
   async createBatch(
     @Body() dto: CreateBatchDto,
     @Headers('x-branch-id') branchIdHeader?: string,
+    @Headers('x-user-id') userIdHeader?: string,
   ) {
     const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
-    return this.inventoryService.createBatch(branchId, dto);
+    return this.inventoryService.createBatch(branchId, dto, userIdHeader);
+  }
+
+  @Post('batches/:id/write-off')
+  @HttpCode(HttpStatus.OK)
+  async writeOffExpiredBatch(
+    @Param('id') batchId: string,
+    @Body('reason') reason: string,
+    @Headers('x-branch-id') branchIdHeader?: string,
+    @Headers('x-user-id') userIdHeader?: string,
+  ) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const userId = userIdHeader || '00000000-0000-0000-0000-000000000000';
+    return this.inventoryService.writeOffExpiredBatch(branchId, batchId, reason, userId);
   }
 
   @Post('movements')

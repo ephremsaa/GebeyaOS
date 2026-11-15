@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@nestjs/common';
-import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow, types } from 'pg';
 import { TenantContextService } from '../tenant/tenant-context.service';
 
 @Injectable()
@@ -16,6 +16,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
+    // Parse PostgreSQL DATE (OID 1082) as exact YYYY-MM-DD string without timezone shifting
+    types.setTypeParser(1082, (val: string) => val);
+
     this.pool = new Pool({
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '5432', 10),

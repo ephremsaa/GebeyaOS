@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateTaxInclusiveLineVat,
   calculateBasketFinancials,
+  calculateItemVatBreakdown,
   round2,
   generateReceiptNumber,
 } from '../src';
@@ -75,5 +76,100 @@ describe('VAT and Rounding Rule for Ethiopian Retail POS', () => {
     expect(totalPaid).toBe(800);
     expect(changeDue).toBe(17.5); // Cash change
     expect(round2(totalPaid - changeDue)).toBe(grandTotal);
+  });
+
+  describe('Item Catalog Bidirectional VAT Calculation (Part 3 Requirements)', () => {
+    it('calculates inclusive 15% VAT: 115.00 shelf price -> Net 100.00, VAT 15.00, Gross 115.00', () => {
+      const result = calculateItemVatBreakdown({
+        typedPrice: 115,
+        priceIncludesVat: true,
+        isVatApplicable: true,
+        vatRate: 0.15,
+        costPrice: 80,
+      });
+
+      expect(result.grossPrice).toBe(115.0);
+      expect(result.netPrice).toBe(100.0);
+      expect(result.vatAmount).toBe(15.0);
+      expect(result.netCents + result.vatCents).toBe(result.grossCents);
+      expect(result.profitMarginBirr).toBe(20.0); // 100 net - 80 cost
+      expect(result.profitMarginPercent).toBe(20.0); // 20 / 100 * 100
+      expect(result.isSellingBelowCost).toBe(false);
+    });
+
+    it('calculates exclusive 15% VAT: 100.00 net price -> Net 100.00, VAT 15.00, Gross 115.00', () => {
+      const result = calculateItemVatBreakdown({
+        typedPrice: 100,
+        priceIncludesVat: false,
+        isVatApplicable: true,
+        vatRate: 0.15,
+        costPrice: 80,
+      });
+
+      expect(result.netPrice).toBe(100.0);
+      expect(result.vatAmount).toBe(15.0);
+      expect(result.grossPrice).toBe(115.0);
+      expect(result.netCents + result.vatCents).toBe(result.grossCents);
+      expect(result.profitMarginBirr).toBe(20.0);
+      expect(result.profitMarginPercent).toBe(20.0);
+      expect(result.isSellingBelowCost).toBe(false);
+    });
+
+    it('calculates exempt 0% VAT: Net === Gross, VAT is 0', () => {
+      const result = calculateItemVatBreakdown({
+        typedPrice: 250,
+        priceIncludesVat: true,
+        isVatApplicable: false,
+        vatRate: 0,
+        costPrice: 200,
+      });
+
+      expect(result.grossPrice).toBe(250.0);
+      expect(result.netPrice).toBe(250.0);
+      expect(result.vatAmount).toBe(0.0);
+      expect(result.netCents + result.vatCents).toBe(result.grossCents);
+      expect(result.profitMarginBirr).toBe(50.0);
+      expect(result.profitMarginPercent).toBe(20.0);
+    });
+
+    it('detects selling below cost with warning flag', () => {
+      const result = calculateItemVatBreakdown({
+        typedPrice: 100, // Gross 100 -> Net 86.96
+        priceIncludesVat: true,
+        isVatApplicable: true,
+        vatRate: 0.15,
+        costPrice: 95, // Cost 95 > Net 86.96
+      });
+
+      expect(result.isSellingBelowCost).toBe(true);
+      expect(result.isNegativeMargin).toBe(true);
+      expect(result.profitMarginBirr).toBeLessThan(0);
+    });
+
+    it('preserves exact cent identity (netCents + vatCents === grossCents) across edge cases', () => {
+      const testCases = [0.01, 0.05, 0.33, 0.99, 1.0, 9.99, 33.33, 49.95, 99.99, 100.0, 115.0, 199.99, 1000.0];
+
+      for (const price of testCases) {
+        // Inclusive
+        const inc = calculateItemVatBreakdown({
+          typedPrice: price,
+          priceIncludesVat: true,
+          isVatApplicable: true,
+          vatRate: 0.15,
+        });
+        expect(inc.netCents + inc.vatCents).toBe(inc.grossCents);
+        expect(round2(inc.netPrice + inc.vatAmount)).toBe(inc.grossPrice);
+
+        // Exclusive
+        const exc = calculateItemVatBreakdown({
+          typedPrice: price,
+          priceIncludesVat: false,
+          isVatApplicable: true,
+          vatRate: 0.15,
+        });
+        expect(exc.netCents + exc.vatCents).toBe(exc.grossCents);
+        expect(round2(exc.netPrice + exc.vatAmount)).toBe(exc.grossPrice);
+      }
+    });
   });
 });

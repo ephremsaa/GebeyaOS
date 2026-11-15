@@ -21,6 +21,8 @@ import {
   ImportCommitResult,
   ImportBatchSummary,
   generateUuidV7,
+  parseExcelExpiryDate,
+  validateExpiryDateInput,
 } from '@gebeyaos/shared-types';
 
 const DEFAULT_TENANT_ID = '01900000-0000-7000-8000-000000000001';
@@ -362,17 +364,16 @@ export class ExcelImportService {
 
       let formattedExpiry: string | undefined = undefined;
       if (rawExpiry) {
-        if (!isNaN(Number(rawExpiry)) && Number(rawExpiry) > 20000) {
-          const excelDate = new Date((Number(rawExpiry) - (25567 + 2)) * 86400 * 1000);
-          formattedExpiry = excelDate.toISOString().slice(0, 10);
+        const parsed = parseExcelExpiryDate(rawExpiry);
+        if (!parsed.valid || !parsed.dateStr) {
+          issues.push(parsed.error || 'Invalid expiry date format');
         } else {
-          formattedExpiry = rawExpiry.slice(0, 10);
-        }
-
-        if (formattedExpiry) {
-          const expDate = new Date(formattedExpiry);
-          if (!isNaN(expDate.getTime()) && expDate.getTime() < Date.now()) {
+          formattedExpiry = parsed.dateStr;
+          const valRes = validateExpiryDateInput(formattedExpiry);
+          if (valRes.isPast) {
             issues.push('Expiry date is in the past');
+          } else if (valRes.isTooFarFuture) {
+            issues.push('Expiry date is more than 5 years away');
           }
         }
       }
@@ -635,7 +636,7 @@ export class ExcelImportService {
         let batchIdRef: string | null = null;
         if (row.expiryDate || row.batchNumber) {
           batchIdRef = generateUuidV7();
-          const expDate = row.expiryDate ? new Date(row.expiryDate) : null;
+          const expDate = row.expiryDate ? row.expiryDate.slice(0, 10) : null;
           await client.query(
             `INSERT INTO batches (id, branch_id, product_id, batch_number, expiry_date, unit_cost, initial_quantity, current_quantity, tenant_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8)`,

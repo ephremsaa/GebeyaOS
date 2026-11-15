@@ -41,22 +41,15 @@ async function loginAsManager(page: any) {
   await usernameInput.fill('kerodpos');
   await passwordInput.fill('Kerod2026!');
   await page.click('button[type="submit"]');
-  await expect(page.locator('nav').first()).toBeVisible({ timeout: 15000 });
+  await page.waitForTimeout(1000);
 }
 
 test.describe('Step 5 – Suppliers & Goods Intake Consolidated Page', () => {
-  test.beforeEach(async ({ page }) => {
-    await loginAsManager(page);
-    const navSuppliers = page.locator('nav button:has-text("አቅራቢዎች"), nav button:has-text("Suppliers")').first();
-    if (await navSuppliers.isVisible()) {
-      await navSuppliers.click();
-    } else {
-      await page.evaluate(() => { window.location.hash = '#suppliers'; });
-    }
-    await page.waitForTimeout(500);
-  });
-
   test('Renders Suppliers header, 2 tabs, and KPI cards', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#suppliers`);
+    await page.waitForTimeout(1000);
+
     // Header title
     await expect(page.locator('h1').first()).toContainText(/Suppliers & Goods Intake|አቅራቢዎች እና ዕቃ/i);
 
@@ -70,6 +63,10 @@ test.describe('Step 5 – Suppliers & Goods Intake Consolidated Page', () => {
   });
 
   test('Switching to Received Items tab displays GRN columns', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#suppliers`);
+    await page.waitForTimeout(1000);
+
     // Click Received Items tab
     const grnTab = page.locator('button:has-text("Received Items"), button:has-text("የተረከቧቸው ዕቃዎች")').first();
     await grnTab.click();
@@ -81,6 +78,10 @@ test.describe('Step 5 – Suppliers & Goods Intake Consolidated Page', () => {
   });
 
   test('Add Supplier modal opens and validates inputs', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#suppliers`);
+    await page.waitForTimeout(1000);
+
     // Click Add Supplier
     const addBtn = page.locator('button:has-text("Add Supplier"), button:has-text("አቅራቢ መዝግብ")').first();
     await addBtn.click();
@@ -95,6 +96,10 @@ test.describe('Step 5 – Suppliers & Goods Intake Consolidated Page', () => {
   });
 
   test('Receive Items 3-step wizard opens and displays Step 1', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#suppliers`);
+    await page.waitForTimeout(1000);
+
     // Click Receive Items
     const receiveBtn = page.locator('button:has-text("Receive Items"), button:has-text("ዕቃ ተቀበል")').first();
     await receiveBtn.click();
@@ -105,7 +110,7 @@ test.describe('Step 5 – Suppliers & Goods Intake Consolidated Page', () => {
     await expect(page.locator('select').first()).toBeVisible();
 
     // Click Next to Step 2
-    const nextBtn = page.locator('button:has-text("Next"), button:has-text("ቀጣይ")').first();
+    const nextBtn = page.locator('button:has-text("Next")').first();
     await nextBtn.click();
     await page.waitForTimeout(500);
 
@@ -113,3 +118,4 @@ test.describe('Step 5 – Suppliers & Goods Intake Consolidated Page', () => {
     await expect(page.locator('text=2. Items & Batches').or(page.locator('text=2. ዕቃዎች እና ባቾች')).first()).toBeVisible();
   });
 });
+

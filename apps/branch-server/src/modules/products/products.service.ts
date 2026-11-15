@@ -61,6 +61,7 @@ export class ProductsService {
     const isWeighed = dto.is_weighed ?? false;
     const minStock = dto.min_stock_level ?? 0;
     const allowDiscount = dto.allow_discount ?? true;
+    const hasExpiryDate = dto.has_expiry_date ?? false;
 
     try {
       const result = await this.db.query<Product>(
@@ -68,8 +69,8 @@ export class ProductsService {
           id, sku, name_en, name_am, category_id, uom_code,
           base_price, cost_price, is_vat_applicable, vat_rate,
           is_weighed, scale_plu, min_stock_level, max_stock_level,
-          allow_discount, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, TRUE)
+          allow_discount, has_expiry_date, is_active
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, TRUE)
         RETURNING *`,
         [
           id,
@@ -87,6 +88,7 @@ export class ProductsService {
           minStock,
           dto.max_stock_level || null,
           allowDiscount,
+          hasExpiryDate,
         ],
       );
 
@@ -493,7 +495,7 @@ export class ProductsService {
       'sku', 'name_en', 'name_am', 'category_id', 'uom_code',
       'base_price', 'cost_price', 'is_vat_applicable', 'vat_rate',
       'is_weighed', 'scale_plu', 'min_stock_level', 'max_stock_level',
-      'allow_discount', 'is_active',
+      'allow_discount', 'has_expiry_date', 'is_active',
     ];
 
     for (const key of updatable) {

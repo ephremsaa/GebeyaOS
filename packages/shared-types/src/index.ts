@@ -15,4 +15,5 @@ export * from './auth.types';
 export * from './import.types';
 export * from './money-formatter';
 export * from './platform.types';
+export * from './date-fefo.helper';
 

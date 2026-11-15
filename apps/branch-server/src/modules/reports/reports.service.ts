@@ -523,12 +523,14 @@ export class ReportsService {
   ): Promise<ExpiringStockReport> {
     const isAllBranches = !branchId || branchId.toUpperCase() === 'ALL';
 
+    const filterByThreshold = thresholdDays && thresholdDays < 3650;
     const res = await this.db.query<any>(
       `SELECT
          b.id as batch_id,
          b.batch_number,
          b.product_id,
          p.name_en as product_name,
+         p.name_am as product_name_am,
          p.uom_code,
          b.expiry_date,
          b.current_quantity,
@@ -539,9 +541,9 @@ export class ReportsService {
        WHERE ${isAllBranches ? '1=1' : 'b.branch_id = $1'}
          AND b.current_quantity > 0
          AND b.expiry_date IS NOT NULL
-         AND b.expiry_date <= (CURRENT_DATE + ($${isAllBranches ? '1' : '2'} || ' days')::interval)
+         ${filterByThreshold ? `AND b.expiry_date <= (CURRENT_DATE + ($${isAllBranches ? '1' : '2'} || ' days')::interval)` : ''}
        ORDER BY b.expiry_date ASC`,
-      isAllBranches ? [thresholdDays] : [branchId, thresholdDays],
+      filterByThreshold ? (isAllBranches ? [thresholdDays] : [branchId, thresholdDays]) : (isAllBranches ? [] : [branchId]),
     );
 
     let totalExpiringValue = 0;
@@ -568,7 +570,9 @@ export class ReportsService {
         productId: r.product_id,
         productName: r.product_name,
         uom: r.uom_code,
-        expiryDate: r.expiry_date instanceof Date ? r.expiry_date.toISOString().split('T')[0] : String(r.expiry_date),
+        expiryDate: typeof r.expiry_date === 'string'
+          ? r.expiry_date.slice(0, 10)
+          : (r.expiry_date instanceof Date ? r.expiry_date.toISOString().split('T')[0] : String(r.expiry_date).slice(0, 10)),
         daysUntilExpiry: days,
         quantityOnHand: qty,
         unitCost: r2(unitCost),

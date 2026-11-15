@@ -18,6 +18,8 @@ import {
   FEFOBatchCandidate,
   FEFOAllocationResult,
   allocateFEFO,
+  getAddisTodayString,
+  validateExpiryDateInput,
 } from '@gebeyaos/shared-types';
 import {
   CreateStockAdjustmentDto,
@@ -182,6 +184,8 @@ export class InventoryService {
 
   /**
    * Allocates batches for a sale using First-Expired, First-Out (FEFO).
+   * By default blocks allocation from expired batches (daysLeft < 0 in Addis Ababa)
+   * unless allowExpiredStock is explicitly authorized by a manager.
    */
   async allocateBatchesForSale(
     branchId: string,
@@ -189,6 +193,7 @@ export class InventoryService {
     requestedQuantity: number,
     allowNegativeStock = false,
     client?: PoolClient,
+    allowExpiredStock = false,
   ): Promise<FEFOAllocationResult> {
     const queryFn = client
       ? (text: string, params: any[]) => client.query(text, params)
@@ -205,53 +210,181 @@ export class InventoryService {
     const candidates: FEFOBatchCandidate[] = res.rows.map((row: any) => ({
       id: row.id,
       batchNumber: row.batch_number,
-      expiryDate: row.expiry_date ? row.expiry_date.toISOString().split('T')[0] : null,
+      expiryDate: typeof row.expiry_date === 'string'
+        ? row.expiry_date.slice(0, 10)
+        : (row.expiry_date instanceof Date
+          ? row.expiry_date.toISOString().split('T')[0]
+          : null),
       unitCost: parseFloat(row.unit_cost),
       currentQuantity: parseFloat(row.current_quantity),
-      createdAt: row.created_at.toISOString(),
+      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     }));
 
     return allocateFEFO(candidates, requestedQuantity, {
       allowNegativeStock,
       deficitBatchStrategy: 'latest',
+      filterExpired: !allowExpiredStock,
+      todayStr: getAddisTodayString(),
     });
   }
 
   /**
-   * Creates a batch for an inventory item (e.g. from receiving or initial count).
+   * Creates or increments a batch for an inventory item (scan, manual entry, or receiving).
+   * Rules:
+   *  - Items with has_expiry_date REQUIRE a valid expiry date.
+   *  - Same item + same expiry date = increment existing batch quantity.
+   *  - Same item + different expiry date = create distinct batch row.
+   *  - Records stock addition into the append-only stock_ledger.
    */
-  async createBatch(branchId: string, dto: CreateBatchDto) {
-    const res = await this.db.query(
-      `INSERT INTO batches (
-         branch_id, product_id, batch_number, expiry_date, unit_cost, initial_quantity, current_quantity, supplier_id
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-      [
-        branchId,
-        dto.productId,
-        dto.batchNumber,
-        dto.expiryDate || null,
-        dto.unitCost,
-        dto.initialQuantity,
-        dto.initialQuantity,
-        dto.supplierId || null,
-      ],
+  async createBatch(branchId: string, dto: CreateBatchDto, userId?: string) {
+    const prodRes = await this.db.query(
+      `SELECT id, name_en, name_am, has_expiry_date, cost_price FROM products WHERE id = $1`,
+      [dto.productId],
     );
+    if (prodRes.rows.length === 0) {
+      throw new NotFoundException(`Product ${dto.productId} not found`);
+    }
+    const product = prodRes.rows[0];
 
-    const row = res.rows[0];
-    return {
-      id: row.id,
-      branchId: row.branch_id,
-      productId: row.product_id,
-      batchNumber: row.batch_number,
-      expiryDate: row.expiry_date ? row.expiry_date.toISOString().split('T')[0] : null,
-      unitCost: parseFloat(row.unit_cost),
-      initialQuantity: parseFloat(row.initial_quantity),
-      currentQuantity: parseFloat(row.current_quantity),
-      supplierId: row.supplier_id,
-      createdAt: row.created_at.toISOString(),
-      updatedAt: row.updated_at.toISOString(),
-    };
+    // Enforce expiry date requirement
+    if (product.has_expiry_date) {
+      if (!dto.expiryDate || String(dto.expiryDate).trim() === '') {
+        throw new BadRequestException(
+          `Expiry date is required for '${product.name_en}' because it is marked as having an expiry date.`,
+        );
+      }
+    }
+
+    let cleanExpiry: string | null = null;
+    if (dto.expiryDate && String(dto.expiryDate).trim() !== '') {
+      cleanExpiry = String(dto.expiryDate).trim().slice(0, 10);
+      const validation = validateExpiryDateInput(cleanExpiry);
+      if (!validation.isValid) {
+        throw new BadRequestException(validation.warning || 'Invalid expiry date');
+      }
+    }
+
+    const unitCost = dto.unitCost ?? (parseFloat(product.cost_price) || 0);
+    const qty = Number(dto.initialQuantity) || 0;
+    if (qty <= 0) {
+      throw new BadRequestException('Batch quantity must be greater than zero');
+    }
+
+    return this.db.withTransaction(async (client) => {
+      // Check if a batch with same expiry date exists for this product at this branch
+      let batchRow: any = null;
+      if (cleanExpiry) {
+        const existingBatch = await client.query(
+          `SELECT * FROM batches
+           WHERE branch_id = $1 AND product_id = $2 AND expiry_date = $3
+           LIMIT 1`,
+          [branchId, dto.productId, cleanExpiry],
+        );
+        if (existingBatch.rows.length > 0) {
+          const b = existingBatch.rows[0];
+          const updateRes = await client.query(
+            `UPDATE batches
+             SET current_quantity = current_quantity + $1,
+                 unit_cost = CASE WHEN $2 > 0 THEN $2 ELSE unit_cost END,
+                 updated_at = clock_timestamp()
+             WHERE id = $3
+             RETURNING *`,
+            [qty, unitCost, b.id],
+          );
+          batchRow = updateRes.rows[0];
+        }
+      }
+
+      if (!batchRow) {
+        const batchNum = dto.batchNumber && dto.batchNumber.trim() !== ''
+          ? dto.batchNumber.trim()
+          : `BATCH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        const insertRes = await client.query(
+          `INSERT INTO batches (
+             branch_id, product_id, batch_number, expiry_date, unit_cost, initial_quantity, current_quantity, supplier_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING *`,
+          [
+            branchId,
+            dto.productId,
+            batchNum,
+            cleanExpiry,
+            unitCost,
+            qty,
+            qty,
+            dto.supplierId || null,
+          ],
+        );
+        batchRow = insertRes.rows[0];
+      }
+
+      // Record to append-only stock_ledger
+      await this.recordMovementInTransaction(client, branchId, {
+        productId: dto.productId,
+        batchId: batchRow.id,
+        movementType: 'PURCHASE_RECEIVE',
+        quantityChange: qty,
+        unitCost,
+        referenceType: 'GRN',
+        referenceId: batchRow.id,
+        notes: `Stock-in batch ${batchRow.batch_number}${cleanExpiry ? ` (Exp: ${cleanExpiry})` : ''}`,
+        createdBy: userId || null,
+        allowNegativeStock: true,
+      });
+
+      return {
+        id: batchRow.id,
+        branchId: batchRow.branch_id,
+        productId: batchRow.product_id,
+        batchNumber: batchRow.batch_number,
+        expiryDate: typeof batchRow.expiry_date === 'string'
+          ? batchRow.expiry_date.slice(0, 10)
+          : (batchRow.expiry_date instanceof Date ? batchRow.expiry_date.toISOString().split('T')[0] : null),
+        unitCost: parseFloat(batchRow.unit_cost),
+        initialQuantity: parseFloat(batchRow.initial_quantity),
+        currentQuantity: parseFloat(batchRow.current_quantity),
+        supplierId: batchRow.supplier_id,
+        createdAt: batchRow.created_at instanceof Date ? batchRow.created_at.toISOString() : String(batchRow.created_at),
+        updatedAt: batchRow.updated_at instanceof Date ? batchRow.updated_at.toISOString() : String(batchRow.updated_at),
+      };
+    });
+  }
+
+  /**
+   * Writes off an expired batch with full audit and stock ledger movement.
+   */
+  async writeOffExpiredBatch(
+    branchId: string,
+    batchId: string,
+    reason: string,
+    userId: string,
+  ): Promise<StockAdjustment> {
+    const batchRes = await this.db.query(
+      `SELECT * FROM batches WHERE id = $1 AND branch_id = $2`,
+      [batchId, branchId],
+    );
+    if (batchRes.rows.length === 0) {
+      throw new NotFoundException(`Batch ${batchId} not found in this branch`);
+    }
+    const b = batchRes.rows[0];
+    const qty = parseFloat(b.current_quantity);
+    if (qty <= 0) {
+      throw new BadRequestException('Batch is already empty or depleted');
+    }
+
+    return this.createAdjustment(branchId, userId, {
+      reasonCode: 'EXPIRED',
+      notes: reason || `Expired batch ${b.batch_number} written off`,
+      items: [
+        {
+          productId: b.product_id,
+          batchId: b.id,
+          quantityChange: -qty,
+          unitCost: parseFloat(b.unit_cost),
+        },
+      ],
+    });
   }
 
   /**

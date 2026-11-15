@@ -165,6 +165,14 @@ export class CreateSaleDto {
   @IsBoolean()
   @IsOptional()
   bypassFiscal?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  managerOverrideExpired?: boolean;
+
+  @IsString()
+  @IsOptional()
+  overrideReason?: string;
 }
 
 export class HeldBasketLineItemDto {

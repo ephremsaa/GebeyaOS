@@ -14,6 +14,7 @@ export interface Product {
   min_stock_level: number;
   max_stock_level: number | null;
   allow_discount: boolean;
+  has_expiry_date: boolean;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
