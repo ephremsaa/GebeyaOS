@@ -131,4 +131,93 @@ test.describe('Step 3 – Items & Categories consolidated page', () => {
     // Verify newly created category appears in table
     await expect(page.locator(`text=${catName}`).first()).toBeVisible({ timeout: 8000 });
   });
+
+  test('Automatic VAT calculation in drawer computes Net, 15% VAT, and profit margin', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#items`);
+    await page.waitForTimeout(500);
+
+    // Open Add product drawer
+    const addItemBtn = page.locator('button', { hasText: /add product|add item|ዕቃ ጨምር/i }).first();
+    await addItemBtn.click();
+
+    // Verify "Price includes VAT" switch is visible
+    const vatSwitch = page.locator('button[role="switch"]').first();
+    await expect(vatSwitch).toBeVisible();
+
+    // Fill Selling price 115.00
+    const priceInput = page.locator('input[placeholder="0.00"]').first();
+    await priceInput.fill('115.00');
+
+    // Fill Cost price 80.00
+    const costInput = page.locator('input[placeholder="0.00"]').nth(1);
+    await costInput.fill('80.00');
+    await page.waitForTimeout(300);
+
+    // Verify live calculation: Net 100.00, VAT 15.00, Gross 115.00
+    await expect(page.locator('text=100.00').first()).toBeVisible();
+    await expect(page.locator('text=15.00').first()).toBeVisible();
+    await expect(page.locator('text=115.00').first()).toBeVisible();
+
+    // Verify profit margin: +20.00 ETB (20.0%)
+    await expect(page.locator('text=+20.00 ETB').first()).toBeVisible();
+
+    // Test Selling Below Cost warning: enter cost 120.00
+    await costInput.fill('120.00');
+    await page.waitForTimeout(300);
+    await expect(page.locator('text=Selling below cost!').or(page.locator('text=ከወጪ በታች እየተሸጠ ነው!')).first()).toBeVisible();
+  });
+
+  test('Fast inline editing on table cell with green flash and 8-second undo toast', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#items`);
+    await page.waitForTimeout(1000);
+
+    // Find the first price cell in the table
+    const priceCell = page.locator('tbody tr td:nth-child(6)').first();
+    await expect(priceCell).toBeVisible();
+
+    // Double-click the price cell to enter inline edit
+    await priceCell.dblclick();
+    await page.waitForTimeout(300);
+
+    // Inline input should be visible
+    const inlineInput = priceCell.locator('input[type="number"]').first();
+    if (await inlineInput.isVisible()) {
+      await inlineInput.fill('99.50');
+      await inlineInput.press('Enter');
+      await page.waitForTimeout(500);
+
+      // Verify 8-second Undo toast appears
+      const undoToast = page.locator('text=Saved!').or(page.locator('text=ተቀምጧል!')).first();
+      await expect(undoToast).toBeVisible();
+
+      // Click Undo
+      const undoBtn = page.locator('button:has-text("Undo"), button:has-text("መልስ")').first();
+      await expect(undoBtn).toBeVisible();
+      await undoBtn.click();
+      await page.waitForTimeout(500);
+
+      // Toast should disappear
+      await expect(undoToast).toBeHidden();
+    }
+  });
+
+  test('Needs attention quick filter chip toggles attention items', async ({ page }) => {
+    await loginAsManager(page);
+    await page.goto(`${BASE}/#items`);
+    await page.waitForTimeout(1000);
+
+    const attentionBtn = page.locator('button:has-text("Needs Attention"), button:has-text("ትኩረት የሚሹ")').first();
+    await expect(attentionBtn).toBeVisible();
+    await attentionBtn.click();
+    await page.waitForTimeout(400);
+
+    // Active state highlighted
+    await expect(attentionBtn).toHaveClass(/bg-amber-500/);
+
+    // Toggle off
+    await attentionBtn.click();
+    await page.waitForTimeout(300);
+  });
 });

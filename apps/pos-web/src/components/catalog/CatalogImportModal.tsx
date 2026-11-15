@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
+import { calculateItemVatBreakdown } from '@gebeyaos/shared-types';
 
 interface ImportRow {
   rowNumber: number;
@@ -350,41 +351,60 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
                       <th className="p-2.5">Barcode</th>
                       <th className="p-2.5">SKU</th>
                       <th className="p-2.5">Name</th>
-                      <th className="p-2.5">Price</th>
+                      <th className="p-2.5 text-right">Net Price</th>
+                      <th className="p-2.5 text-right">15% VAT</th>
+                      <th className="p-2.5 text-right">Gross Price</th>
                       <th className="p-2.5">Issues</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {rows.slice(0, 100).map((r) => (
-                      <tr
-                        key={r.rowNumber}
-                        className={
-                          r.status === 'ERROR'
-                            ? 'bg-rose-50/50 dark:bg-rose-950/20'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                        }
-                      >
-                        <td className="p-2.5 font-mono text-[11px] text-slate-400">#{r.rowNumber}</td>
-                        <td className="p-2.5">
-                          {r.status === 'OK' ? (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 text-[10px] font-bold">
-                              OK
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 text-[10px] font-bold">
-                              ERROR
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-2.5 font-mono text-[11px]">{r.barcode || '—'}</td>
-                        <td className="p-2.5 font-mono text-[11px]">{r.sku}</td>
-                        <td className="p-2.5 font-semibold text-slate-900 dark:text-white">{r.nameEn}</td>
-                        <td className="p-2.5 font-mono">{r.sellingPrice.toFixed(2)} ETB</td>
-                        <td className="p-2.5 text-[11px] text-rose-600">
-                          {r.issues.length > 0 ? r.issues.join(', ') : '—'}
-                        </td>
-                      </tr>
-                    ))}
+                    {rows.slice(0, 100).map((r) => {
+                      const vat = calculateItemVatBreakdown({
+                        typedPrice: r.sellingPrice,
+                        priceIncludesVat: true,
+                        isVatApplicable: true,
+                        vatRate: 0.15,
+                        costPrice: r.costPrice,
+                      });
+                      return (
+                        <tr
+                          key={r.rowNumber}
+                          className={
+                            r.status === 'ERROR'
+                              ? 'bg-rose-50/50 dark:bg-rose-950/20'
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                          }
+                        >
+                          <td className="p-2.5 font-mono text-[11px] text-slate-400">#{r.rowNumber}</td>
+                          <td className="p-2.5">
+                            {r.status === 'OK' ? (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 text-[10px] font-bold">
+                                OK
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 text-[10px] font-bold">
+                                ERROR
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2.5 font-mono text-[11px]">{r.barcode || '—'}</td>
+                          <td className="p-2.5 font-mono text-[11px]">{r.sku}</td>
+                          <td className="p-2.5 font-semibold text-slate-900 dark:text-white">{r.nameEn}</td>
+                          <td className="p-2.5 font-mono text-right text-slate-700 dark:text-slate-300">
+                            {vat.netPrice.toFixed(2)}
+                          </td>
+                          <td className="p-2.5 font-mono text-right text-emerald-600">
+                            {vat.vatAmount.toFixed(2)}
+                          </td>
+                          <td className="p-2.5 font-mono text-right font-bold text-slate-900 dark:text-white">
+                            {vat.grossPrice.toFixed(2)} ETB
+                          </td>
+                          <td className="p-2.5 text-[11px] text-rose-600">
+                            {r.issues.length > 0 ? r.issues.join(', ') : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

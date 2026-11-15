@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X,
   Barcode,
@@ -17,11 +17,15 @@ import {
   RefreshCw,
   Archive,
   Clock,
+  Lock,
+  History,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
 import { posApi } from '../../utils/pos-api';
 import { generateInternalEan13, generateInternalCode128 } from '../../utils/code128Svg';
+import { calculateItemVatBreakdown } from '@gebeyaos/shared-types';
+import { PriceHistoryModal } from './PriceHistoryModal';
 
 export interface ProductDrawerData {
   id?: string;
@@ -111,11 +115,27 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
+  const [priceIncludesVat, setPriceIncludesVat] = useState<boolean>(true);
+  const [isPriceHistoryOpen, setIsPriceHistoryOpen] = useState<boolean>(false);
+
   const canChangePrice =
-    hasPermission('pricing.override') ||
-    hasPermission('pos.override_price') ||
+    currentUser?.role === 'OWNER' ||
+    currentUser?.role === 'STORE_OWNER' ||
+    currentUser?.role === 'BRANCH_MANAGER' ||
     currentUser?.role === 'HQ_ADMIN' ||
-    currentUser?.role === 'BRANCH_MANAGER';
+    hasPermission('pricing.override') ||
+    hasPermission('pos.override_price');
+
+  // Live Bidirectional VAT and Profit Margin Calculation (Part 3)
+  const vatBreakdown = useMemo(() => {
+    return calculateItemVatBreakdown({
+      typedPrice: basePrice,
+      priceIncludesVat,
+      isVatApplicable,
+      vatRate: isVatApplicable ? vatRate : 0,
+      costPrice,
+    });
+  }, [basePrice, priceIncludesVat, isVatApplicable, vatRate, costPrice]);
 
   // Initialize or reset form
   useEffect(() => {
@@ -272,8 +292,10 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       return;
     }
 
+    const finalSellingPrice = vatBreakdown.grossPrice;
+
     // Check price modification permission if price changed on existing product
-    if (isEdit && product && Number(product.base_price) !== basePrice) {
+    if (isEdit && product && Number(product.base_price) !== finalSellingPrice) {
       if (!canChangePrice) {
         setFormError('You do not have permission to modify product base prices.');
         return;
@@ -292,7 +314,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
         name_am: effectiveNameAm,
         category_id: categoryId || categories[0]?.id,
         uom_code: uomCode,
-        base_price: Number(basePrice),
+        base_price: finalSellingPrice,
         cost_price: Number(costPrice),
         is_vat_applicable: isVatApplicable,
         vat_rate: isVatApplicable ? Number(vatRate) : 0,
@@ -315,9 +337,9 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
         resultProduct = res.product;
 
         // If price changed, record audit price change
-        if (Number(product.base_price) !== basePrice && priceChangeReason) {
+        if (Number(product.base_price) !== finalSellingPrice && priceChangeReason) {
           await posApi.updatePrice(product.id, {
-            new_price: basePrice,
+            new_price: finalSellingPrice,
             reason: priceChangeReason.trim(),
             changed_by: currentUser?.id,
           });
@@ -639,32 +661,128 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
               </div>
             </div>
 
-            {/* 5. Pricing & VAT */}
+            {/* 5. Pricing & Automatic Bidirectional VAT (Part 3) */}
             <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 space-y-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                <DollarSign size={15} />
-                Pricing & VAT Status
-              </h3>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                  <DollarSign size={15} />
+                  Pricing & VAT Calculation
+                </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    HQ Base Price (ETB) *
+                <div className="flex items-center gap-3">
+                  {/* Price History Button (if product exists) */}
+                  {isEdit && product?.id && (
+                    <button
+                      type="button"
+                      onClick={() => setIsPriceHistoryOpen(true)}
+                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 text-[11px] font-bold flex items-center gap-1 transition shadow-xs"
+                      title={t('catalog.priceHistory')}
+                    >
+                      <History size={12} />
+                      {t('catalog.priceHistory')}
+                    </button>
+                  )}
+
+                  {/* "Price includes VAT" Switch (default ON for retail) */}
+                  <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      {t('catalog.priceIncludesVat')}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={priceIncludesVat}
+                      onClick={() => setPriceIncludesVat(!priceIncludesVat)}
+                      className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out ${
+                        priceIncludesVat ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
+                      }`}
+                    >
+                      <div
+                        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                          priceIncludesVat ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
                   </label>
+                </div>
+              </div>
+
+              {/* VAT Type Selection */}
+              <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Percent size={13} className="text-emerald-600" />
+                  {t('catalog.vatType')}:
+                </span>
+                <div className="flex items-center gap-4">
+                  <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
+                    <input
+                      type="radio"
+                      name="vatType"
+                      checked={isVatApplicable}
+                      onChange={() => {
+                        setIsVatApplicable(true);
+                        setVatRate(0.15);
+                      }}
+                      className="text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>{t('catalog.vatTypeTaxable')} (15%)</span>
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
+                    <input
+                      type="radio"
+                      name="vatType"
+                      checked={!isVatApplicable}
+                      onChange={() => {
+                        setIsVatApplicable(false);
+                        setVatRate(0);
+                      }}
+                      className="text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>{t('catalog.vatTypeExempt')}</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Price Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Selling Price Input (Gross if switch is ON, Net if switch is OFF) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      {priceIncludesVat ? t('catalog.grossPrice') : t('catalog.netPrice')} (ETB) *
+                    </label>
+                    {!canChangePrice && (
+                      <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold" title={t('catalog.noEditPermission')}>
+                        <Lock size={10} /> Locked
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     required
+                    disabled={!canChangePrice}
                     value={basePrice || ''}
                     onChange={(e) => setBasePrice(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 text-xs font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="0.00"
+                    className={`w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border text-xs font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 ${
+                      !canChangePrice
+                        ? 'opacity-60 cursor-not-allowed border-slate-200 dark:border-slate-700'
+                        : 'border-emerald-300 dark:border-emerald-700 focus:ring-emerald-500'
+                    }`}
                   />
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {priceIncludesVat
+                      ? (language === 'am' ? 'የመደርደሪያ ዋጋ (ተ.እ.ታን ጨምሮ)' : 'Shelf price inclusive of VAT')
+                      : (language === 'am' ? 'የተጣራ ዋጋ (ያለ ተ.እ.ታ)' : 'Net price before VAT')}
+                  </div>
                 </div>
 
+                {/* Cost Price Input */}
                 <div>
                   <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Cost Price (ETB)
+                    {t('catalog.costPriceLabel')} (ETB)
                   </label>
                   <input
                     type="number"
@@ -672,10 +790,15 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     min="0"
                     value={costPrice || ''}
                     onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
                     className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {language === 'am' ? 'የእቃው አማካይ የግዢ ወጪ' : 'Unit cost / AVCO'}
+                  </div>
                 </div>
 
+                {/* Branch Override Price */}
                 <div>
                   <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                     Branch Override Price
@@ -689,46 +812,80 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     onChange={(e) => setBranchOverridePrice(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {language === 'am' ? 'ለዚህ ቅርንጫፍ ብቻ የሚተገበር' : 'Local branch price'}
+                  </div>
                 </div>
               </div>
 
-              {/* VAT Type Selection */}
-              <div className="pt-1 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    VAT Type:
-                  </span>
-                  <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
-                    <input
-                      type="radio"
-                      name="vatType"
-                      checked={isVatApplicable}
-                      onChange={() => {
-                        setIsVatApplicable(true);
-                        setVatRate(0.15);
-                      }}
-                      className="text-emerald-600 focus:ring-emerald-500"
-                    />
-                    Type A: Taxable 15% (VAT included)
-                  </label>
-                  <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
-                    <input
-                      type="radio"
-                      name="vatType"
-                      checked={!isVatApplicable}
-                      onChange={() => {
-                        setIsVatApplicable(false);
-                        setVatRate(0);
-                      }}
-                      className="text-emerald-600 focus:ring-emerald-500"
-                    />
-                    Type B: Exempt (0%)
-                  </label>
+              {/* LIVE BIDIRECTIONAL VAT BREAKDOWN CARD (Part 3) */}
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 space-y-2">
+                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {language === 'am' ? 'የዋጋ እና ተ.እ.ታ ስሌት ዝርዝር (Live Calculation)' : 'Computed Price & VAT Breakdown (Live)'}
                 </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {/* Net Price */}
+                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <div className="text-[10px] font-bold text-slate-500">{t('catalog.netPrice')}</div>
+                    <div className="text-sm font-mono font-black text-slate-900 dark:text-white mt-0.5">
+                      {vatBreakdown.netPrice.toFixed(2)} <span className="text-[10px] font-normal">ETB</span>
+                    </div>
+                  </div>
+
+                  {/* VAT Amount */}
+                  <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                    <div className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                      {isVatApplicable ? t('catalog.vatAmount') : t('catalog.vatTypeExempt')}
+                    </div>
+                    <div className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      {vatBreakdown.vatAmount.toFixed(2)} <span className="text-[10px] font-normal">ETB</span>
+                    </div>
+                  </div>
+
+                  {/* Gross Price */}
+                  <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
+                    <div className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300">{t('catalog.grossPrice')}</div>
+                    <div className="text-sm font-mono font-black text-indigo-600 dark:text-indigo-400 mt-0.5">
+                      {vatBreakdown.grossPrice.toFixed(2)} <span className="text-[10px] font-normal">ETB</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profit Margin & AVCO Cost Breakdown */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">
+                    {t('catalog.profitMarginBirr')}:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-mono font-bold ${vatBreakdown.isNegativeMargin ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {vatBreakdown.profitMarginBirr > 0 ? '+' : ''}{vatBreakdown.profitMarginBirr.toFixed(2)} ETB
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
+                      vatBreakdown.isNegativeMargin
+                        ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                        : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                    }`}>
+                      {vatBreakdown.profitMarginPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Selling Below Cost Alert */}
+                {vatBreakdown.isSellingBelowCost && (
+                  <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-start gap-2 animate-in fade-in">
+                    <AlertTriangle size={15} className="shrink-0 text-rose-500 mt-0.5" />
+                    <div>
+                      <div>{t('catalog.sellingBelowCost')}</div>
+                      <div className="text-[11px] font-normal text-rose-600 dark:text-rose-400">
+                        {t('catalog.sellingBelowCostDesc')}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Mandatory Reason for Price Change if editing existing price */}
-              {isEdit && product && Number(product.base_price) !== basePrice && (
+              {isEdit && product && Number(product.base_price) !== vatBreakdown.grossPrice && (
                 <div className="pt-2 animate-in fade-in">
                   <label className="text-[11px] font-bold text-amber-700 dark:text-amber-400 block mb-1">
                     Reason for Price Change (Mandatory Audit Requirement) *
@@ -920,6 +1077,22 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Price History Modal (Part 3) */}
+      {isPriceHistoryOpen && product?.id && (
+        <PriceHistoryModal
+          isOpen={isPriceHistoryOpen}
+          onClose={() => setIsPriceHistoryOpen(false)}
+          product={{
+            id: product.id,
+            sku: product.sku,
+            name_en: product.name_en,
+            base_price: product.base_price,
+            override_price: product.branch_override_price,
+          }}
+          onPriceUpdated={() => {}}
+        />
+      )}
     </div>
   );
 };
