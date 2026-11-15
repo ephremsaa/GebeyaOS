@@ -151,35 +151,41 @@ describe('SystemService', () => {
   });
 
   describe('getNotifications', () => {
-    it('aggregates stockouts, expiries, and sync queue warnings', async () => {
-      // 1. Stockout query
-      (mockDb.query as any).mockResolvedValueOnce({
-        rows: [{ id: 'p1', sku: 'SKU-01', name_en: 'Cooking Oil', soh: '0' }],
-      });
-
-      // 2. Expiries query
-      (mockDb.query as any).mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'b1',
-            batch_number: 'BATCH-2026',
-            expiry_date: '2026-11-01',
-            current_quantity: '20',
-            name_en: 'Milk 1L',
-          },
-        ],
-      });
-
-      // 3. Sync pending count
-      (mockDb.query as any).mockResolvedValueOnce({
-        rows: [{ count: '45' }],
+    it('aggregates notifications table alerts, stockouts, and sync queue warnings', async () => {
+      (mockDb.query as any).mockImplementation((sql: string) => {
+        if (sql.includes('FROM notifications n')) {
+          return Promise.resolve({
+            rows: [
+              {
+                id: 'notif-1',
+                type: 'EXPIRY',
+                stage: '30D',
+                severity: 'WARNING',
+                title: 'Advance Warning: Milk',
+                message: 'Milk expires soon',
+                timestamp: '2026-11-15T12:00:00.000Z',
+              },
+            ],
+          });
+        }
+        if (sql.includes('stock_ledger')) {
+          return Promise.resolve({
+            rows: [{ id: 'p1', sku: 'SKU-01', name_en: 'Cooking Oil', soh: '0' }],
+          });
+        }
+        if (sql.includes('sync_outbox')) {
+          return Promise.resolve({
+            rows: [{ count: '45' }],
+          });
+        }
+        return Promise.resolve({ rows: [] });
       });
 
       const notifications = await service.getNotifications('branch-01');
 
       expect(notifications.length).toBe(3);
-      expect(notifications[0].type).toBe('STOCKOUT');
-      expect(notifications[1].type).toBe('EXPIRY');
+      expect(notifications[0].type).toBe('EXPIRY');
+      expect(notifications[1].type).toBe('STOCKOUT');
       expect(notifications[2].type).toBe('SYNC');
     });
   });

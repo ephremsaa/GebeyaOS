@@ -129,6 +129,7 @@ const MainApp: React.FC = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [criticalCount, setCriticalCount] = useState<number>(0);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -228,7 +229,11 @@ const MainApp: React.FC = () => {
 
       {/* Main workspace */}
       <div className="flex-1 flex overflow-hidden relative">
-        <NavigationRail activeTab={activeTab} onTabChange={setActiveTab} />
+        <NavigationRail
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          hasCriticalAlerts={criticalCount > 0}
+        />
 
         <main className="flex-1 flex overflow-hidden bg-page">
           {/* PAGE 1 — Sales (checkout + day control strip added in Step 2) */}
@@ -275,6 +280,7 @@ const MainApp: React.FC = () => {
         onClose={() => setIsNotificationsOpen(false)}
         onNavigate={setActiveTab}
         onUnreadCountChange={setUnreadCount}
+        onCriticalCountChange={setCriticalCount}
       />
 
       {/* Contextual onboarding hints */}

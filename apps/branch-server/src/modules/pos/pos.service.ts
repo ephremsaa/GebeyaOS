@@ -22,6 +22,7 @@ import {
   SaleItemRecord,
   SalePaymentRecord,
   HeldBasketRecord,
+  computeDaysLeftInAddis,
 } from '@gebeyaos/shared-types';
 import {
   OpenShiftDto,
@@ -42,7 +43,7 @@ const calculateTaxInclusiveLineVat = (gross: number, isVat: boolean): number =>
 
 @Injectable()
 export class PosService {
-  private mapShift(shift: any): ShiftResponseDto {
+  private mapShift(shift: any): any {
     return {
       id: shift.id,
       branchId: shift.branch_id,
@@ -116,7 +117,7 @@ export class PosService {
       );
 
       if (activeCheck.rows.length > 0) {
-        const existingRes = await client.query<ShiftRow>(
+        const existingRes = await client.query<any>(
           `SELECT * FROM shifts WHERE id = $1`,
           [activeCheck.rows[0].id],
         );
@@ -1169,7 +1170,7 @@ export class PosService {
   }
 
   /**
-   * Retrieves product catalog for POS with branch overrides and current stock.
+   * Retrieves product catalog for POS with branch overrides, nearest FEFO expiry status, and current stock.
    */
   async getCatalog(branchId: string): Promise<any[]> {
     const query = `
@@ -1190,10 +1191,16 @@ export class PosService {
         p.scale_plu,
         p.min_stock_level,
         p.allow_discount,
+        p.photo_path,
         COALESCE(bpo.selling_price, p.base_price) as effective_price,
         bpo.selling_price IS NOT NULL as is_price_overridden,
         pb.barcode,
-        COALESCE(sl.current_stock, 0) as stock_on_hand
+        COALESCE(sl.current_stock, 0) as stock_on_hand,
+        nb.batch_number as nearest_batch_number,
+        nb.expiry_date as nearest_expiry_date,
+        nb.clearance_price as nearest_clearance_price,
+        nb.clearance_start_date as nearest_clearance_start,
+        nb.clearance_end_date as nearest_clearance_end
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN branch_product_overrides bpo ON p.id = bpo.product_id AND bpo.branch_id = $1 AND bpo.is_active = TRUE
@@ -1205,32 +1212,66 @@ export class PosService {
         FROM stock_ledger
         WHERE branch_id = $1 AND product_id = p.id
       ) sl ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT b.batch_number, b.expiry_date, b.clearance_price, b.clearance_start_date, b.clearance_end_date
+        FROM batches b
+        WHERE b.product_id = p.id AND b.branch_id = $1 AND b.current_quantity > 0
+        ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC
+        LIMIT 1
+      ) nb ON TRUE
       WHERE p.is_active = TRUE
       ORDER BY p.name_en ASC
     `;
     const res = await this.db.query<any>(query, [branchId]);
-    return res.rows.map((r) => ({
-      id: r.id,
-      sku: r.sku,
-      nameEn: r.name_en,
-      nameAm: r.name_am,
-      categoryId: r.category_id,
-      categoryNameEn: r.category_name_en,
-      categoryNameAm: r.category_name_am,
-      uomCode: r.uom_code,
-      basePrice: parseFloat(r.base_price),
-      effectivePrice: parseFloat(r.effective_price),
-      isPriceOverridden: r.is_price_overridden,
-      costPrice: parseFloat(r.cost_price),
-      isVatApplicable: r.is_vat_applicable,
-      vatRate: parseFloat(r.vat_rate),
-      isWeighed: r.is_weighed,
-      scalePlu: r.scale_plu,
-      minStockLevel: parseFloat(r.min_stock_level || '0'),
-      allowDiscount: r.allow_discount,
-      barcode: r.barcode || r.sku,
-      stockOnHand: parseFloat(r.stock_on_hand),
-    }));
+    const today = new Date().toISOString().slice(0, 10);
+
+    return res.rows.map((r) => {
+      const expiryDate = r.nearest_expiry_date ? String(r.nearest_expiry_date).slice(0, 10) : null;
+      const daysLeft = expiryDate ? computeDaysLeftInAddis(expiryDate) : null;
+      const isExpired = daysLeft !== null && daysLeft <= 0;
+      const expiringIn7Days = daysLeft !== null && daysLeft > 0 && daysLeft <= 7;
+
+      const isClearanceActive =
+        r.nearest_clearance_price &&
+        (!r.nearest_clearance_start || String(r.nearest_clearance_start).slice(0, 10) <= today) &&
+        (!r.nearest_clearance_end || String(r.nearest_clearance_end).slice(0, 10) >= today);
+
+      const clearancePrice = isClearanceActive ? parseFloat(r.nearest_clearance_price) : null;
+      const regularEffective = parseFloat(r.effective_price);
+      const effectivePrice = clearancePrice !== null ? clearancePrice : regularEffective;
+
+      return {
+        id: r.id,
+        sku: r.sku,
+        nameEn: r.name_en,
+        nameAm: r.name_am,
+        categoryId: r.category_id,
+        categoryNameEn: r.category_name_en,
+        categoryNameAm: r.category_name_am,
+        uomCode: r.uom_code,
+        basePrice: parseFloat(r.base_price),
+        effectivePrice,
+        regularEffectivePrice: regularEffective,
+        clearancePrice,
+        isClearance: clearancePrice !== null,
+        isPriceOverridden: r.is_price_overridden,
+        costPrice: parseFloat(r.cost_price),
+        isVatApplicable: r.is_vat_applicable,
+        vatRate: parseFloat(r.vat_rate),
+        isWeighed: r.is_weighed,
+        scalePlu: r.scale_plu,
+        minStockLevel: parseFloat(r.min_stock_level || '0'),
+        allowDiscount: r.allow_discount,
+        barcode: r.barcode || r.sku,
+        stockOnHand: parseFloat(r.stock_on_hand),
+        photoPath: r.photo_path || null,
+        nearestBatchNumber: r.nearest_batch_number || null,
+        nearestExpiry: expiryDate,
+        daysLeft,
+        isExpired,
+        expiringIn7Days,
+      };
+    });
   }
 
   /**

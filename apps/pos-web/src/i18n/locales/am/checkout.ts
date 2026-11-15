@@ -137,4 +137,13 @@ export const checkoutAm = {
   dropFailed: 'ወደ ካዝና ማስቀመጥ አልተቻለም። እንደገና ይሞክሩ።',
   startDayCardTitle: 'ሽያጭ ለመጀመር ቀንዎን ያስጀምሩ',
   startDayCardDesc: 'የመሸጫ መዝገቡን ለመጀመር በስቅለትዎ ውስጥ ያለውን የመክፈቻ ብር ያስገቡ።',
+  expiredItemBlockedTitle: 'ጊዜው ያለፈበት እቃ ተከልክሏል',
+  expiredItemBlockedMsg: 'ይህ እቃ በ {{date}} ጊዜው አልፏል። መሸጥ አይቻልም። ለማስወገድ ለይተው ያስቀምጡ።',
+  putAside: 'ለይተው ያስቀምጡ / ሰርዝ',
+  managerOverride: 'የአስተዳዳሪ ማረጋገጫ',
+  overrideReasonPrompt: 'ጊዜው ያለፈበትን እቃ ለመሸጥ ምክንያት (ለምሳሌ፡ ቅናሽ፣ ናሙና፣ የሙከራ ሽያጭ)፡',
+  overrideReasonPlaceholder: 'የአስተዳዳሪ ማረጋገጫ ምክንያትን እዚህ ይጻፉ...',
+  managerPinPlaceholder: 'ባለ 4-አሃዝ የአስተዳዳሪ ፒን (PIN) ያስገቡ',
+  overrideSuccess: 'የአስተዳዳሪ ማረጋገጫ ጸድቋል። ሽያጩ ተፈቅዷል።',
+  overrideReasonRequired: 'ጊዜው ያለፈበትን እቃ ለመፍቀድ ምክንያት መጻፍ ግዴታ ነው።',
 };

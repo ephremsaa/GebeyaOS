@@ -41,6 +41,7 @@ export type NavTabId =
 export interface NavigationRailProps {
   activeTab: NavTabId;
   onTabChange: (tab: NavTabId) => void;
+  hasCriticalAlerts?: boolean;
 }
 
 interface NavItem {
@@ -53,6 +54,7 @@ interface NavItem {
 export const NavigationRail: React.FC<NavigationRailProps> = ({
   activeTab,
   onTabChange,
+  hasCriticalAlerts = false,
 }) => {
   const { t } = useI18n();
   const { hasPermission, hasRole } = useAuth();
@@ -140,6 +142,12 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
             >
               {isActive && (
                 <span className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-primary rounded-r-full" />
+              )}
+              {item.id === 'stock' && hasCriticalAlerts && (
+                <span className="absolute top-2 right-3 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600" />
+                </span>
               )}
               {item.icon}
               <span className="text-[11px] leading-tight text-center truncate w-full px-1">

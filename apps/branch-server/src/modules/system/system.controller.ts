@@ -5,6 +5,7 @@ import {
   Put,
   Body,
   Query,
+  Param,
   Headers,
   Ip,
   UseGuards,
@@ -70,6 +71,44 @@ export class SystemController {
   async getNotifications(@Headers('x-branch-id') branchIdHeader?: string) {
     const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
     return this.systemService.getNotifications(branchId);
+  }
+
+  @Get('notifications/unread-count')
+  async getUnreadNotificationsCount(@Headers('x-branch-id') branchIdHeader?: string) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    return this.systemService.getUnreadNotificationsCount(branchId);
+  }
+
+  @Post('notifications/:id/read')
+  @HttpCode(HttpStatus.OK)
+  async markNotificationRead(@Param('id') id: string) {
+    await this.systemService.markNotificationAsRead(id);
+    return { success: true };
+  }
+
+  @Post('notifications/:id/snooze')
+  @HttpCode(HttpStatus.OK)
+  async snoozeNotification(
+    @Param('id') id: string,
+    @Body() dto: { days?: number },
+  ) {
+    await this.systemService.snoozeNotification(id, dto.days || 7);
+    return { success: true, snoozedDays: dto.days || 7 };
+  }
+
+  @Post('notifications/:id/dismiss')
+  @HttpCode(HttpStatus.OK)
+  async dismissNotification(@Param('id') id: string) {
+    await this.systemService.dismissNotification(id);
+    return { success: true };
+  }
+
+  @Post('notifications/dismiss-all')
+  @HttpCode(HttpStatus.OK)
+  async dismissAllNotifications(@Headers('x-branch-id') branchIdHeader?: string) {
+    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    await this.systemService.dismissAllNotifications(branchId);
+    return { success: true };
   }
 
   @Get('backup')

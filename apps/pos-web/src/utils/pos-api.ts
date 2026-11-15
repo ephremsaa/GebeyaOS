@@ -23,6 +23,9 @@ export interface PosCatalogItem {
   categoryNameAm?: string;
   basePrice: number;
   effectivePrice: number;
+  regularEffectivePrice?: number;
+  clearancePrice?: number | null;
+  isClearance?: boolean;
   isPriceOverridden: boolean;
   costPrice: number;
   isVatApplicable: boolean;
@@ -33,6 +36,12 @@ export interface PosCatalogItem {
   allowDiscount: boolean;
   barcode: string;
   stockOnHand: number;
+  photoPath?: string | null;
+  nearestBatchNumber?: string | null;
+  nearestExpiry?: string | null;
+  daysLeft?: number | null;
+  isExpired?: boolean;
+  expiringIn7Days?: boolean;
 }
 
 export interface XReportData {

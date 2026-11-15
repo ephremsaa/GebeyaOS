@@ -19,6 +19,7 @@ import { DayControlBar } from './DayControlBar';
 import { DiscountModal } from './checkout/DiscountModal';
 import { HeldBasketsDrawer } from './checkout/HeldBasketsDrawer';
 import { RefundModal } from './checkout/RefundModal';
+import { ExpiredItemBlockModal } from './checkout/ExpiredItemBlockModal';
 import { posApi, PosCatalogItem } from '../utils/pos-api';
 import { playScanBeep } from '../utils/sound';
 
@@ -94,6 +95,11 @@ export const PosCheckout: React.FC = () => {
     grossAmount: 0,
   });
 
+  // Expired scanner block & Manager Override state
+  const [blockedExpiredProduct, setBlockedExpiredProduct] = useState<PosCatalogItem | null>(null);
+  const [overriddenProductIds, setOverriddenProductIds] = useState<Set<string>>(new Set());
+  const [hasOverriddenExpiredItems, setHasOverriddenExpiredItems] = useState<boolean>(false);
+
   const searchInputRef = useRef<SearchInputHandle>(null);
 
   // Initial Data Load (Catalog & held baskets)
@@ -151,9 +157,18 @@ export const PosCheckout: React.FC = () => {
   }, [cart, heldBaskets, isPaymentOpen]);
 
   // Add Item to Cart with sound and visual feedback
-  const addToCart = (product: PosCatalogItem, quantity: number = 1, scaleWeightGrams?: number) => {
+  const addToCart = (
+    product: PosCatalogItem,
+    quantity: number = 1,
+    scaleWeightGrams?: number,
+    isOverride: boolean = false,
+  ) => {
     if (!isShiftOpen) {
       setIsStartDayRequested(true);
+      return;
+    }
+    if (product.isExpired && !overriddenProductIds.has(product.id) && !isOverride) {
+      setBlockedExpiredProduct(product);
       return;
     }
     playScanBeep();
@@ -220,11 +235,26 @@ export const PosCheckout: React.FC = () => {
       return;
     }
     if (product.stockOnHand <= 0) return;
+    if (product.isExpired && !overriddenProductIds.has(product.id)) {
+      setBlockedExpiredProduct(product);
+      return;
+    }
 
     if (product.isWeighed) {
       setWeighedProduct(product);
     } else {
       addToCart(product, 1);
+    }
+  };
+
+  const handleAuthorizeExpiredOverride = (product: PosCatalogItem, _reason: string) => {
+    setOverriddenProductIds((prev) => new Set(prev).add(product.id));
+    setHasOverriddenExpiredItems(true);
+    setBlockedExpiredProduct(null);
+    if (product.isWeighed) {
+      setWeighedProduct(product);
+    } else {
+      addToCart(product, 1, undefined, true);
     }
   };
 
@@ -246,6 +276,11 @@ export const PosCheckout: React.FC = () => {
           catalog.find((p) => p.isWeighed);
 
         if (matched) {
+          if (matched.isExpired && !overriddenProductIds.has(matched.id)) {
+            setBlockedExpiredProduct(matched);
+            setSearchQuery('');
+            return;
+          }
           addToCart(matched, parsed.embeddedQuantity, parsed.embeddedQuantity * 1000);
           setSearchQuery('');
           searchInputRef.current?.focus();
@@ -256,6 +291,11 @@ export const PosCheckout: React.FC = () => {
           catalog.find((p) => !p.isWeighed && code.startsWith(p.barcode.slice(0, 4))) ||
           catalog.find((p) => p.barcode === code);
         if (matched) {
+          if (matched.isExpired && !overriddenProductIds.has(matched.id)) {
+            setBlockedExpiredProduct(matched);
+            setSearchQuery('');
+            return;
+          }
           const price = matched.effectivePrice ?? matched.basePrice;
           const qty = price > 0 ? round2(parsed.embeddedPrice / price) : 1;
           addToCart(matched, qty);
@@ -275,6 +315,11 @@ export const PosCheckout: React.FC = () => {
     );
 
     if (found) {
+      if (found.isExpired && !overriddenProductIds.has(found.id)) {
+        setBlockedExpiredProduct(found);
+        setSearchQuery('');
+        return;
+      }
       if (found.isWeighed) {
         setWeighedProduct(found);
       } else {
@@ -489,6 +534,7 @@ export const PosCheckout: React.FC = () => {
         terminalId,
         shiftId: currentShift?.id || '018e0000-0000-7000-8000-000000000050',
         idempotencyKey,
+        managerOverrideExpired: hasOverriddenExpiredItems || cart.some((i) => i.product.isExpired),
         discountTotal: totalDiscounts,
         lines: cart.map((i) => ({
           productId: i.product.id,
@@ -531,6 +577,8 @@ export const PosCheckout: React.FC = () => {
     setCompletedReceiptNo(null);
     setCompletedReceiptText(null);
     setCompletedSaleId(null);
+    setHasOverriddenExpiredItems(false);
+    setOverriddenProductIds(new Set());
     searchInputRef.current?.focus();
   };
 
@@ -837,6 +885,15 @@ export const PosCheckout: React.FC = () => {
         branchId={branchId}
         cashierId={cashierId}
         currentShiftId={currentShift?.id || '018e0000-0000-7000-8000-000000000050'}
+      />
+
+      {/* 10. Expired Item Scanner Block Modal with Manager Override */}
+      <ExpiredItemBlockModal
+        isOpen={!!blockedExpiredProduct}
+        product={blockedExpiredProduct}
+        branchId={branchId}
+        onClose={() => setBlockedExpiredProduct(null)}
+        onAuthorizeOverride={handleAuthorizeExpiredOverride}
       />
     </div>
   );

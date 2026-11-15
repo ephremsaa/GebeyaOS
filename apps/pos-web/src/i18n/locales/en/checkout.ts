@@ -137,4 +137,13 @@ export const checkoutEn = {
   dropFailed: 'Safe drop failed. Please try again.',
   startDayCardTitle: 'Start your day to begin selling',
   startDayCardDesc: 'Enter the cash in your drawer to start today\'s sales register.',
+  expiredItemBlockedTitle: 'Expired Item Blocked',
+  expiredItemBlockedMsg: 'This item expired on {{date}}. Cannot be sold. Put it aside for write-off.',
+  putAside: 'Put Aside / Cancel',
+  managerOverride: 'Manager Override',
+  overrideReasonPrompt: 'Reason for selling expired batch (e.g. clearance, sampling, manual test):',
+  overrideReasonPlaceholder: 'Enter manager override reason...',
+  managerPinPlaceholder: 'Enter 4-digit Manager PIN',
+  overrideSuccess: 'Manager override approved. Sale authorized.',
+  overrideReasonRequired: 'A reason is required to override expired stock.',
 };

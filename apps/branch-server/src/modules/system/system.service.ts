@@ -392,80 +392,187 @@ export class SystemService {
   }
 
   /**
-   * Gathers live notification alerts.
+   * Gathers live notification alerts from notifications table, stockouts, and sync queue.
    */
-  async getNotifications(branchId: string): Promise<NotificationItem[]> {
-    const notifications: NotificationItem[] = [];
+  async getNotifications(branchId: string): Promise<any[]> {
+    const notifications: any[] = [];
 
-    // 1. Stockout check
-    const stockouts = await this.db.query(
-      `SELECT p.id, p.sku, p.name_en, COALESCE(stock.soh, 0) as soh
-       FROM products p
-       LEFT JOIN (
-         SELECT product_id, SUM(quantity_change) as soh
-         FROM stock_ledger WHERE branch_id = $1 GROUP BY product_id
-       ) stock ON p.id = stock.product_id
-       WHERE p.is_active = TRUE AND COALESCE(stock.soh, 0) <= 0
-       LIMIT 5`,
-      [branchId],
-    );
-    for (const p of stockouts.rows) {
-      notifications.push({
-        id: `stockout-${p.id}`,
-        type: 'STOCKOUT',
-        severity: 'CRITICAL',
-        title: `Out of Stock: ${p.name_en}`,
-        message: `Product SKU ${p.sku} is completely depleted. Reorder immediately.`,
-        timestamp: new Date().toISOString(),
-        actionUrl: 'reorder',
-      });
+    // 1. Fetch active alerts from notifications table
+    try {
+      const dbNotifs = await this.db.query<any>(
+        `SELECT n.id, n.type, n.stage, n.severity, n.title, n.title_am, n.message, n.message_am,
+                n.action_url as "actionUrl", n.is_read as "isRead", n.created_at as "timestamp",
+                n.batch_id as "batchId", n.product_id as "productId",
+                b.batch_number as "batchNumber", b.expiry_date as "expiryDate",
+                b.current_quantity as "currentQuantity", b.clearance_price as "clearancePrice",
+                p.name_en as "productName", p.name_am as "productNameAm", p.photo_path as "photoPath", p.uom_code as "uomCode"
+         FROM notifications n
+         LEFT JOIN batches b ON n.batch_id = b.id
+         LEFT JOIN products p ON n.product_id = p.id
+         WHERE n.branch_id = $1
+           AND n.dismissed = FALSE
+           AND n.resolved = FALSE
+           AND (n.snoozed_until IS NULL OR n.snoozed_until <= NOW())
+         ORDER BY
+           CASE n.severity WHEN 'CRITICAL' THEN 1 WHEN 'WARNING' THEN 2 ELSE 3 END,
+           n.created_at DESC
+         LIMIT 50`,
+        [branchId],
+      );
+
+      for (const row of dbNotifs.rows) {
+        notifications.push({
+          id: row.id,
+          type: row.type || 'EXPIRY',
+          stage: row.stage,
+          severity: row.severity,
+          title: row.title,
+          titleAm: row.title_am,
+          message: row.message,
+          messageAm: row.message_am,
+          timestamp: row.timestamp ? new Date(row.timestamp).toISOString() : new Date().toISOString(),
+          actionUrl: row.actionUrl || 'inventory',
+          isRead: Boolean(row.isRead),
+          batchId: row.batchId,
+          productId: row.productId,
+          batchNumber: row.batchNumber,
+          expiryDate: row.expiryDate,
+          currentQuantity: row.currentQuantity ? parseFloat(row.currentQuantity) : 0,
+          clearancePrice: row.clearancePrice ? parseFloat(row.clearancePrice) : null,
+          productName: row.productName,
+          productNameAm: row.productNameAm,
+          photoPath: row.photoPath,
+          uomCode: row.uomCode,
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not query notifications table: ${err.message}`);
     }
 
-    // 2. Upcoming Expiries (within 30 days)
-    const in30Days = new Date();
-    in30Days.setDate(in30Days.getDate() + 30);
-    const expiries = await this.db.query(
-      `SELECT b.id, b.batch_number, b.expiry_date, b.current_quantity, p.name_en
-       FROM batches b
-       JOIN products p ON b.product_id = p.id
-       WHERE b.branch_id = $1
-         AND b.expiry_date IS NOT NULL
-         AND b.expiry_date <= $2
-         AND b.current_quantity > 0
-       ORDER BY b.expiry_date ASC
-       LIMIT 5`,
-      [branchId, in30Days.toISOString().slice(0, 10)],
-    );
-    for (const b of expiries.rows) {
-      notifications.push({
-        id: `expiry-${b.id}`,
-        type: 'EXPIRY',
-        severity: 'WARNING',
-        title: `Expiring Batch: ${b.name_en}`,
-        message: `Batch ${b.batch_number} (${b.current_quantity} units) expires on ${b.expiry_date}. Plan FEFO clearance.`,
-        timestamp: new Date().toISOString(),
-        actionUrl: 'reports',
-      });
+    // 2. Stockout check
+    try {
+      const stockouts = await this.db.query(
+        `SELECT p.id, p.sku, p.name_en, COALESCE(stock.soh, 0) as soh
+         FROM products p
+         LEFT JOIN (
+           SELECT product_id, SUM(quantity_change) as soh
+           FROM stock_ledger WHERE branch_id = $1 GROUP BY product_id
+         ) stock ON p.id = stock.product_id
+         WHERE p.is_active = TRUE AND COALESCE(stock.soh, 0) <= 0
+         LIMIT 5`,
+        [branchId],
+      );
+      for (const p of stockouts.rows) {
+        notifications.push({
+          id: `stockout-${p.id}`,
+          type: 'STOCKOUT',
+          severity: 'CRITICAL',
+          title: `Out of Stock: ${p.name_en}`,
+          titleAm: `ዕቃው አልቋል: ${p.name_en}`,
+          message: `Product SKU ${p.sku} is completely depleted. Reorder immediately.`,
+          messageAm: `ምርት ${p.name_en} ሙሉ በሙሉ አልቋል። በፍጥነት ይዘዙ።`,
+          timestamp: new Date().toISOString(),
+          actionUrl: 'items',
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not check stockouts: ${err.message}`);
     }
 
     // 3. Sync pending check
-    const syncRes = await this.db.query(
-      `SELECT COUNT(id) as count FROM sync_outbox WHERE status = 'PENDING'`,
-    );
-    const pendingCount = parseInt(syncRes.rows[0]?.count || '0', 10);
-    if (pendingCount > 20) {
-      notifications.push({
-        id: 'sync-pending-warning',
-        type: 'SYNC',
-        severity: 'WARNING',
-        title: `Unsynced Local Transactions (${pendingCount})`,
-        message: `${pendingCount} transactions queued in local outbox pending upstream sync.`,
-        timestamp: new Date().toISOString(),
-        actionUrl: 'sync',
-      });
+    try {
+      const syncRes = await this.db.query(
+        `SELECT COUNT(id) as count FROM sync_outbox WHERE status = 'PENDING'`,
+      );
+      const pendingCount = parseInt(syncRes.rows[0]?.count || '0', 10);
+      if (pendingCount > 20) {
+        notifications.push({
+          id: 'sync-pending-warning',
+          type: 'SYNC',
+          severity: 'WARNING',
+          title: `Unsynced Local Transactions (${pendingCount})`,
+          titleAm: `ያልተመሳሰሉ የሽያጭ መረጃዎች (${pendingCount})`,
+          message: `${pendingCount} transactions queued in local outbox pending upstream sync.`,
+          messageAm: `${pendingCount} ሽያጮች ወደ ዋናው ሰርቨር ለመላክ ተራ እየጠበቁ ናቸው።`,
+          timestamp: new Date().toISOString(),
+          actionUrl: 'settings',
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not check sync status: ${err.message}`);
     }
 
     return notifications;
+  }
+
+  /**
+   * Retrieves summary count of unread and critical notifications.
+   */
+  async getUnreadNotificationsCount(branchId: string): Promise<{ total: number; unread: number; critical: number }> {
+    try {
+      const res = await this.db.query<any>(
+        `SELECT 
+           COUNT(id) as total,
+           COUNT(CASE WHEN is_read = FALSE THEN 1 END) as unread,
+           COUNT(CASE WHEN severity = 'CRITICAL' AND is_read = FALSE THEN 1 END) as critical
+         FROM notifications
+         WHERE branch_id = $1
+           AND dismissed = FALSE
+           AND resolved = FALSE
+           AND (snoozed_until IS NULL OR snoozed_until <= NOW())`,
+        [branchId],
+      );
+      return {
+        total: parseInt(res.rows[0]?.total || '0', 10),
+        unread: parseInt(res.rows[0]?.unread || '0', 10),
+        critical: parseInt(res.rows[0]?.critical || '0', 10),
+      };
+    } catch {
+      return { total: 0, unread: 0, critical: 0 };
+    }
+  }
+
+  /**
+   * Marks a notification as read.
+   */
+  async markNotificationAsRead(id: string): Promise<void> {
+    await this.db.query(
+      `UPDATE notifications SET is_read = TRUE, updated_at = NOW() WHERE id = $1`,
+      [id],
+    );
+  }
+
+  /**
+   * Snoozes a notification for a specified duration in days (default 7 days).
+   */
+  async snoozeNotification(id: string, days = 7): Promise<void> {
+    await this.db.query(
+      `UPDATE notifications
+       SET snoozed_until = NOW() + ($2 || ' days')::interval, updated_at = NOW()
+       WHERE id = $1`,
+      [id, Math.max(1, days)],
+    );
+  }
+
+  /**
+   * Dismisses a single notification.
+   */
+  async dismissNotification(id: string): Promise<void> {
+    await this.db.query(
+      `UPDATE notifications SET dismissed = TRUE, updated_at = NOW() WHERE id = $1`,
+      [id],
+    );
+  }
+
+  /**
+   * Dismisses all active notifications for a branch.
+   */
+  async dismissAllNotifications(branchId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE notifications SET dismissed = TRUE, updated_at = NOW()
+       WHERE branch_id = $1 AND dismissed = FALSE`,
+      [branchId],
+    );
   }
 
   /**

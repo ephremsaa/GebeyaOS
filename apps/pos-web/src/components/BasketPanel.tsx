@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   Tag,
   RotateCcw,
+  Clock,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { EmptyState, Button, Modal, KeyboardHint } from './ui';
@@ -170,11 +171,17 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
               >
                 {/* Item Details */}
                 <div className="flex-1 min-w-0 pr-1">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {isScale && <Scale size={14} strokeWidth={1.75} className="text-primary flex-shrink-0" />}
                     <h4 className="text-[14px] font-semibold text-text-main truncate">
                       {productName}
                     </h4>
+                    {item.product.isClearance && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-amber-100 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 text-[10px] font-bold">
+                        <Tag size={10} className="text-amber-600" />
+                        {language === 'am' ? 'ክሊራንስ' : 'Clearance'}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[13px] text-text-muted mt-0.5 tabular-nums">
                     {isScale ? (
@@ -185,6 +192,16 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
                       <span>{formatCurrency(item.unitPrice)}</span>
                     )}
                   </div>
+                  {item.product.expiringIn7Days && (
+                    <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                      <Clock size={11} className="shrink-0" />
+                      <span>
+                        {language === 'am'
+                          ? `በ${item.product.daysLeft} ቀናት ውስጥ ያበቃል`
+                          : `Expires in ${item.product.daysLeft} days`}
+                      </span>
+                    </div>
+                  )}
                   {item.discount > 0 && (
                     <span className="text-[11px] font-semibold text-primary block mt-0.5">
                       -{formatCurrency(item.discount)} {t('discount')}
