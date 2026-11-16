@@ -328,5 +328,45 @@ describe('Tenant Back-Office Login & Lifecycle Flow (Step 2)', () => {
       );
     });
   });
+
+  describe('6. Public Branding Endpoint', () => {
+    it('returns custom branding when tenant code matches', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'ten-kerod-1',
+            name: 'Kerod Supermarket',
+            slug: 'kerod',
+            logo_url: '/media/tenants/kerod/logo.webp',
+            receipt_header: 'Welcome to Kerod!',
+            plan: 'growth',
+            vat_settings: { primaryColor: '#10b981' },
+          },
+        ],
+      });
+
+      const branding = await authService.getPublicBranding('kerod');
+      expect(branding).toEqual({
+        displayName: 'Kerod Supermarket',
+        logoUrl: '/media/tenants/kerod/logo.webp',
+        primaryColor: '#10b981',
+        tagline: 'Welcome to Kerod!',
+        showPoweredBy: true,
+      });
+    });
+
+    it('returns default GebeyaOS branding when tenant not found', async () => {
+      mockDb.query.mockResolvedValueOnce({ rows: [] });
+
+      const branding = await authService.getPublicBranding('unknown-store');
+      expect(branding).toEqual({
+        displayName: 'GebeyaOS',
+        logoUrl: null,
+        primaryColor: '#2563eb',
+        tagline: '',
+        showPoweredBy: true,
+      });
+    });
+  });
 });
 

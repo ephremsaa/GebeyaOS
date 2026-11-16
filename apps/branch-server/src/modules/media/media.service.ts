@@ -314,7 +314,7 @@ export class MediaService {
   /**
    * Storage stats for Settings > Data: files count and size in MB.
    */
-  async getStorageStats(tenantId: string): Promise<{ fileCount: number; totalBytes: number; totalMb: string }> {
+  async getStorageStats(tenantId: string): Promise<{ fileCount: number; totalBytes: number; totalMb: string; formatted: string }> {
     const tenantDir = this.getTenantDir(tenantId);
     let fileCount = 0;
     let totalBytes = 0;

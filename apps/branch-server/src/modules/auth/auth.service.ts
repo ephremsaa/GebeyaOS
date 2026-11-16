@@ -432,6 +432,54 @@ export class AuthService {
   }
 
   /**
+   * Public Branding Lookup (unauthenticated, safe for login / landing / topbar)
+   */
+  async getPublicBranding(code?: string) {
+    const defaultBranding = {
+      displayName: 'GebeyaOS',
+      logoUrl: null,
+      primaryColor: '#2563eb',
+      tagline: '',
+      showPoweredBy: true,
+    };
+
+    let query = `SELECT id, name, slug, logo_url, receipt_header, plan, vat_settings FROM tenants`;
+    let params: any[] = [];
+
+    if (code && code.trim()) {
+      query += ` WHERE LOWER(slug) = LOWER($1) OR LOWER(name) = LOWER($1) OR LOWER(slug) LIKE LOWER($1) || '%' OR id::text = $1 LIMIT 1`;
+      params.push(code.trim());
+    } else {
+      query += ` ORDER BY created_at ASC LIMIT 1`;
+    }
+
+    try {
+      const res = await this.db.query(query, params);
+      if (res.rows.length === 0) {
+        return defaultBranding;
+      }
+
+      const t = res.rows[0];
+      let vatSettings: any = {};
+      try {
+        vatSettings = typeof t.vat_settings === 'string' ? JSON.parse(t.vat_settings) : (t.vat_settings || {});
+      } catch {
+        vatSettings = {};
+      }
+
+      return {
+        displayName: t.name || 'GebeyaOS',
+        logoUrl: t.logo_url || null,
+        primaryColor: vatSettings?.primaryColor || '#2563eb',
+        tagline: t.receipt_header || '',
+        showPoweredBy: t.plan !== 'enterprise',
+      };
+    } catch {
+      return defaultBranding;
+    }
+  }
+
+  /**
    * 3. Back-Office Login (2-Step, Progressive Lockout, Argon2id, TOTP)
    */
   async login(
