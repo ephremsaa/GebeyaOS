@@ -92,7 +92,22 @@ export class ProductsService {
         ],
       );
 
-      return result.rows[0];
+      const createdProduct = result.rows[0];
+
+      if (dto.barcode && dto.barcode.trim()) {
+        try {
+          await this.addBarcode(id, {
+            barcode: dto.barcode.trim(),
+            barcode_type: dto.barcode.trim().length === 13 ? 'EAN13' : 'CODE128',
+            pack_multiplier: dto.pack_multiplier || 1.0,
+            is_primary: true,
+          });
+        } catch {
+          // Ignore if barcode already exists or handled separately
+        }
+      }
+
+      return createdProduct;
     } catch (err: any) {
       if (err.code === '23505') {
         throw new ConflictException(`Product with SKU '${dto.sku}' already exists.`);

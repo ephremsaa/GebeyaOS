@@ -91,9 +91,19 @@ export class CreateProductDto {
   @IsOptional()
   barcode?: string;
 
+  @IsNumber()
+  @Min(0.001)
+  @IsOptional()
+  @Type(() => Number)
+  pack_multiplier?: number;
+
   @IsString()
   @IsOptional()
   image_url?: string;
+
+  @IsString()
+  @IsOptional()
+  default_expiry_date?: string;
 }
 
 export class CreateBarcodeDto {
@@ -240,6 +250,24 @@ export class UpdateProductDto {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+
+  @IsString()
+  @IsOptional()
+  barcode?: string;
+
+  @IsNumber()
+  @Min(0.001)
+  @IsOptional()
+  @Type(() => Number)
+  pack_multiplier?: number;
+
+  @IsString()
+  @IsOptional()
+  image_url?: string;
+
+  @IsString()
+  @IsOptional()
+  default_expiry_date?: string;
 }
 
 export class ProductQueryDto {
