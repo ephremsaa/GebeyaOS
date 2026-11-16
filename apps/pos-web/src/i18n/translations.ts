@@ -104,7 +104,7 @@ export const TRANSLATIONS = {
     shortcutEnter: 'Confirm / New sale',
     // Phase 1: Auth, Roles, Setup & Users
     usersTab: 'Staff & Roles',
-    loginTitle: 'Sign In to GebeyaOS',
+    loginTitle: 'Sign In',
     loginSubtitle: 'Enter your credentials to access the store system',
     usernameOrPhone: 'Username or Phone Number',
     password: 'Password',
@@ -338,7 +338,7 @@ export const TRANSLATIONS = {
 
     // Phase 1: Auth, Roles, Setup & Users
     usersTab: 'ሰራተኞች እና ፈቃዶች',
-    loginTitle: 'ወደ ገበያ ኦኤስ ይግቡ',
+    loginTitle: 'ይግቡ',
     loginSubtitle: 'የመደብሩን ሥርዓት ለመጠቀም መለያዎን ያስገቡ',
     usernameOrPhone: 'የተጠቃሚ ስም ወይም ስልክ ቁጥር',
     password: 'የይለፍ ቃል',

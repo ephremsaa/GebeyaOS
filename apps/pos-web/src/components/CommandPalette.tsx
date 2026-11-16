@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
+import { useBrand } from '../brand/BrandContext';
 import { NavTabId } from './NavigationRail';
 
 interface CommandPaletteProps {
@@ -43,6 +44,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 }) => {
   const { language, isDarkMode, toggleDarkMode } = useI18n();
   const { lockSession } = useAuth();
+  const brand = useBrand();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [productResults, setProductResults] = useState<any[]>([]);
@@ -302,7 +304,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             <span>Use <kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&uarr;</kbd> <kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&darr;</kbd> to navigate</span>
             <span><kbd className="px-1 rounded bg-slate-200 dark:bg-slate-700">&crarr;</kbd> to select</span>
           </div>
-          <span>GebeyaOS</span>
+          <span>{brand.displayName}</span>
         </div>
       </div>
     </div>

@@ -73,7 +73,7 @@ export const OnboardingHints: React.FC<OnboardingHintsProps> = ({ currentTab }) 
         title: language === 'am' ? 'የቅርንጫፍ LAN ሉዓላዊነት' : 'Branch LAN Sovereign Operation',
         desc: language === 'am'
           ? 'የኢንተርኔት ግንኙነት ቢቋረጥም ሁሉም የሱቅ ሽያጮች እና የክምችት ስራዎች ያለማቋረጥ ይሰራሉ።'
-          : 'GebeyaOS operates 100% offline on the branch server. All sales and inventories are safe and sync automatically when internet restores.',
+          : 'The system operates 100% offline on the branch server. All sales and inventories are safe and sync automatically when internet restores.',
       },
       {
         title: language === 'am' ? 'ፈጣን የትእዛዝ ሳጥን' : 'Command Palette (Ctrl+K)',

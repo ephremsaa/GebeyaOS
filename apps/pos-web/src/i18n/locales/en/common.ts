@@ -1,5 +1,6 @@
 export const commonEn = {
   "appName": "GebeyaOS",
+  "brandFallback": "Supermarket",
   "productTagline": "Retail Management & POS System",
   "branchName": "Bole Medhanialem",
   /* ── New 7-page nav labels ── */

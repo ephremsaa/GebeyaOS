@@ -1,5 +1,5 @@
 export const authEn = {
-  loginTitle: 'Sign In to GebeyaOS',
+  loginTitle: 'Sign In to {{brand}}',
   loginSubtitle: 'Enter your credentials to access the store system',
   companyCodeLabel: 'Company Code (Supermarket)',
   companyCodePlaceholder: 'e.g., KEROD or MAYA',

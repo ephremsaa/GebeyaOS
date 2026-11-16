@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
+import { useBrand } from '../brand/BrandContext';
 import { Button, Modal, Input } from './ui';
 import { UserProfileModal } from './auth/UserProfileModal';
 import { TerminalPairModal } from './auth/TerminalPairModal';
@@ -34,6 +35,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const { currentUser, logout, lockSession, switchCashier, updateUserPassword, updateUserPin } = useAuth();
   const { t, language, setLanguage, isDarkMode, toggleDarkMode } = useI18n();
+  const brand = useBrand();
+
+  const brandName = currentUser?.tenantName?.trim() || (brand.displayName !== 'GebeyaOS' ? brand.displayName : '') || 'Supermarket';
+  const initialLetter = brandName.charAt(0).toUpperCase();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
@@ -135,16 +140,20 @@ export const TopBar: React.FC<TopBarProps> = ({
     <header className="h-14 px-5 bg-surface border-b border-border-subtle flex items-center justify-between flex-shrink-0 relative z-30 select-none">
       {/* Left: Product Logo, Brand, Store Badge, and Branch Pill */}
       <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-soft flex-shrink-0">
-          <Store size={18} strokeWidth={1.75} />
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-soft flex-shrink-0 font-extrabold text-sm overflow-hidden">
+          {brand.logoUrl ? (
+            <img src={brand.logoUrl} alt={brandName} className="w-full h-full object-cover" />
+          ) : (
+            <span>{initialLetter}</span>
+          )}
         </div>
         <div className="flex items-baseline gap-2">
           <span className="font-bold text-lg tracking-tight text-text-main">
-            {t('common.appName')}
+            {brandName}
           </span>
-          {currentUser?.tenantName && (
-            <span className="hidden md:inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md bg-surface-2 text-text-muted border border-border-subtle">
-              {currentUser.tenantName.trim()}
+          {brand.showPoweredBy && (
+            <span className="hidden xl:inline-flex items-center text-[10px] font-medium text-text-muted opacity-60">
+              powered by GebeyaOS
             </span>
           )}
         </div>

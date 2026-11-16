@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth, AssignedBranch } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
+import { useBrand } from '../../brand/BrandContext';
 import { calculatePasswordStrength } from '../../utils/password-meter';
 
 interface LoginPageProps {
@@ -43,6 +44,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
     updateUserPassword,
   } = useAuth();
   const { t, language, setLanguage, isDarkMode, toggleDarkMode } = useI18n();
+  const brand = useBrand();
+
+  const brandDisplayName = companyInfo?.name || (brand.displayName !== 'GebeyaOS' ? brand.displayName : '') || '';
+  const brandInitial = brandDisplayName ? brandDisplayName.charAt(0).toUpperCase() : '';
 
   // Multi-step flow state
   // Step 1: Company Code, Step 2: Credentials, Step 3: Branch Selection
@@ -286,14 +291,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
       <div className="w-full max-w-md bg-card border border-border-subtle rounded-3xl shadow-modal p-6 sm:p-8 flex flex-col gap-5 z-10">
         {/* Brand / Logo */}
         <div className="flex flex-col items-center text-center gap-2">
-          <div className="w-14 h-14 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
-            <Store size={30} />
+          <div className="w-14 h-14 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 overflow-hidden font-extrabold text-2xl">
+            {companyInfo?.logoUrl || brand.logoUrl ? (
+              <img
+                src={companyInfo?.logoUrl || brand.logoUrl || ''}
+                alt={brandDisplayName || 'Logo'}
+                className="w-full h-full object-cover"
+              />
+            ) : brandInitial ? (
+              <span>{brandInitial}</span>
+            ) : (
+              <Store size={30} />
+            )}
           </div>
           <h1 className="text-2xl font-black tracking-tight">
-            {companyInfo ? companyInfo.name : t('loginTitle')}
+            {brandDisplayName ? `${brandDisplayName}` : t('loginTitle')}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {companyInfo?.receiptHeader || t('loginSubtitle')}
+            {companyInfo?.receiptHeader || brand.tagline || (brandDisplayName ? (language === 'am' ? 'የሰራተኞች እና የቢሮ መግቢያ' : 'Staff & Back-Office Login') : t('loginSubtitle'))}
           </p>
         </div>
 
@@ -632,14 +647,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
           <button
             type="button"
             onClick={() => {
-              window.location.hash = '#platform';
+              window.location.hash = '#website';
             }}
             className="text-[11px] text-text-dim hover:text-primary transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
           >
-            <ShieldAlert size={13} className="text-primary" />
-            {language === 'am' ? 'የስርዓት አስተዳዳሪ HQ' : 'Platform HQ'}
+            <Globe size={13} className="text-primary" />
+            {language === 'am' ? 'ስለ GebeyaOS' : 'About GebeyaOS'}
           </button>
         </div>
+
+        {brand.showPoweredBy && (
+          <div className="text-center text-[10px] text-text-dim opacity-70 mt-1 select-none">
+            Powered by GebeyaOS
+          </div>
+        )}
       </div>
 
       {/* FORGOT PASSWORD MODAL */}

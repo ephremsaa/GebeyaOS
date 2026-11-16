@@ -13,10 +13,12 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
+import { useBrand } from '../brand/BrandContext';
 
 export const BackupRestoreView: React.FC = () => {
   const { language } = useI18n();
   const { currentUser } = useAuth();
+  const brand = useBrand();
 
   // Backup state
   const [generating, setGenerating] = useState<boolean>(false);
@@ -46,7 +48,8 @@ export const BackupRestoreView: React.FC = () => {
         });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        const filename = `gebeyaos-backup-${data.metadata.branchId.slice(0, 8)}-${new Date()
+        const brandSlug = (brand.displayName || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const filename = `${brandSlug}-backup-${data.metadata.branchId.slice(0, 8)}-${new Date()
           .toISOString()
           .replace(/[:.]/g, '-')}.json`;
         a.href = url;
@@ -175,7 +178,7 @@ export const BackupRestoreView: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
-              GebeyaOS creates complete standalone JSON snapshots containing all branch tables. Backups can be copied directly to USB flash drives or external drives for disaster recovery during catastrophic hardware failure.
+              The system creates complete standalone JSON snapshots containing all branch tables. Backups can be copied directly to USB flash drives or external drives for disaster recovery during catastrophic hardware failure.
             </p>
 
             {latestBackup && (
@@ -253,7 +256,7 @@ export const BackupRestoreView: React.FC = () => {
               />
               <FileCheck size={28} className="mx-auto text-emerald-500 mb-2" />
               <div className="text-xs font-bold text-slate-800 dark:text-white">
-                {uploadedFile ? uploadedFile.name : 'Click or drag a GebeyaOS backup JSON file here'}
+                {uploadedFile ? uploadedFile.name : `Click or drag a ${brand.displayName} backup JSON file here`}
               </div>
               <div className="text-[11px] text-slate-400 mt-0.5">
                 {uploadedFile ? `${(uploadedFile.size / 1024).toFixed(1)} KB` : 'Supports .json snapshots'}

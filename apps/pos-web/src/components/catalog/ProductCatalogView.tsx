@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
+import { useBrand } from '../../brand/BrandContext';
 import { posApi } from '../../utils/pos-api';
 import { BarcodeLabelModal, LabelProductItem } from './BarcodeLabelModal';
 import { ProductDrawer, ProductDrawerData } from './ProductDrawer';
@@ -83,6 +84,7 @@ interface UomOption {
 export const ProductCatalogView: React.FC = () => {
   const { t, language } = useI18n();
   const { hasPermission, currentUser } = useAuth();
+  const brand = useBrand();
 
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -603,7 +605,8 @@ export const ProductCatalogView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `gebeyaos_catalog_${new Date().toISOString().slice(0, 10)}.csv`);
+    const brandSlug = (brand.displayName || 'items').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    link.setAttribute('download', `${brandSlug}_catalog_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1590,7 +1593,7 @@ export const ProductCatalogView: React.FC = () => {
             Showing {products.length} of {totalCount} items
           </span>
           <span className="text-[11px]">
-            GebeyaOS Master Catalog • Synced with Sync Outbox
+            {brand.displayName} Master Catalog • Synced with Sync Outbox
           </span>
         </div>
       </div>

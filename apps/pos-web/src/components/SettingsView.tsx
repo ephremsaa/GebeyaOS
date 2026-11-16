@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
+import { useBrand } from '../brand/BrandContext';
 
 const BRAND_PRESETS = [
   { id: 'emerald', name: 'Emerald', hex: '#10B981', secondary: '#0F766E' },
@@ -48,6 +49,7 @@ const BRAND_PRESETS = [
 export const SettingsView: React.FC = () => {
   const { t, language, textSize, setTextSize, isDarkMode, toggleDarkMode, calendar, setCalendar } = useI18n();
   const { currentUser, logout, updateUserPassword, updateUserPin } = useAuth();
+  const brand = useBrand();
 
   const isOwner = currentUser?.role === 'STORE_OWNER' || currentUser?.role === 'OWNER';
 
@@ -59,13 +61,13 @@ export const SettingsView: React.FC = () => {
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
   // ─── 1. Business Section State ───
-  const [storeName, setStoreName] = useState('Gebeya Supermarket');
+  const [storeName, setStoreName] = useState(() => currentUser?.tenantName || brand.displayName || 'Supermarket');
   const [branchCode, setBranchCode] = useState('BOLE-01');
-  const [branchName, setBranchName] = useState('Bole Medhanialem');
+  const [branchName, setBranchName] = useState(() => currentUser?.branchName || 'Bole Medhanialem');
   const [storeAddress, setStoreAddress] = useState('Bole Sub-City, Addis Ababa, Ethiopia');
   const [storePhone, setStorePhone] = useState('0911223344');
   const [tinNumber, setTinNumber] = useState('0082842324');
-  const [receiptHeader, setReceiptHeader] = useState('Gebeya Supermarket - Bole Medhanialem');
+  const [receiptHeader, setReceiptHeader] = useState(() => brand.tagline || `${currentUser?.tenantName || brand.displayName || 'Supermarket'} - ${currentUser?.branchName || 'Main'}`);
   const [receiptFooter, setReceiptFooter] = useState('Thank you for shopping with us! / እናመሰግናለን!');
   const [brandColor, setBrandColor] = useState('#10B981');
   const [logoUrl, setLogoUrl] = useState('');
@@ -275,7 +277,8 @@ export const SettingsView: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `GebeyaOS_Backup_${branchCode}_${new Date().toISOString().slice(0, 10)}.bak`;
+      const brandSlug = (brand.displayName || 'Backup').replace(/[^a-zA-Z0-9]+/g, '_');
+      link.download = `${brandSlug}_Backup_${branchCode}_${new Date().toISOString().slice(0, 10)}.bak`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

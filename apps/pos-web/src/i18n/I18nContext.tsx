@@ -57,10 +57,22 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem('gebeya_lang', language);
     document.documentElement.lang = language;
-    document.title =
-      language === 'am'
-        ? 'ገበያ ኦኤስ - የችርቻሮ መሸጫ እና መጋዘን አስተዳደር'
-        : 'GebeyaOS - Retail Management & POS';
+    const cachedBrand = (() => {
+      try {
+        const raw = localStorage.getItem('gebeyaos_brand_cache');
+        if (raw) return JSON.parse(raw).displayName;
+      } catch {}
+      return null;
+    })();
+
+    if (cachedBrand && cachedBrand !== 'GebeyaOS') {
+      document.title = `${cachedBrand} - ${language === 'am' ? 'የችርቻሮ መሸጫ ስርዓት' : 'POS & Retail System'}`;
+    } else {
+      document.title =
+        language === 'am'
+          ? 'ገበያ ኦኤስ - የችርቻሮ መሸጫ እና መጋዘን አስተዳደር'
+          : 'GebeyaOS - Retail Management & POS';
+    }
   }, [language]);
 
   // Sync calendar preference

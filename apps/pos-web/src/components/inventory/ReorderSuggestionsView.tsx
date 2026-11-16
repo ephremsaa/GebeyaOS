@@ -127,7 +127,7 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
       const payload = {
         supplierId: selectedSupplierId,
         expectedDeliveryDate: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
-        notes: `Generated automatically from GebeyaOS Reorder Suggestions engine for ${selectedItems.length} low-stock SKUs.`,
+        notes: `Generated automatically from Reorder Suggestions engine for ${selectedItems.length} low-stock SKUs.`,
         items: selectedItems.map((i) => ({
           productId: i.id,
           orderedQuantity: i.suggestedReorderQuantity,

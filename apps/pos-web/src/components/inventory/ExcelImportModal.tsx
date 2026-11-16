@@ -245,7 +245,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                 <FileCheck size={28} className="text-emerald-600" />
                 <div className="flex flex-col">
                   <span className="font-bold text-sm text-slate-900 dark:text-white">
-                    Official GebeyaOS Products &amp; Stock Template (.xlsx)
+                    Official Products &amp; Stock Template (.xlsx)
                   </span>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
                     Includes bilingual instructions, category/unit dropdowns, and example rows.

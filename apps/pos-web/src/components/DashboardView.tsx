@@ -462,7 +462,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-700 text-[11px] text-slate-400 flex items-center justify-between">
-            <span>GebeyaOS Retail v1.0.0</span>
+            <span>Retail POS v1.0.0</span>
             <span className="text-emerald-400 font-medium">Ready</span>
           </div>
         </div>

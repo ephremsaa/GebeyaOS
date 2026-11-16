@@ -1545,7 +1545,7 @@ export const StockTakeView: React.FC = () => {
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
               <span className="text-xs text-slate-400">
-                Audited with GebeyaOS Real-Time Inventory & Stock Ledger Engine
+                Audited with Real-Time Inventory & Stock Ledger Engine
               </span>
               <button
                 onClick={() => setIsReportModalOpen(false)}

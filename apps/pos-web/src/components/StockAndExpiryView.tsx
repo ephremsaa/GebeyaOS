@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
+import { useBrand } from '../brand/BrandContext';
 import { posApi } from '../utils/pos-api';
 import {
   StockAdjustmentReasonCode,
@@ -123,6 +124,7 @@ export interface ExpirySummary {
 export const StockAndExpiryView: React.FC = () => {
   const { language, t, formatCurrency } = useI18n();
   const { hasPermission, currentUser } = useAuth();
+  const brand = useBrand();
 
   const [products, setProducts] = useState<StockItem[]>([]);
   const [batches, setBatches] = useState<BatchItem[]>([]);
@@ -473,7 +475,8 @@ export const StockAndExpiryView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `GebeyaOS_Expiry_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    const brandSlug = (brand.displayName || 'Stock').replace(/[^a-zA-Z0-9]+/g, '_');
+    link.setAttribute('download', `${brandSlug}_Expiry_Report_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -500,10 +503,11 @@ export const StockAndExpiryView: React.FC = () => {
       )
       .join('');
 
+    const brandName = currentUser?.tenantName || brand.displayName || 'Supermarket';
     printWindow.document.write(`
       <html>
         <head>
-          <title>GebeyaOS - Expiry Report</title>
+          <title>${brandName} - Expiry Report</title>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #0f172a; }
             h1 { margin: 0 0 4px 0; font-size: 20px; }
@@ -516,8 +520,8 @@ export const StockAndExpiryView: React.FC = () => {
         <body>
           <div class="header">
             <div>
-              <h1>GebeyaOS - Stock Expiry Report</h1>
-              <p style="margin: 0; font-size: 12px; color: #64748b;">${currentUser?.tenantName || 'Gebeya Supermarket'} • ${currentUser?.branchName || 'Main Branch'}</p>
+              <h1>${brandName} - Stock Expiry Report</h1>
+              <p style="margin: 0; font-size: 12px; color: #64748b;">${brandName} • ${currentUser?.branchName || 'Main Branch'}</p>
             </div>
             <div style="text-align: right; font-size: 12px;">
               <p style="margin: 0;"><strong>Date:</strong> ${dateStr}</p>

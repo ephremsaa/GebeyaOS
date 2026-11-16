@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
+import { useBrand } from '../../brand/BrandContext';
 import { CashierSummary } from '@gebeyaos/shared-types';
 
 interface PinPadModalProps {
@@ -39,6 +40,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
     isLoading,
   } = useAuth();
   const { t, language } = useI18n();
+  const brand = useBrand();
 
   // Cashier list & selection
   const [cashiers, setCashiers] = useState<CashierSummary[]>([]);
@@ -193,7 +195,7 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
         }
       } else {
         // Login as selected cashier
-        const res = await pinLogin(selectedCashier!.id, pin);
+        const res = await pinLogin(pin, selectedCashier?.id);
         if (res.success) {
           triggerHaptic([50]);
           if (onClose) onClose();
@@ -335,7 +337,12 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
             <div className="w-14 h-14 rounded-2xl bg-primary text-white flex items-center justify-center shadow-md shadow-primary/25">
               <KeyRound size={26} />
             </div>
-            <h2 className="text-lg font-black text-text-main mt-1">
+            {brand.displayName && (
+              <span className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">
+                {currentUser?.tenantName || brand.displayName}
+              </span>
+            )}
+            <h2 className="text-lg font-black text-text-main">
               {isLockScreen ? t('auth.terminalLocked') : t('auth.pinLogin')}
             </h2>
             <p className="text-xs text-text-muted">

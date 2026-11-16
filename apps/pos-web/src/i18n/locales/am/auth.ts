@@ -1,5 +1,5 @@
 export const authAm = {
-  loginTitle: 'ወደ ገበያ ኦኤስ ይግቡ',
+  loginTitle: 'ወደ {{brand}} ይግቡ',
   loginSubtitle: 'የመደብሩን ሥርዓት ለመጠቀም መለያዎን ያስገቡ',
   companyCodeLabel: 'የኩባንያ መለያ ኮድ (ሱፐርማርኬት)',
   companyCodePlaceholder: 'ለምሳሌ፡ KEROD ወይም MAYA',

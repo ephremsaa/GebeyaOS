@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
+import { useBrand } from '../brand/BrandContext';
 import {
   DailySalesReport,
   ProductProfitabilityReport,
@@ -51,6 +52,7 @@ const AVAILABLE_BRANCHES: BranchOption[] = [
 export const ReportsView: React.FC = () => {
   const { currentUser } = useAuth();
   const { t, language } = useI18n();
+  const brand = useBrand();
 
   // Role authority check: Owner and HQ Admin see consolidated multi-branch selector; branch managers are locked to branch
   const isHqUser = currentUser?.role === 'OWNER' || currentUser?.role === 'HQ_ADMIN';
@@ -167,7 +169,8 @@ export const ReportsView: React.FC = () => {
 
   // Export to CSV generator
   const exportToCsv = () => {
-    let csv = `GEBEYAOS COMPREHENSIVE RETAIL REPORT\n`;
+    const brandName = brand.displayName || 'Retail';
+    let csv = `${brandName.toUpperCase()} COMPREHENSIVE RETAIL REPORT\n`;
     csv += `Scope: ${selectedBranch === 'ALL' ? 'All Branches' : selectedBranch}\n`;
     csv += `Period: ${timeRange}\n`;
     csv += `Generated At: ${new Date().toISOString()}\n\n`;
@@ -213,9 +216,10 @@ export const ReportsView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
+    const brandSlug = (brand.displayName || 'Retail').replace(/[^a-zA-Z0-9]+/g, '_');
     link.setAttribute(
       'download',
-      `GebeyaOS_Report_${selectedBranch}_${timeRange}_${new Date().toISOString().split('T')[0]}.csv`,
+      `${brandSlug}_Report_${selectedBranch}_${timeRange}_${new Date().toISOString().split('T')[0]}.csv`,
     );
     document.body.appendChild(link);
     link.click();

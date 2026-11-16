@@ -554,7 +554,13 @@ export const posApi = {
     };
 
     const thermalReceipt = formatEscPosThermalReceipt({
-      storeName: 'GebeyaOS Supermarket',
+      storeName: (() => {
+        try {
+          const raw = localStorage.getItem('gebeyaos_brand_cache');
+          if (raw) return JSON.parse(raw).displayName || 'Supermarket';
+        } catch {}
+        return 'Supermarket';
+      })(),
       storeTin: '0012345678',
       storeVatNumber: 'VAT-ET-9921',
       branchName: 'Bole Medhanialem',

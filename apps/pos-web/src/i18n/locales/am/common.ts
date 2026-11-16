@@ -1,5 +1,6 @@
 export const commonAm = {
   "appName": "ገበያ ኦኤስ",
+  "brandFallback": "ሱፐርማርኬት",
   "productTagline": "የችርቻሮ መሸጫ እና መጋዘን አስተዳደር",
   "branchName": "ቦሌ መድኃኔዓለም",
   /* ── New 7-page nav labels ── */

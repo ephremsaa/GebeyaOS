@@ -465,7 +465,7 @@ export const ProductLedgerDrawer: React.FC<ProductLedgerDrawerProps> = ({
           {/* Footer */}
           <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between">
             <span className="text-[11px] text-slate-400">
-              GebeyaOS Inventory Engine • Real-time FEFO Allocation
+              Inventory Ledger Engine • Real-time FEFO Allocation
             </span>
 
             <button
