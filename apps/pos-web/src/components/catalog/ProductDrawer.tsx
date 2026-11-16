@@ -10,7 +10,6 @@ import {
   Check,
   Plus,
   Layers,
-  Image as ImageIcon,
   DollarSign,
   Package,
   AlertCircle,
@@ -19,6 +18,7 @@ import {
   Clock,
   Lock,
   History,
+  Palette,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
@@ -26,7 +26,7 @@ import { posApi } from '../../utils/pos-api';
 import { generateInternalEan13, generateInternalCode128 } from '../../utils/code128Svg';
 import { calculateItemVatBreakdown } from '@gebeyaos/shared-types';
 import { PriceHistoryModal } from './PriceHistoryModal';
-import { ProductPhotoUpload } from './ProductPhotoUpload';
+import { ExpiryDatePicker } from '../ui/ExpiryDatePicker';
 
 export interface ProductDrawerData {
   id?: string;
@@ -49,7 +49,6 @@ export interface ProductDrawerData {
   barcode: string;
   pack_multiplier?: number;
   image_url?: string;
-  photo_path?: string | null;
   stock_on_hand?: number;
   has_expiry_date?: boolean;
 }
@@ -61,65 +60,98 @@ interface ProductDrawerProps {
   categories: Array<{ id: string; code: string; name_en: string; name_am?: string | null }>;
   uoms: Array<{ code: string; name_en: string }>;
   onSaved: (savedProduct: any) => void;
-  onOpenCategoryManager: () => void;
+  onOpenCategoryManager?: () => void;
 }
+
+const STANDARD_UOMS = [
+  { code: 'PCS', name_en: 'Piece', name_am: 'ፍሬ / ቁራጭ' },
+  { code: 'KG', name_en: 'Kilogram', name_am: 'ኪሎግራም' },
+  { code: 'G', name_en: 'Gram', name_am: 'ግራም' },
+  { code: 'LTR', name_en: 'Liter', name_am: 'ሊትር' },
+  { code: 'ML', name_en: 'Milliliter', name_am: 'ሚሊሊትር' },
+  { code: 'PACK', name_en: 'Pack', name_am: 'ፓኬት' },
+  { code: 'BOX', name_en: 'Box', name_am: 'ሳጥን' },
+  { code: 'DOZ', name_en: 'Dozen', name_am: 'ደርዘን' },
+  { code: 'BTL', name_en: 'Bottle', name_am: 'ጠርሙስ' },
+  { code: 'CTN', name_en: 'Carton', name_am: 'ካርቶን' },
+  { code: 'BAG', name_en: 'Bag', name_am: 'ጆንያ / ፌስታል' },
+  { code: 'SCH', name_en: 'Sachet', name_am: 'ሳሼ' },
+];
+
+const PRESET_COLORS = [
+  '#10B981', '#0284C7', '#7C3AED', '#EA580C',
+  '#E11D48', '#0D9488', '#D97706', '#475569',
+];
 
 export const ProductDrawer: React.FC<ProductDrawerProps> = ({
   isOpen,
   onClose,
   product,
-  categories,
-  uoms,
+  categories: initialCategories,
+  uoms: initialUoms,
   onSaved,
-  onOpenCategoryManager,
 }) => {
   const { language, t, formatCurrency } = useI18n();
+  const isAm = language === 'am';
   const { hasPermission, currentUser } = useAuth();
   const isEdit = Boolean(product?.id);
 
-  // Form State
-  const [sku, setSku] = useState('');
+  // Categories list
+  const [categoriesList, setCategoriesList] = useState(initialCategories);
+  useEffect(() => {
+    setCategoriesList(initialCategories);
+  }, [initialCategories]);
+
+  // Form state
   const [nameEn, setNameEn] = useState('');
   const [nameAm, setNameAm] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [sku, setSku] = useState('');
   const [uomCode, setUomCode] = useState('PCS');
   const [packMultiplier, setPackMultiplier] = useState<number>(1);
-  const [basePrice, setBasePrice] = useState<number>(0);
-  const [costPrice, setCostPrice] = useState<number>(0);
-  const [branchOverridePrice, setBranchOverridePrice] = useState<string>('');
-  const [isVatApplicable, setIsVatApplicable] = useState(true);
-  const [vatRate, setVatRate] = useState(0.15);
-  const [isWeighed, setIsWeighed] = useState(false);
-  const [scalePlu, setScalePlu] = useState('');
-  const [minStockLevel, setMinStockLevel] = useState(5);
-  const [maxStockLevel, setMaxStockLevel] = useState(50);
-  const [allowDiscount, setAllowDiscount] = useState(true);
-  const [isActive, setIsActive] = useState(true);
-  const [barcode, setBarcode] = useState('');
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(null);
-  const [hasExpiryDate, setHasExpiryDate] = useState<boolean>(false);
-  const [priceChangeReason, setPriceChangeReason] = useState('');
 
-  // Duplicate Barcode Warning Inline state
-  const [barcodeChecking, setBarcodeChecking] = useState(false);
+  // Price & Bidirectional VAT State
+  const [priceBeforeVat, setPriceBeforeVat] = useState<string>('0.00');
+  const [priceAfterVat, setPriceAfterVat] = useState<string>('0.00');
+  const [isVatApplicable, setIsVatApplicable] = useState<boolean>(true);
+  const [vatRate, setVatRate] = useState<number>(0.15);
+  const [costPrice, setCostPrice] = useState<number>(0);
+  const [minStockLevel, setMinStockLevel] = useState<number>(5);
+  const [maxStockLevel, setMaxStockLevel] = useState<number>(50);
+  const [hasExpiryDate, setHasExpiryDate] = useState<boolean>(false);
+  const [defaultExpiryDate, setDefaultExpiryDate] = useState<string | null>(null);
+  const [isWeighed, setIsWeighed] = useState<boolean>(false);
+  const [scalePlu, setScalePlu] = useState<string>('');
+  const [allowDiscount, setAllowDiscount] = useState<boolean>(true);
+  const [isActive, setIsActive] = useState<boolean>(true);
+  const [imageUrl, setImageUrl] = useState('');
+  const [priceChangeReason, setPriceChangeReason] = useState<string>('');
+  const [stockOnHand, setStockOnHand] = useState<number>(0);
+
+  // Inline Category Add State
+  const [showInlineCatAdd, setShowInlineCatAdd] = useState<boolean>(false);
+  const [inlineCatNameEn, setInlineCatNameEn] = useState<string>('');
+  const [inlineCatNameAm, setInlineCatNameAm] = useState<string>('');
+  const [inlineCatColor, setInlineCatColor] = useState<string>('#10B981');
+  const [inlineCatSaving, setInlineCatSaving] = useState<boolean>(false);
+  const [inlineCatError, setInlineCatError] = useState<string | null>(null);
+
+  // Inline Barcode Duplicate Check
+  const [barcodeChecking, setBarcodeChecking] = useState<boolean>(false);
   const [duplicateWarning, setDuplicateWarning] = useState<{
     exists: boolean;
     productName?: string;
     productSku?: string;
   } | null>(null);
 
-  // Stock Warning on Archive
-  const [stockOnHand, setStockOnHand] = useState<number>(0);
-
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [isPriceHistoryOpen, setIsPriceHistoryOpen] = useState<boolean>(false);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
-
-  const [priceIncludesVat, setPriceIncludesVat] = useState<boolean>(true);
-  const [isPriceHistoryOpen, setIsPriceHistoryOpen] = useState<boolean>(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const canChangePrice =
     currentUser?.role === 'OWNER' ||
@@ -129,18 +161,64 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
     hasPermission('pricing.override') ||
     hasPermission('pos.override_price');
 
-  // Live Bidirectional VAT and Profit Margin Calculation (Part 3)
+  // Compute live VAT breakdown based on priceAfterVat (shelf price)
   const vatBreakdown = useMemo(() => {
+    const shelfPrice = parseFloat(priceAfterVat) || 0;
     return calculateItemVatBreakdown({
-      typedPrice: basePrice,
-      priceIncludesVat,
+      typedPrice: shelfPrice,
+      priceIncludesVat: true,
       isVatApplicable,
       vatRate: isVatApplicable ? vatRate : 0,
       costPrice,
     });
-  }, [basePrice, priceIncludesVat, isVatApplicable, vatRate, costPrice]);
+  }, [priceAfterVat, isVatApplicable, vatRate, costPrice]);
 
-  // Initialize or reset form
+  // Handle typing in Price Before VAT -> recalculate Price After VAT
+  const handlePriceBeforeVatChange = (valStr: string) => {
+    setPriceBeforeVat(valStr);
+    const num = parseFloat(valStr);
+    if (isNaN(num) || num < 0) {
+      setPriceAfterVat('');
+      return;
+    }
+    if (!isVatApplicable || vatRate <= 0) {
+      setPriceAfterVat(num.toFixed(2));
+    } else {
+      const gross = Math.round(num * (1 + vatRate) * 100) / 100;
+      setPriceAfterVat(gross.toFixed(2));
+    }
+  };
+
+  // Handle typing in Price After VAT (shelf price) -> back-calculate Price Before VAT
+  const handlePriceAfterVatChange = (valStr: string) => {
+    setPriceAfterVat(valStr);
+    const num = parseFloat(valStr);
+    if (isNaN(num) || num < 0) {
+      setPriceBeforeVat('');
+      return;
+    }
+    if (!isVatApplicable || vatRate <= 0) {
+      setPriceBeforeVat(num.toFixed(2));
+    } else {
+      const net = Math.round((num / (1 + vatRate)) * 100) / 100;
+      setPriceBeforeVat(net.toFixed(2));
+    }
+  };
+
+  // When VAT switch or rate toggles, re-sync from Price After VAT
+  const handleVatToggle = (applicable: boolean, newRate: number = 0.15) => {
+    setIsVatApplicable(applicable);
+    setVatRate(newRate);
+    const shelf = parseFloat(priceAfterVat) || 0;
+    if (!applicable || newRate <= 0) {
+      setPriceBeforeVat(shelf.toFixed(2));
+    } else {
+      const net = Math.round((shelf / (1 + newRate)) * 100) / 100;
+      setPriceBeforeVat(net.toFixed(2));
+    }
+  };
+
+  // Initialize form when drawer opens
   useEffect(() => {
     if (!isOpen) return;
 
@@ -148,43 +226,41 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setSku(product.sku);
       setNameEn(product.name_en);
       setNameAm(product.name_am || '');
-      setCategoryId(product.category_id || categories[0]?.id || '');
+      setCategoryId(product.category_id || categoriesList[0]?.id || '');
       setUomCode(product.uom_code || 'PCS');
       setPackMultiplier(product.pack_multiplier || 1);
-      setBasePrice(Number(product.base_price) || 0);
+      const gross = Number(product.base_price) || 0;
+      const effectiveVat = Boolean(product.is_vat_applicable);
+      const effectiveRate = Number(product.vat_rate) || 0.15;
+      setIsVatApplicable(effectiveVat);
+      setVatRate(effectiveRate);
+      setPriceAfterVat(gross.toFixed(2));
+      const net = effectiveVat ? Math.round((gross / (1 + effectiveRate)) * 100) / 100 : gross;
+      setPriceBeforeVat(net.toFixed(2));
       setCostPrice(Number(product.cost_price) || 0);
-      setBranchOverridePrice(
-        product.branch_override_price !== undefined && product.branch_override_price !== null
-          ? String(product.branch_override_price)
-          : '',
-      );
-      setIsVatApplicable(product.is_vat_applicable);
-      setVatRate(Number(product.vat_rate) || 0.15);
-      setIsWeighed(product.is_weighed);
+      setIsWeighed(Boolean(product.is_weighed));
       setScalePlu(product.scale_plu || '');
       setMinStockLevel(Number(product.min_stock_level) || 0);
       setMaxStockLevel(Number(product.max_stock_level) || 50);
       setAllowDiscount(product.allow_discount);
       setIsActive(product.is_active);
       setBarcode(product.barcode || '');
-      setCurrentPhotoUrl(product.photo_path || product.image_url || null);
-      setPhotoFile(null);
+      setImageUrl(product.image_url || '');
       setHasExpiryDate(Boolean(product.has_expiry_date));
       setStockOnHand(Number(product.stock_on_hand) || 0);
       setPriceChangeReason('');
     } else {
-      // Rapid Add Initializer (<30s)
       setSku(`SKU-${Date.now().toString().slice(-6)}`);
       setNameEn('');
       setNameAm('');
-      setCategoryId(categories[0]?.id || '');
+      setCategoryId(categoriesList[0]?.id || '');
       setUomCode('PCS');
       setPackMultiplier(1);
-      setBasePrice(0);
-      setCostPrice(0);
-      setBranchOverridePrice('');
+      setPriceBeforeVat('0.00');
+      setPriceAfterVat('0.00');
       setIsVatApplicable(true);
       setVatRate(0.15);
+      setCostPrice(0);
       setIsWeighed(false);
       setScalePlu('');
       setMinStockLevel(5);
@@ -192,24 +268,21 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setAllowDiscount(true);
       setIsActive(true);
       setBarcode('');
-      setCurrentPhotoUrl(null);
-      setPhotoFile(null);
+      setImageUrl('');
       setHasExpiryDate(false);
+      setDefaultExpiryDate(null);
       setStockOnHand(0);
       setPriceChangeReason('');
-
-      // Auto focus barcode input for rapid scanning
-      setTimeout(() => {
-        barcodeInputRef.current?.focus();
-      }, 100);
+      setTimeout(() => nameInputRef.current?.focus(), 120);
     }
 
     setDuplicateWarning(null);
     setFormError(null);
     setFormSuccess(null);
-  }, [isOpen, product, categories]);
+    setShowInlineCatAdd(false);
+  }, [isOpen, product, categoriesList]);
 
-  // Debounced Barcode Inline Duplicate Check
+  // Debounced Barcode Duplicate Check
   useEffect(() => {
     if (!barcode || barcode.trim() === '') {
       setDuplicateWarning(null);
@@ -217,7 +290,6 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
     }
 
     const trimmed = barcode.trim();
-    // Don't warn on the product's own existing barcode when editing
     if (isEdit && product?.barcode === trimmed) {
       setDuplicateWarning(null);
       return;
@@ -228,7 +300,6 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       try {
         const check = await posApi.checkBarcode(trimmed);
         if (check.exists && check.product) {
-          // If editing and matched product is current product, ignore
           if (isEdit && check.product.id === product?.id) {
             setDuplicateWarning(null);
           } else {
@@ -253,8 +324,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
 
   if (!isOpen) return null;
 
-  // Rapid generators
-  const handleGenerateEan = () => {
+  const handleGenerateBarcode = () => {
     const ean = generateInternalEan13();
     setBarcode(ean);
     if (!sku || sku.startsWith('SKU-')) {
@@ -262,11 +332,32 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
     }
   };
 
-  const handleGenerateCode128 = () => {
-    const code = generateInternalCode128();
-    setBarcode(code);
-    if (!sku || sku.startsWith('SKU-')) {
-      setSku(code);
+  const handleCreateCategoryInline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inlineCatNameEn.trim()) {
+      setInlineCatError(isAm ? 'የምድብ ስም ያስገቡ' : 'Category name is required');
+      return;
+    }
+
+    setInlineCatSaving(true);
+    setInlineCatError(null);
+    try {
+      const code = inlineCatNameEn.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || `CAT-${Date.now().toString().slice(-4)}`;
+      const newCat = await posApi.createCategory({
+        code,
+        name_en: inlineCatNameEn.trim(),
+        name_am: inlineCatNameAm.trim() || undefined,
+      });
+
+      setCategoriesList((prev) => [...prev, newCat]);
+      setCategoryId(newCat.id);
+      setShowInlineCatAdd(false);
+      setInlineCatNameEn('');
+      setInlineCatNameAm('');
+    } catch (err: any) {
+      setInlineCatError(err.message || 'Failed to create category');
+    } finally {
+      setInlineCatSaving(false);
     }
   };
 
@@ -275,72 +366,69 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
     setFormSuccess(null);
 
     const effectiveNameEn = nameEn.trim() || nameAm.trim();
-    const effectiveNameAm = nameAm.trim() || undefined;
-
     if (!effectiveNameEn) {
-      setFormError(t('catalog.nameRequired'));
-      return;
-    }
-    const finalSku = sku.trim() || (barcode.trim() ? `SKU-${barcode.trim().slice(-6)}` : `SKU-${Date.now().toString().slice(-6)}`);
-    if (basePrice < 0) {
-      setFormError('Selling price cannot be negative.');
-      return;
-    }
-    if (costPrice < 0) {
-      setFormError('Cost price cannot be negative.');
+      setFormError(isAm ? 'እባክዎ የእቃውን ስም ያስገቡ' : 'Product English name is required');
       return;
     }
 
-    // Check duplicate barcode restriction
+    const finalSellingPrice = parseFloat(priceAfterVat) || 0;
+    if (finalSellingPrice < 0) {
+      setFormError(isAm ? 'የሽያጭ ዋጋ ከዜሮ በታች መሆን አይችልም' : 'Selling price cannot be negative');
+      return;
+    }
+
     if (duplicateWarning?.exists) {
-      setFormError(`Barcode '${barcode}' is already in use by ${duplicateWarning.productName}. Barcodes must be unique.`);
+      setFormError(
+        isAm
+          ? `ባርኮድ '${barcode}' በ${duplicateWarning.productName} ተይዟል`
+          : `Barcode '${barcode}' is already in use by ${duplicateWarning.productName}. Barcodes must be unique.`,
+      );
       return;
     }
 
-    const finalSellingPrice = vatBreakdown.grossPrice;
-
-    // Check price modification permission if price changed on existing product
     if (isEdit && product && Number(product.base_price) !== finalSellingPrice) {
       if (!canChangePrice) {
         setFormError('You do not have permission to modify product base prices.');
         return;
       }
       if (!priceChangeReason.trim()) {
-        setFormError('Please enter a reason for this price change (audit requirement).');
+        setFormError(isAm ? 'እባክዎ የዋጋ ለውጥ ምክንያት ያስገቡ' : 'Please enter a reason for this price change (audit requirement).');
         return;
       }
     }
 
     setSaving(true);
     try {
+      const finalSku = sku.trim() || (barcode.trim() ? `SKU-${barcode.trim().slice(-6)}` : `SKU-${Date.now().toString().slice(-6)}`);
+
       const payload: any = {
         sku: finalSku,
         name_en: effectiveNameEn,
-        name_am: effectiveNameAm,
-        category_id: categoryId || categories[0]?.id,
+        name_am: nameAm.trim() || undefined,
+        category_id: categoryId || categoriesList[0]?.id,
         uom_code: uomCode,
         base_price: finalSellingPrice,
-        cost_price: Number(costPrice),
+        cost_price: Number(costPrice) || 0,
         is_vat_applicable: isVatApplicable,
         vat_rate: isVatApplicable ? Number(vatRate) : 0,
         is_weighed: isWeighed,
         scale_plu: isWeighed ? (scalePlu.trim() || undefined) : undefined,
-        min_stock_level: Number(minStockLevel),
-        max_stock_level: Number(maxStockLevel),
+        min_stock_level: Number(minStockLevel) || 0,
+        max_stock_level: Number(maxStockLevel) || 50,
         allow_discount: allowDiscount,
         is_active: isActive,
         barcode: barcode.trim() || undefined,
+        image_url: imageUrl.trim() || undefined,
         has_expiry_date: hasExpiryDate,
+        pack_multiplier: Number(packMultiplier) || 1.0,
       };
 
       let resultProduct: any;
 
       if (isEdit && product?.id) {
-        // Update product
         const res = await posApi.updateProduct(product.id, payload);
         resultProduct = res.product;
 
-        // If price changed, record audit price change
         if (Number(product.base_price) !== finalSellingPrice && priceChangeReason) {
           await posApi.updatePrice(product.id, {
             new_price: finalSellingPrice,
@@ -348,23 +436,9 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
             changed_by: currentUser?.id,
           });
         }
-
-        // If branch override price specified
-        if (branchOverridePrice !== '') {
-          const overrideVal = parseFloat(branchOverridePrice);
-          if (!isNaN(overrideVal)) {
-            await fetch(`/api/products/${product.id}/branch-overrides/${currentUser?.branchId || '018e0000-0000-7000-8000-000000000020'}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ selling_price: overrideVal }),
-            });
-          }
-        }
       } else {
-        // Create product
         resultProduct = await posApi.createProduct(payload);
 
-        // If barcode entered, also attach via barcodes endpoint
         if (barcode.trim()) {
           try {
             await fetch(`/api/products/${resultProduct.id}/barcodes`, {
@@ -377,11 +451,11 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                 is_primary: true,
               }),
             });
-          } catch {}
+          } catch { }
         }
       }
 
-      // Photo upload/delete handling
+      // Photo upload
       if (photoFile && resultProduct?.id) {
         try {
           const photoFormData = new FormData();
@@ -403,27 +477,23 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
 
       setFormSuccess(
         isEdit
-          ? 'Product updated successfully!'
-          : `"${nameEn}" added to catalog in under 30 seconds!`,
+          ? (isAm ? 'እቃው በተሳካ ሁኔታ ተሻሽሏል!' : 'Product updated successfully!')
+          : (isAm ? `"${effectiveNameEn}" በተሳካ ሁኔታ ተመዝግቧል!` : `"${effectiveNameEn}" added to catalog!`),
       );
 
       onSaved(resultProduct);
 
       if (addAnother) {
-        // Reset for another rapid addition
-        setSku(`SKU-${Date.now().toString().slice(-6)}`);
         setNameEn('');
         setNameAm('');
-        setBasePrice(0);
+        setPriceBeforeVat('0.00');
+        setPriceAfterVat('0.00');
         setCostPrice(0);
-        setBranchOverridePrice('');
         setBarcode('');
-        setCurrentPhotoUrl(null);
-        setPhotoFile(null);
+        setSku(`SKU-${Date.now().toString().slice(-6)}`);
+        setImageUrl('');
         setDuplicateWarning(null);
-        setTimeout(() => {
-          barcodeInputRef.current?.focus();
-        }, 150);
+        setTimeout(() => nameInputRef.current?.focus(), 150);
       } else {
         setTimeout(onClose, 600);
       }
@@ -434,348 +504,372 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
     }
   };
 
+  const isPackUnit = ['PACK', 'BOX', 'DOZ', 'CTN', 'BAG'].includes(uomCode.toUpperCase());
+
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden select-none">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-50 overflow-hidden select-none font-sans">
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
         onClick={onClose}
       />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-xl bg-white dark:bg-slate-800 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-700 animate-in slide-in-from-right duration-250">
+        <div className="w-screen max-w-2xl bg-surface shadow-2xl flex flex-col border-l border-border-subtle animate-in slide-in-from-right duration-250">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-border-subtle bg-surface-2 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gebeya-100 dark:bg-gebeya-950/60 text-gebeya-600 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-bold shadow-md shadow-primary/25">
                 <Package size={20} />
               </div>
               <div>
-                <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  {isEdit ? t('catalog.editProduct') : t('catalog.addProductQuick')}
+                <h2 className="text-base font-black text-text-main flex items-center gap-2">
+                  {isEdit
+                    ? isAm ? 'እቃ ማሻሻያ' : 'Edit Product'
+                    : isAm ? 'አዲስ እቃ መመዝገቢያ' : 'Add New Item'}
                 </h2>
-                <p className="text-xs text-slate-500">
-                  {isEdit ? `SKU: ${product?.sku}` : 'Scan or type barcode, enter name, price, and save.'}
+                <p className="text-xs text-text-muted">
+                  {isEdit
+                    ? `SKU: ${product?.sku}`
+                    : isAm
+                    ? 'ስም፣ ምድብ፣ ባርኮድ እና ዋጋ ያስገቡና ይመዝግቡ'
+                    : 'Enter product name, category, barcode, and price'}
                 </p>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
+              className="w-8 h-8 rounded-full hover:bg-surface-2 flex items-center justify-center text-text-muted hover:text-text-main transition-colors"
             >
               <X size={18} />
             </button>
           </div>
 
-          {/* Body: Fast Form Fields */}
+          {/* Body: High-Legibility Fields in Strict Order */}
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* Alerts */}
             {formError && (
-              <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 text-xs flex items-center gap-2 animate-in fade-in">
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs flex items-center gap-2 animate-in fade-in">
                 <AlertCircle size={16} className="shrink-0" />
-                <span>{formError}</span>
+                <span className="font-semibold">{formError}</span>
               </div>
             )}
 
             {formSuccess && (
-              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 text-xs flex items-center gap-2 animate-in fade-in">
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2 animate-in fade-in">
                 <Check size={16} className="shrink-0" />
-                <span>{formSuccess}</span>
+                <span className="font-semibold">{formSuccess}</span>
               </div>
             )}
 
-            {/* 1. Barcode Scanner & Inline Warning (UX Focus: 30 seconds) */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-2">
+            {/* 1. English Name (Required, Large 16px) */}
+            <div>
+              <label className="text-xs font-bold text-text-main block mb-1">
+                {isAm ? 'የእቃ ስም (እንግሊዝኛ) *' : 'Product Name (English) *'}
+              </label>
+              <input
+                ref={nameInputRef}
+                type="text"
+                required
+                placeholder={isAm ? 'ለምሳሌ Cooking Oil 1L' : 'e.g. Cooking Oil 1L'}
+                value={nameEn}
+                onChange={(e) => setNameEn(e.target.value)}
+                className="w-full h-12 px-4 rounded-xl bg-surface border border-border-subtle text-base font-semibold text-text-main placeholder-text-dim focus:outline-hidden focus:border-primary transition-colors"
+              />
+            </div>
+
+            {/* 2. Amharic Name (Optional) */}
+            <div>
+              <label className="text-xs font-bold text-text-main block mb-1">
+                {isAm ? 'የእቃ ስም (አማርኛ - አማራጭ)' : 'Product Name (Amharic - Optional)'}
+              </label>
+              <input
+                type="text"
+                placeholder={isAm ? 'ለምሳሌ የምግብ ዘይት 1 ሊትር' : 'e.g. የምግብ ዘይት 1 ሊትር'}
+                value={nameAm}
+                onChange={(e) => setNameAm(e.target.value)}
+                className="w-full h-12 px-4 rounded-xl bg-surface border border-border-subtle text-base font-semibold text-text-main placeholder-text-dim focus:outline-hidden focus:border-primary transition-colors"
+              />
+            </div>
+
+            {/* 3. Category (Required) + Inline Category Add Option */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Barcode size={16} className="text-gebeya-600" />
-                  {language === 'am' ? 'ባርኮድ (ስካን ወይም ፃፍ) *' : 'Barcode (Scan or Type) *'}
+                <label className="text-xs font-bold text-text-main flex items-center gap-1.5">
+                  <Tag size={14} className="text-primary" />
+                  <span>{isAm ? 'ምድብ (Category) *' : 'Category *'}</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowInlineCatAdd((prev) => !prev)}
+                  className="text-xs text-primary hover:underline font-bold flex items-center gap-1"
+                >
+                  <Plus size={13} />
+                  {showInlineCatAdd
+                    ? (isAm ? 'ሰርዝ' : 'Close')
+                    : (isAm ? '+ አዲስ ምድብ ጨምር' : '+ Add new category')}
+                </button>
+              </div>
+
+              {/* Inline Category Mini Form */}
+              {showInlineCatAdd && (
+                <form
+                  onSubmit={handleCreateCategoryInline}
+                  className="p-4 rounded-2xl bg-surface-2 border border-border-subtle space-y-3 animate-in fade-in"
+                >
+                  <div className="text-xs font-bold text-text-main">
+                    {isAm ? 'አዲስ ምድብ መፍጠሪያ' : 'Create New Category'}
+                  </div>
+
+                  {inlineCatError && (
+                    <div className="text-xs text-rose-500 font-semibold">{inlineCatError}</div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Category name (EN)"
+                      value={inlineCatNameEn}
+                      onChange={(e) => setInlineCatNameEn(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl bg-surface border border-border-subtle text-sm text-text-main"
+                    />
+                    <input
+                      type="text"
+                      placeholder="የምድብ ስም (አማርኛ)"
+                      value={inlineCatNameAm}
+                      onChange={(e) => setInlineCatNameAm(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl bg-surface border border-border-subtle text-sm text-text-main"
+                    />
+                  </div>
+
+                  {/* Preset Colors */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="text-[11px] font-semibold text-text-muted">
+                      {isAm ? 'ቀለም:' : 'Color:'}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {PRESET_COLORS.map((col) => (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() => setInlineCatColor(col)}
+                          style={{ backgroundColor: col }}
+                          className={`w-6 h-6 rounded-full transition-transform ${
+                            inlineCatColor === col ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowInlineCatAdd(false)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold text-text-muted hover:text-text-main"
+                    >
+                      {isAm ? 'ተመለስ' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={inlineCatSaving}
+                      className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold shadow-xs hover:opacity-90 disabled:opacity-50"
+                    >
+                      {inlineCatSaving
+                        ? (isAm ? 'በመመዝገብ ላይ...' : 'Saving...')
+                        : (isAm ? 'ምድብ መዝግብ' : 'Save Category')}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full h-12 px-4 rounded-xl bg-surface border border-border-subtle text-base font-semibold text-text-main focus:outline-hidden focus:border-primary transition-colors"
+              >
+                {categoriesList.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name_en} {c.name_am ? `(${c.name_am})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Barcode (Scan / Type / Auto Generator / Instant Duplicate Check) */}
+            <div className="space-y-2 p-4 rounded-2xl bg-surface-2 border border-border-subtle">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-text-main flex items-center gap-1.5">
+                  <Barcode size={15} className="text-primary" />
+                  <span>{isAm ? 'ባርኮድ (ስካን ወይም ፃፍ)' : 'Barcode (Scan or Type)'}</span>
                 </label>
 
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleGenerateEan}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-[10px] font-bold flex items-center gap-1 transition"
-                  >
-                    <Sparkles size={11} className="text-emerald-600 dark:text-emerald-400" />
-                    {t('catalog.makeCodeForMe')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleGenerateCode128}
-                    className="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 text-[10px] font-bold transition"
-                  >
-                    + Code128
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateBarcode}
+                  className="px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  <Sparkles size={12} />
+                  {isAm ? 'ኮድ አዘጋጅልኝ' : 'Make a code for me'}
+                </button>
               </div>
 
               <div className="relative">
                 <input
                   ref={barcodeInputRef}
                   type="text"
-                  placeholder={t('catalog.barcodePlaceholder')}
+                  placeholder={isAm ? 'ባርኮድ ስካን ያድርጉ ወይም ቁጥሩን እዚህ ይፃፉ' : 'Scan barcode or type barcode number'}
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border font-mono text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 ${
+                  className={`w-full h-12 px-4 rounded-xl bg-surface border font-mono text-base font-bold text-text-main placeholder-text-dim focus:outline-hidden ${
                     duplicateWarning?.exists
-                      ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/20'
-                      : 'border-slate-200 dark:border-slate-700 focus:ring-gebeya-500'
+                      ? 'border-rose-500 bg-rose-500/10'
+                      : 'border-border-subtle focus:border-primary'
                   }`}
                 />
                 {barcodeChecking && (
-                  <div className="absolute right-3 top-2.5">
-                    <RefreshCw size={14} className="animate-spin text-slate-400" />
+                  <div className="absolute right-4 top-3.5">
+                    <RefreshCw size={16} className="animate-spin text-text-muted" />
                   </div>
                 )}
               </div>
 
-              {/* INLINE DUPLICATE WARNING */}
+              {/* Instant Duplicate Warning with Product Link */}
               {duplicateWarning?.exists && (
-                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2 animate-in fade-in">
-                  <AlertTriangle size={15} className="shrink-0 text-rose-500 mt-0.5" />
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs flex items-start gap-2 animate-in fade-in">
+                  <AlertTriangle size={15} className="shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold">Duplicate Barcode Warning:</span> This barcode is already assigned to{' '}
-                    <strong>{duplicateWarning.productName}</strong> ({duplicateWarning.productSku}). Barcodes must be unique across the catalog!
+                    <span className="font-bold">{isAm ? 'የተደገመ ባርኮድ ማስጠንቀቂያ:' : 'Duplicate Barcode Warning:'}</span>{' '}
+                    {isAm
+                      ? `ይህ ባርኮድ አስቀድሞ ለ"${duplicateWarning.productName}" (${duplicateWarning.productSku}) ተሰጥቷል። ባርኮዶች በካታሎግ ውስጥ ልዩ መሆን አለባቸው።`
+                      : `This barcode is already assigned to "${duplicateWarning.productName}" (${duplicateWarning.productSku}). Every product must have a unique barcode.`}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 2. Names & SKU */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    {language === 'am' ? 'የእቃ ስም (እንግሊዝኛ) *' : 'Product Name (EN) *'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Sunflower Cooking Oil 5L"
-                    value={nameEn}
-                    onChange={(e) => setNameEn(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    {language === 'am' ? 'የእቃ ስም (አማርኛ)' : 'Product Name (AM)'}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="ለምሳሌ የሱፍ ዘይት 5 ሊትር"
-                    value={nameAm}
-                    onChange={(e) => setNameAm(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                  SKU Code *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={sku}
-                  onChange={(e) => setSku(e.target.value.toUpperCase())}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
-                />
-              </div>
-
-              {/* Product Photo Direct Upload (Camera / File / Crop / WebP) */}
-              <div className="pt-1">
-                <ProductPhotoUpload
-                  currentPhotoUrl={currentPhotoUrl}
-                  onPhotoSelected={(file) => {
-                    setPhotoFile(file);
-                    if (!file) setCurrentPhotoUrl(null);
-                  }}
-                  disabled={saving}
-                />
-              </div>
-            </div>
-
-            {/* 3. Category & Base Unit */}
+            {/* 5. Unit of Measure (Required Dropdown + Pack Multiplier) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400">
-                    {language === 'am' ? 'ምድብ (Category) *' : 'Category *'}
-                  </label>
-                  <button
-                    type="button"
-                    onClick={onOpenCategoryManager}
-                    className="text-[10px] text-gebeya-600 hover:underline font-bold flex items-center gap-0.5"
-                  >
-                    <Plus size={10} /> {language === 'am' ? 'አዲስ ምድብ' : '+ New Cat'}
-                  </button>
-                </div>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name_en} {c.name_am ? `(${c.name_am})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                  {language === 'am' ? 'መለኪያ አሃድ (Unit)' : 'Base Unit (UOM) *'}
+                <label className="text-xs font-bold text-text-main block mb-1">
+                  {isAm ? 'መለኪያ አሃድ (Unit) *' : 'Unit of Measure (UOM) *'}
                 </label>
                 <select
                   value={uomCode}
                   onChange={(e) => setUomCode(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                  className="w-full h-12 px-4 rounded-xl bg-surface border border-border-subtle text-base font-semibold text-text-main focus:outline-hidden focus:border-primary transition-colors"
                 >
-                  {uoms.map((u) => (
+                  {STANDARD_UOMS.map((u) => (
                     <option key={u.code} value={u.code}>
-                      {u.code} - {u.name_en}
+                      {u.code} - {isAm ? u.name_am : u.name_en}
                     </option>
                   ))}
                 </select>
               </div>
-            </div>
 
-            {/* 4. Pack Multiplier Conversion */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Layers size={14} className="text-indigo-500" />
-                  Pack Units & Conversion
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  {packMultiplier > 1 ? `1 Pack = ${packMultiplier} ${uomCode}` : 'Single Unit'}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
-                    Pack Multiplier
+              {/* Pack Multiplier (automatically visible when Pack/Box/Carton/Dozen or multiplier > 1) */}
+              {(isPackUnit || packMultiplier > 1) && (
+                <div className="animate-in fade-in">
+                  <label className="text-xs font-bold text-text-main block mb-1 flex items-center gap-1.5">
+                    <Layers size={13} className="text-primary" />
+                    <span>{isAm ? 'በአንድ ፓኬት ውስጥ ያለው ብዛት' : 'Pack Multiplier (Pieces)'}</span>
                   </label>
                   <input
                     type="number"
-                    step="1"
-                    min="1"
+                    min={1}
+                    step={1}
                     value={packMultiplier}
                     onChange={(e) => setPackMultiplier(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
+                    className="w-full h-12 px-4 rounded-xl bg-surface border border-border-subtle text-base font-mono font-bold text-text-main focus:outline-hidden focus:border-primary"
                   />
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
-                    Pack Selling Price (Computed)
-                  </label>
-                  <div className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-indigo-600">
-                    {(basePrice * packMultiplier).toFixed(2)} ETB
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* 5. Pricing & Automatic Bidirectional VAT (Part 3) */}
-            <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 space-y-3">
+            {/* 6. Pricing & Bidirectional Automatic VAT Calculator */}
+            <div className="p-4 rounded-2xl bg-surface-2 border border-border-subtle space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                  <DollarSign size={15} />
-                  Pricing & VAT Calculation
+                <h3 className="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-1.5">
+                  <DollarSign size={15} className="text-primary" />
+                  <span>{isAm ? 'የዋጋ እና ተ.እ.ታ (VAT) ስሌት' : 'Price & Automatic VAT Calculation'}</span>
                 </h3>
 
-                <div className="flex items-center gap-3">
-                  {/* Price History Button (if product exists) */}
-                  {isEdit && product?.id && (
-                    <button
-                      type="button"
-                      onClick={() => setIsPriceHistoryOpen(true)}
-                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 text-[11px] font-bold flex items-center gap-1 transition shadow-xs"
-                      title={t('catalog.priceHistory')}
-                    >
-                      <History size={12} />
-                      {t('catalog.priceHistory')}
-                    </button>
-                  )}
-
-                  {/* "Price includes VAT" Switch (default ON for retail) */}
-                  <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                      {t('catalog.priceIncludesVat')}
-                    </span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={priceIncludesVat}
-                      onClick={() => setPriceIncludesVat(!priceIncludesVat)}
-                      className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out ${
-                        priceIncludesVat ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
-                      }`}
-                    >
-                      <div
-                        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
-                          priceIncludesVat ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </label>
-                </div>
+                {isEdit && product?.id && (
+                  <button
+                    type="button"
+                    onClick={() => setIsPriceHistoryOpen(true)}
+                    className="px-2.5 py-1 rounded-lg bg-surface border border-border-subtle text-text-muted hover:text-text-main text-xs font-bold flex items-center gap-1 transition-colors"
+                  >
+                    <History size={12} />
+                    <span>{isAm ? 'የዋጋ ታሪክ' : 'Price History'}</span>
+                  </button>
+                )}
               </div>
 
-              {/* VAT Type Selection */}
-              <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-between flex-wrap gap-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Percent size={13} className="text-emerald-600" />
-                  {t('catalog.vatType')}:
-                </span>
+              {/* VAT Switch (Taxable 15% vs Exempt 0%) */}
+              <div className="p-3 rounded-xl bg-surface border border-border-subtle flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Percent size={15} className="text-primary" />
+                  <span className="text-xs font-bold text-text-main">
+                    {isAm ? 'ተጨማሪ እሴት ታክስ (VAT 15%):' : 'Value Added Tax (15%):'}
+                  </span>
+                </div>
                 <div className="flex items-center gap-4">
                   <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
                     <input
                       type="radio"
-                      name="vatType"
+                      name="vatApplicable"
                       checked={isVatApplicable}
-                      onChange={() => {
-                        setIsVatApplicable(true);
-                        setVatRate(0.15);
-                      }}
-                      className="text-emerald-600 focus:ring-emerald-500"
+                      onChange={() => handleVatToggle(true, 0.15)}
+                      className="text-primary focus:ring-0 cursor-pointer"
                     />
-                    <span>{t('catalog.vatTypeTaxable')} (15%)</span>
+                    <span>{isAm ? 'የሚከፈልበት (15%)' : 'Taxable (15%)'}</span>
                   </label>
                   <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
                     <input
                       type="radio"
-                      name="vatType"
+                      name="vatApplicable"
                       checked={!isVatApplicable}
-                      onChange={() => {
-                        setIsVatApplicable(false);
-                        setVatRate(0);
-                      }}
-                      className="text-emerald-600 focus:ring-emerald-500"
+                      onChange={() => handleVatToggle(false, 0)}
+                      className="text-primary focus:ring-0 cursor-pointer"
                     />
-                    <span>{t('catalog.vatTypeExempt')}</span>
+                    <span>{isAm ? 'ነጻ (Exempt 0%)' : 'Tax Exempt (0%)'}</span>
                   </label>
                 </div>
               </div>
 
-              {/* Price Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Selling Price Input (Gross if switch is ON, Net if switch is OFF) */}
+              {/* Bidirectional Price Pair */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Price Before VAT */}
+                <div>
+                  <label className="text-xs font-bold text-text-muted block mb-1">
+                    {isAm ? 'ዋጋ ያለ ተ.እ.ታ (Price Before VAT)' : 'Price Before VAT (Net ETB)'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    disabled={!canChangePrice}
+                    value={priceBeforeVat}
+                    onChange={(e) => handlePriceBeforeVatChange(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full h-12 px-4 rounded-xl bg-surface border border-border-subtle text-base font-mono font-semibold text-text-main focus:outline-hidden focus:border-primary disabled:opacity-50"
+                  />
+                  <div className="text-[11px] text-text-muted mt-1">
+                    {isAm ? 'ያለ 15% ተ.እ.ታ የተጣራ ዋጋ' : 'Net base price before tax'}
+                  </div>
+                </div>
+
+                {/* Price After VAT (Bold Shelf Price) */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                      {priceIncludesVat ? t('catalog.grossPrice') : t('catalog.netPrice')} (ETB) *
+                    <label className="text-xs font-extrabold text-text-main flex items-center gap-1">
+                      <span>{isAm ? 'የመደርደሪያ ዋጋ ከተ.እ.ታ ጋር *' : 'Shelf Price After VAT (Gross) *'}</span>
                     </label>
                     {!canChangePrice && (
-                      <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold" title={t('catalog.noEditPermission')}>
-                        <Lock size={10} /> Locked
+                      <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                        <Lock size={10} /> {isAm ? 'የተቆለፈ' : 'Locked'}
                       </span>
                     )}
                   </div>
@@ -785,26 +879,29 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     min="0"
                     required
                     disabled={!canChangePrice}
-                    value={basePrice || ''}
-                    onChange={(e) => setBasePrice(parseFloat(e.target.value) || 0)}
+                    value={priceAfterVat}
+                    onChange={(e) => handlePriceAfterVatChange(e.target.value)}
                     placeholder="0.00"
-                    className={`w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border text-xs font-mono font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 ${
-                      !canChangePrice
-                        ? 'opacity-60 cursor-not-allowed border-slate-200 dark:border-slate-700'
-                        : 'border-emerald-300 dark:border-emerald-700 focus:ring-emerald-500'
-                    }`}
+                    className="w-full h-12 px-4 rounded-xl bg-surface border-2 border-primary text-lg font-mono font-black text-text-main focus:outline-hidden shadow-xs disabled:opacity-50"
                   />
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    {priceIncludesVat
-                      ? (language === 'am' ? 'የመደርደሪያ ዋጋ (ተ.እ.ታን ጨምሮ)' : 'Shelf price inclusive of VAT')
-                      : (language === 'am' ? 'የተጣራ ዋጋ (ያለ ተ.እ.ታ)' : 'Net price before VAT')}
+                  <div className="text-[11px] font-semibold text-primary mt-1 flex items-center justify-between">
+                    <span>
+                      {isVatApplicable
+                        ? `VAT (15%): ETB ${vatBreakdown.vatAmount.toFixed(2)}`
+                        : (isAm ? 'ከታክስ ነጻ (0.00 ETB)' : 'Tax Exempt (0.00 ETB)')}
+                    </span>
+                    <span className="text-text-muted text-[10px]">
+                      {isAm ? 'ደንበኞች የሚከፍሉት ዋጋ' : 'Customer pays this'}
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                {/* Cost Price Input */}
+              {/* Profit Margin & AVCO Cost Line */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    {t('catalog.costPriceLabel')} (ETB)
+                  <label className="text-xs font-bold text-text-main block mb-1">
+                    {isAm ? 'የግዢ ወጪ ዋጋ (Cost Price ETB)' : 'Cost Price (AVCO ETB)'}
                   </label>
                   <input
                     type="number"
@@ -813,195 +910,74 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                     value={costPrice || ''}
                     onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full h-11 px-4 rounded-xl bg-surface border border-border-subtle text-sm font-mono font-semibold text-text-main focus:outline-hidden focus:border-primary"
                   />
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    {language === 'am' ? 'የእቃው አማካይ የግዢ ወጪ' : 'Unit cost / AVCO'}
-                  </div>
                 </div>
 
-                {/* Branch Override Price */}
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Branch Override Price
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Optional override"
-                    value={branchOverridePrice}
-                    onChange={(e) => setBranchOverridePrice(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  />
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    {language === 'am' ? 'ለዚህ ቅርንጫፍ ብቻ የሚተገበር' : 'Local branch price'}
-                  </div>
-                </div>
-              </div>
-
-              {/* LIVE BIDIRECTIONAL VAT BREAKDOWN CARD (Part 3) */}
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 space-y-2">
-                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {language === 'am' ? 'የዋጋ እና ተ.እ.ታ ስሌት ዝርዝር (Live Calculation)' : 'Computed Price & VAT Breakdown (Live)'}
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  {/* Net Price */}
-                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    <div className="text-[10px] font-bold text-slate-500">{t('catalog.netPrice')}</div>
-                    <div className="text-sm font-mono font-black text-slate-900 dark:text-white mt-0.5">
-                      {vatBreakdown.netPrice.toFixed(2)} <span className="text-[10px] font-normal">ETB</span>
-                    </div>
-                  </div>
-
-                  {/* VAT Amount */}
-                  <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
-                    <div className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-                      {isVatApplicable ? t('catalog.vatAmount') : t('catalog.vatTypeExempt')}
-                    </div>
-                    <div className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
-                      {vatBreakdown.vatAmount.toFixed(2)} <span className="text-[10px] font-normal">ETB</span>
-                    </div>
-                  </div>
-
-                  {/* Gross Price */}
-                  <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
-                    <div className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300">{t('catalog.grossPrice')}</div>
-                    <div className="text-sm font-mono font-black text-indigo-600 dark:text-indigo-400 mt-0.5">
-                      {vatBreakdown.grossPrice.toFixed(2)} <span className="text-[10px] font-normal">ETB</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Profit Margin & AVCO Cost Breakdown */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">
-                    {t('catalog.profitMarginBirr')}:
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className={`font-mono font-bold ${vatBreakdown.isNegativeMargin ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {vatBreakdown.profitMarginBirr > 0 ? '+' : ''}{vatBreakdown.profitMarginBirr.toFixed(2)} ETB
+                <div className="flex flex-col justify-end">
+                  <div className="p-2.5 rounded-xl bg-surface border border-border-subtle flex items-center justify-between text-xs">
+                    <span className="font-semibold text-text-muted">
+                      {isAm ? 'የትርፍ ህዳግ:' : 'Gross Margin:'}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
-                      vatBreakdown.isNegativeMargin
-                        ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
-                        : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                    }`}>
-                      {vatBreakdown.profitMarginPercent.toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Selling Below Cost Alert */}
-                {vatBreakdown.isSellingBelowCost && (
-                  <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-start gap-2 animate-in fade-in">
-                    <AlertTriangle size={15} className="shrink-0 text-rose-500 mt-0.5" />
-                    <div>
-                      <div>{t('catalog.sellingBelowCost')}</div>
-                      <div className="text-[11px] font-normal text-rose-600 dark:text-rose-400">
-                        {t('catalog.sellingBelowCostDesc')}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-mono font-bold ${vatBreakdown.isNegativeMargin ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {vatBreakdown.profitMarginBirr > 0 ? '+' : ''}{vatBreakdown.profitMarginBirr.toFixed(2)} ETB
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
+                        vatBreakdown.isNegativeMargin ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'
+                      }`}>
+                        {vatBreakdown.profitMarginPercent.toFixed(1)}%
+                      </span>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Mandatory Reason for Price Change if editing existing price */}
-              {isEdit && product && Number(product.base_price) !== vatBreakdown.grossPrice && (
+              {isEdit && product && Number(product.base_price) !== (parseFloat(priceAfterVat) || 0) && (
                 <div className="pt-2 animate-in fade-in">
-                  <label className="text-[11px] font-bold text-amber-700 dark:text-amber-400 block mb-1">
-                    Reason for Price Change (Mandatory Audit Requirement) *
+                  <label className="text-xs font-bold text-amber-600 dark:text-amber-400 block mb-1">
+                    {isAm ? 'የዋጋ ለውጥ ምክንያት (የኦዲት መስፈርት) *' : 'Reason for Price Change (Mandatory Audit Requirement) *'}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Supplier invoice cost revision, periodic tariff update"
+                    placeholder="e.g. Supplier invoice revision, tariff update"
                     value={priceChangeReason}
                     onChange={(e) => setPriceChangeReason(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full h-11 px-4 rounded-xl bg-surface border border-amber-500/40 text-sm font-semibold text-text-main focus:outline-hidden focus:border-amber-500"
                   />
                 </div>
               )}
             </div>
 
-            {/* 6. Deli / Scale Options */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isWeighed}
-                    onChange={(e) => setIsWeighed(e.target.checked)}
-                    className="rounded text-gebeya-600 focus:ring-gebeya-500"
-                  />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                    <Scale size={14} className="text-gebeya-600" />
-                    Weighed / Scale Item (Butcher & Produce)
-                  </span>
-                </label>
-              </div>
-
-              {isWeighed && (
-                <div className="pt-2 grid grid-cols-2 gap-3 animate-in fade-in">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
-                      Scale PLU Code (5 digits, e.g. 00123)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="00123"
-                      value={scalePlu}
-                      onChange={(e) => setScalePlu(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold"
-                    />
-                  </div>
-                  <div className="text-[11px] text-slate-500 flex items-center">
-                    Barcode format: 20-PLU-WEIGHT-C (e.g. 2000123015002)
-                  </div>
-                </div>
-              )}
+            {/* 7. Minimum Stock Level */}
+            <div>
+              <label className="text-xs font-bold text-text-main block mb-1">
+                {isAm ? 'ዝቅተኛ የክምችት መጠን (Min Stock Alert Level)' : 'Minimum Stock Level (Alert Point)'}
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={minStockLevel}
+                onChange={(e) => setMinStockLevel(parseInt(e.target.value, 10) || 0)}
+                className="w-full h-11 px-4 rounded-xl bg-surface border border-border-subtle text-base font-mono font-bold text-text-main focus:outline-hidden focus:border-primary"
+              />
             </div>
 
-            {/* 7. Stock Thresholds */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                  Min Stock Level (Alert Point)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={minStockLevel}
-                  onChange={(e) => setMinStockLevel(parseInt(e.target.value, 10) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                  Reorder Quantity (Max Stock)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={maxStockLevel}
-                  onChange={(e) => setMaxStockLevel(parseInt(e.target.value, 10) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
-                />
-              </div>
-            </div>
-
-            {/* 8. Expiry Date Tracking */}
-            <div className="p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60">
+            {/* 8. Expiry Date Required Switch & Expiry Control */}
+            <div className="p-4 rounded-2xl bg-surface-2 border border-border-subtle space-y-3">
               <label className="flex items-center justify-between cursor-pointer">
-                <div className="flex items-center gap-2">
-                  <Clock size={16} className="text-amber-500" />
+                <div className="flex items-center gap-2.5">
+                  <Clock size={18} className="text-amber-500" />
                   <div>
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      {t('catalog.hasExpiryDate')}
+                    <span className="text-xs font-bold text-text-main">
+                      {isAm ? 'ይህ እቃ የጊዜ ማብቂያ ቀን አለው (Has Expiry Date)' : 'This Item Has an Expiry Date'}
                     </span>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                      {t('catalog.hasExpiryDateDesc')}
+                    <p className="text-[11px] text-text-muted">
+                      {isAm
+                        ? 'ሲበራ ክምችት ሲገባ እና ሲሸጥ የFEFO ባች ቁጥጥር ይደረግበታል'
+                        : 'Enforces FEFO batch tracking, 90-day expiry notifications, and cashier alerts'}
                     </p>
                   </div>
                 </div>
@@ -1009,65 +985,78 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   type="checkbox"
                   checked={hasExpiryDate}
                   onChange={(e) => setHasExpiryDate(e.target.checked)}
-                  className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                  className="w-5 h-5 rounded-md text-primary focus:ring-0 cursor-pointer"
                 />
               </label>
-            </div>
 
-            {/* 9. Active vs Archived Status with Stock Warning */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Archive size={15} className="text-slate-500" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Product Status
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
-                    <input
-                      type="radio"
-                      name="status"
-                      checked={isActive}
-                      onChange={() => setIsActive(true)}
-                      className="text-emerald-600 focus:ring-emerald-500"
-                    />
-                    Active
-                  </label>
-                  <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
-                    <input
-                      type="radio"
-                      name="status"
-                      checked={!isActive}
-                      onChange={() => setIsActive(false)}
-                      className="text-amber-600 focus:ring-amber-500"
-                    />
-                    Archived
-                  </label>
-                </div>
-              </div>
-
-              {/* Warning if archiving with physical stock */}
-              {!isActive && stockOnHand > 0 && (
-                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs flex items-start gap-2 animate-in fade-in">
-                  <AlertTriangle size={15} className="shrink-0 text-amber-500 mt-0.5" />
-                  <div>
-                    <strong>Stock Warning:</strong> This product currently has{' '}
-                    <strong>{stockOnHand} {uomCode}</strong> in stock. Archiving will hide it from the POS cashier register while stock remains on ledger!
-                  </div>
+              {/* Show ExpiryDatePicker when Has Expiry Date is checked */}
+              {hasExpiryDate && (
+                <div className="pt-2 border-t border-border-subtle animate-in fade-in">
+                  <ExpiryDatePicker
+                    value={defaultExpiryDate}
+                    onChange={setDefaultExpiryDate}
+                    label={isAm ? 'የመጀመሪያ ክምችት ማለቂያ ቀን (Default Batch Expiry)' : 'Default Batch Expiry Date'}
+                  />
                 </div>
               )}
             </div>
+
+            {/* 9. Product Photo Direct Upload (Camera / File, NO URL fields) */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-text-main block mb-1">
+                {isAm ? 'የእቃው ፎቶ (Product Photo)' : 'Product Photo'}
+              </label>
+              <ProductPhotoUpload
+                currentPhotoUrl={currentPhotoUrl}
+                onPhotoSelected={(file) => {
+                  setPhotoFile(file);
+                  if (!file) setCurrentPhotoUrl(null);
+                }}
+                disabled={saving}
+              />
+            </div>
+
+            {/* Active vs Archived Status */}
+            <div className="p-3.5 rounded-2xl bg-surface-2 border border-border-subtle flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Archive size={15} className="text-text-muted" />
+                <span className="text-xs font-bold text-text-main">
+                  {isAm ? 'የእቃው ሁኔታ (Status)' : 'Product Status'}
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="productActiveStatus"
+                    checked={isActive}
+                    onChange={() => setIsActive(true)}
+                    className="text-primary focus:ring-0"
+                  />
+                  <span>{isAm ? 'ንቁ (Active)' : 'Active'}</span>
+                </label>
+                <label className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="productActiveStatus"
+                    checked={!isActive}
+                    onChange={() => setIsActive(false)}
+                    className="text-amber-500 focus:ring-0"
+                  />
+                  <span>{isAm ? 'የታገደ (Archived)' : 'Archived'}</span>
+                </label>
+              </div>
+            </div>
           </div>
 
-          {/* Footer Action Bar */}
-          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between gap-3">
+          {/* Footer Action Bar: Save & Save and Add Another */}
+          <div className="px-6 py-4 border-t border-border-subtle bg-surface-2 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+              className="px-4 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-xs font-bold text-text-main transition-colors"
             >
-              {language === 'am' ? 'ሰርዝ' : 'Cancel'}
+              {isAm ? 'ሰርዝ' : 'Cancel'}
             </button>
 
             <div className="flex items-center gap-2">
@@ -1076,9 +1065,9 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   type="button"
                   disabled={saving || duplicateWarning?.exists}
                   onClick={() => handleSave(true)}
-                  className="px-4 py-2.5 rounded-xl border border-gebeya-600 text-gebeya-600 hover:bg-gebeya-50 dark:hover:bg-gebeya-950/50 text-xs font-bold transition disabled:opacity-50"
+                  className="px-4 py-2.5 rounded-xl border border-primary text-primary hover:bg-primary/10 text-xs font-bold transition-colors disabled:opacity-50"
                 >
-                  {language === 'am' ? 'መዝግብ እና ሌላ ጨምር' : 'Save & Add Another'}
+                  {isAm ? 'መዝግብ እና ሌላ ጨምር' : 'Save & Add Another'}
                 </button>
               )}
 
@@ -1086,21 +1075,21 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                 type="button"
                 disabled={saving || duplicateWarning?.exists}
                 onClick={() => handleSave(false)}
-                className="px-5 py-2.5 rounded-xl bg-gebeya-600 hover:bg-gebeya-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition active:scale-95 disabled:opacity-50"
+                className="btn-primary px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md disabled:opacity-50"
               >
                 {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
                 {saving
-                  ? 'Saving...'
+                  ? (isAm ? 'በመመዝገብ ላይ...' : 'Saving...')
                   : isEdit
-                  ? (language === 'am' ? 'ለውጦችን መዝግብ' : 'Update Product')
-                  : (language === 'am' ? 'እቃ መዝግብ' : 'Save Product')}
+                  ? (isAm ? 'ለውጦችን መዝግብ' : 'Update Product')
+                  : (isAm ? 'እቃ መዝግብ' : 'Save Product')}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Price History Modal (Part 3) */}
+      {/* Price History Modal */}
       {isPriceHistoryOpen && product?.id && (
         <PriceHistoryModal
           isOpen={isPriceHistoryOpen}
@@ -1112,7 +1101,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
             base_price: product.base_price,
             override_price: product.branch_override_price,
           }}
-          onPriceUpdated={() => {}}
+          onPriceUpdated={() => { }}
         />
       )}
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { I18nProvider } from './i18n/I18nContext';
+import { BrandProvider } from './brand/BrandContext';
 import { BrandThemeProvider } from './theme/BrandThemeContext';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ShiftProvider } from './context/ShiftContext';
@@ -15,6 +16,7 @@ import { SetupWizard } from './components/auth/SetupWizard';
 import { PlatformAdminConsole } from './components/platform/PlatformAdminConsole';
 import { TenantOnboardingWizard } from './components/onboarding/TenantOnboardingWizard';
 import { RegisterApplicationPage } from './components/auth/RegisterApplicationPage';
+import { GebeyaOSPublicSite } from './components/public/GebeyaOSPublicSite';
 
 // ── The 7 pages ──
 import { PosCheckout } from './components/PosCheckout';        // Sales (checkout + day control)
@@ -51,7 +53,15 @@ function resolveHashTab(): NavTabId | null {
   const raw = window.location.hash.replace('#', '').split('?')[0].trim();
   if (!raw) return null;
   // Special routes handled before this function is called
-  if (raw === 'platform' || raw === 'register' || raw.startsWith('onboarding')) return null;
+  if (
+    raw === 'platform' ||
+    raw === 'register' ||
+    raw === 'website' ||
+    raw === 'landing' ||
+    raw.startsWith('onboarding')
+  ) {
+    return null;
+  }
   return raw as NavTabId;
 }
 
@@ -75,6 +85,12 @@ const MainApp: React.FC = () => {
   const [isRegisterRoute, setIsRegisterRoute] = useState<boolean>(
     () => window.location.hash === '#register' || window.location.pathname.startsWith('/register'),
   );
+  const [isWebsiteRoute, setIsWebsiteRoute] = useState<boolean>(
+    () =>
+      window.location.hash === '#website' ||
+      window.location.hash === '#landing' ||
+      window.location.pathname.startsWith('/landing'),
+  );
 
   // Sync route flags on hash change
   useEffect(() => {
@@ -84,6 +100,11 @@ const MainApp: React.FC = () => {
       );
       setIsRegisterRoute(
         window.location.hash === '#register' || window.location.pathname.startsWith('/register'),
+      );
+      setIsWebsiteRoute(
+        window.location.hash === '#website' ||
+          window.location.hash === '#landing' ||
+          window.location.pathname.startsWith('/landing'),
       );
       const hashTab = resolveHashTab();
       if (hashTab) {
@@ -172,6 +193,22 @@ const MainApp: React.FC = () => {
         onComplete={() => {
           window.location.hash = '';
           window.location.href = '/';
+        }}
+      />
+    );
+  }
+
+  if (isWebsiteRoute) {
+    return (
+      <GebeyaOSPublicSite
+        onRegister={() => {
+          window.location.hash = 'register';
+          setIsRegisterRoute(true);
+          setIsWebsiteRoute(false);
+        }}
+        onLogin={() => {
+          window.location.hash = '';
+          setIsWebsiteRoute(false);
         }}
       />
     );
@@ -294,12 +331,14 @@ const MainApp: React.FC = () => {
 
 export const App: React.FC = () => (
   <I18nProvider>
-    <BrandThemeProvider>
-      <AuthProvider>
-        <ShiftProvider>
-          <MainApp />
-        </ShiftProvider>
-      </AuthProvider>
-    </BrandThemeProvider>
+    <BrandProvider>
+      <BrandThemeProvider>
+        <AuthProvider>
+          <ShiftProvider>
+            <MainApp />
+          </ShiftProvider>
+        </AuthProvider>
+      </BrandThemeProvider>
+    </BrandProvider>
   </I18nProvider>
 );

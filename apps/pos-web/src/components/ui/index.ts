@@ -22,6 +22,7 @@ export * from './CountUpNumber';
 export * from './AnimatedProgressBar';
 export * from './PageTransition';
 export * from './SaleCompleteAnimation';
+export * from './ExpiryDatePicker';
 export * from '../PageLayout';
 export * from '../TopBar';
 export * from '../NavigationRail';
