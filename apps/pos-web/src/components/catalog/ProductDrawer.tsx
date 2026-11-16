@@ -27,6 +27,7 @@ import { generateInternalEan13, generateInternalCode128 } from '../../utils/code
 import { calculateItemVatBreakdown } from '@gebeyaos/shared-types';
 import { PriceHistoryModal } from './PriceHistoryModal';
 import { ExpiryDatePicker } from '../ui/ExpiryDatePicker';
+import { ProductPhotoUpload } from './ProductPhotoUpload';
 
 export interface ProductDrawerData {
   id?: string;
@@ -126,6 +127,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
   const [allowDiscount, setAllowDiscount] = useState<boolean>(true);
   const [isActive, setIsActive] = useState<boolean>(true);
   const [imageUrl, setImageUrl] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(null);
   const [priceChangeReason, setPriceChangeReason] = useState<string>('');
   const [stockOnHand, setStockOnHand] = useState<number>(0);
 
@@ -246,6 +249,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setIsActive(product.is_active);
       setBarcode(product.barcode || '');
       setImageUrl(product.image_url || '');
+      setCurrentPhotoUrl(product.photo_path || (product as any).photoUrl || null);
+      setPhotoFile(null);
       setHasExpiryDate(Boolean(product.has_expiry_date));
       setStockOnHand(Number(product.stock_on_hand) || 0);
       setPriceChangeReason('');
@@ -269,6 +274,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setIsActive(true);
       setBarcode('');
       setImageUrl('');
+      setCurrentPhotoUrl(null);
+      setPhotoFile(null);
       setHasExpiryDate(false);
       setDefaultExpiryDate(null);
       setStockOnHand(0);

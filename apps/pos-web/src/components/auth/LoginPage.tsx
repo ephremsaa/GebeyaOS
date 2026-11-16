@@ -305,7 +305,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             )}
           </div>
           <h1 className="text-2xl font-black tracking-tight">
-            {brandDisplayName ? `${brandDisplayName}` : t('loginTitle')}
+            {brandDisplayName || t('loginTitle', { brand: brand.displayName || 'GebeyaOS' })}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {companyInfo?.receiptHeader || brand.tagline || (brandDisplayName ? (language === 'am' ? 'የሰራተኞች እና የቢሮ መግቢያ' : 'Staff & Back-Office Login') : t('loginSubtitle'))}

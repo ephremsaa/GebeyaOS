@@ -351,10 +351,10 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({
           type="button"
           disabled={isCartEmpty}
           onClick={onOpenPayment}
-          className={`w-full min-h-[56px] px-5 rounded-xl font-semibold flex items-center justify-between transition-all duration-fast select-none active:scale-[0.98] cursor-pointer ${
+          className={`w-full min-h-[56px] px-5 rounded-xl font-semibold flex items-center justify-between transition-all duration-fast select-none active:scale-[0.98] ${
             isCartEmpty
               ? 'bg-surface-2 text-text-muted border border-border-subtle cursor-not-allowed pointer-events-none'
-              : 'bg-primary hover:bg-primary-hover text-white shadow-soft'
+              : 'bg-primary hover:bg-primary-hover text-white shadow-soft cursor-pointer'
           }`}
           aria-label="Proceed to payment"
         >

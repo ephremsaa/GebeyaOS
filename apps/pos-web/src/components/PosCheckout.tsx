@@ -728,6 +728,8 @@ export const PosCheckout: React.FC = () => {
                 return (
                   <div
                     key={product.id}
+                    data-testid="product-card"
+                    data-product-out={isOut}
                     onClick={() => !isOut && handleProductCardClick(product)}
                     className={`bg-surface border border-border-subtle rounded-xl min-h-[108px] p-3.5 flex flex-col justify-between transition-all duration-fast shadow-soft select-none ${
                       isOut
