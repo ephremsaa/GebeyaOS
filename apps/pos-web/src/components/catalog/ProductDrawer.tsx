@@ -26,6 +26,7 @@ import { posApi } from '../../utils/pos-api';
 import { generateInternalEan13, generateInternalCode128 } from '../../utils/code128Svg';
 import { calculateItemVatBreakdown } from '@gebeyaos/shared-types';
 import { PriceHistoryModal } from './PriceHistoryModal';
+import { ProductPhotoUpload } from './ProductPhotoUpload';
 
 export interface ProductDrawerData {
   id?: string;
@@ -48,6 +49,7 @@ export interface ProductDrawerData {
   barcode: string;
   pack_multiplier?: number;
   image_url?: string;
+  photo_path?: string | null;
   stock_on_hand?: number;
   has_expiry_date?: boolean;
 }
@@ -94,7 +96,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
   const [allowDiscount, setAllowDiscount] = useState(true);
   const [isActive, setIsActive] = useState(true);
   const [barcode, setBarcode] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(null);
   const [hasExpiryDate, setHasExpiryDate] = useState<boolean>(false);
   const [priceChangeReason, setPriceChangeReason] = useState('');
 
@@ -164,7 +167,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setAllowDiscount(product.allow_discount);
       setIsActive(product.is_active);
       setBarcode(product.barcode || '');
-      setImageUrl(product.image_url || '');
+      setCurrentPhotoUrl(product.photo_path || product.image_url || null);
+      setPhotoFile(null);
       setHasExpiryDate(Boolean(product.has_expiry_date));
       setStockOnHand(Number(product.stock_on_hand) || 0);
       setPriceChangeReason('');
@@ -188,7 +192,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setAllowDiscount(true);
       setIsActive(true);
       setBarcode('');
-      setImageUrl('');
+      setCurrentPhotoUrl(null);
+      setPhotoFile(null);
       setHasExpiryDate(false);
       setStockOnHand(0);
       setPriceChangeReason('');
@@ -325,7 +330,6 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
         allow_discount: allowDiscount,
         is_active: isActive,
         barcode: barcode.trim() || undefined,
-        image_url: imageUrl.trim() || undefined,
         has_expiry_date: hasExpiryDate,
       };
 
@@ -377,6 +381,26 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
         }
       }
 
+      // Photo upload/delete handling
+      if (photoFile && resultProduct?.id) {
+        try {
+          const photoFormData = new FormData();
+          photoFormData.append('photo', photoFile);
+          await fetch(`/api/media/products/${resultProduct.id}/photo`, {
+            method: 'POST',
+            body: photoFormData,
+          });
+        } catch (err) {
+          console.error('Failed to upload product photo:', err);
+        }
+      } else if (!currentPhotoUrl && isEdit && product?.id && product?.photo_path) {
+        try {
+          await fetch(`/api/media/products/${product.id}/photo`, {
+            method: 'DELETE',
+          });
+        } catch {}
+      }
+
       setFormSuccess(
         isEdit
           ? 'Product updated successfully!'
@@ -394,7 +418,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
         setCostPrice(0);
         setBranchOverridePrice('');
         setBarcode('');
-        setImageUrl('');
+        setCurrentPhotoUrl(null);
+        setPhotoFile(null);
         setDuplicateWarning(null);
         setTimeout(() => {
           barcodeInputRef.current?.focus();
@@ -550,32 +575,29 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    SKU Code *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value.toUpperCase())}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  SKU Code *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value.toUpperCase())}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                />
+              </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    {language === 'am' ? 'የምስል አድራሻ (Image URL)' : 'Image URL'}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="https://images.unsplash.com/..."
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gebeya-500"
-                  />
-                </div>
+              {/* Product Photo Direct Upload (Camera / File / Crop / WebP) */}
+              <div className="pt-1">
+                <ProductPhotoUpload
+                  currentPhotoUrl={currentPhotoUrl}
+                  onPhotoSelected={(file) => {
+                    setPhotoFile(file);
+                    if (!file) setCurrentPhotoUrl(null);
+                  }}
+                  disabled={saving}
+                />
               </div>
             </div>
 

@@ -10,6 +10,8 @@ import {
   ArrowRight,
   Download,
   RefreshCw,
+  Archive,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
@@ -41,8 +43,10 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
   onClose,
   onImportCompleted,
 }) => {
-  const { language } = useI18n();
+  const { language, t } = useI18n();
   const { currentUser } = useAuth();
+
+  const [activeTab, setActiveTab] = useState<'excel' | 'zip'>('excel');
 
   const [file, setFile] = useState<File | null>(null);
   const [fileHash, setFileHash] = useState<string>('');
@@ -55,7 +59,19 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // ZIP Photo Import State
+  const [zipFile, setZipFile] = useState<File | null>(null);
+  const [zipUploading, setZipUploading] = useState<boolean>(false);
+  const [zipResult, setZipResult] = useState<{
+    totalInZip: number;
+    matchedCount: number;
+    unmatchedCount: number;
+    unmatchedFiles: string[];
+    errors: string[];
+  } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -138,6 +154,39 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
     document.body.removeChild(link);
   };
 
+  const handleUploadZip = async () => {
+    if (!zipFile) return;
+    setZipUploading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const formData = new FormData();
+      formData.append('zip', zipFile);
+      const res = await fetch('/api/media/products/bulk-zip', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('gebeyaos_access_token') || ''}`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'ZIP upload failed.');
+      }
+
+      const data = await res.json();
+      setZipResult(data);
+      if (data.matchedCount > 0) {
+        onImportCompleted();
+      }
+    } catch (err: any) {
+      setError(err.message || 'ZIP import failed');
+    } finally {
+      setZipUploading(false);
+    }
+  };
+
   const handleCommit = async () => {
     if (isDuplicateFile && !confirmDuplicate) {
       setError('Please acknowledge the duplicate file warning before proceeding.');
@@ -205,21 +254,25 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
-                {language === 'am' ? 'እቃዎችን በፋይል ማስመጣት (Excel/CSV)' : 'Import Products (Excel / CSV)'}
+                {language === 'am' ? 'እቃዎችን በጅምላ ማስመጣት' : 'Catalog Bulk Import'}
               </h2>
               <p className="text-xs text-slate-500">
-                Bulk upload with SHA-256 idempotency check and preview validation.
+                {language === 'am'
+                  ? 'የምርት መረጃዎችን በኤክሴል ወይም የምስል ፋይሎችን በZIP ጥቅል ያስገቡ'
+                  : 'Import product items via Excel/CSV or bulk photos via ZIP package'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={downloadTemplate}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
-            >
-              <Download size={14} />
-              Download Template
-            </button>
+            {activeTab === 'excel' && (
+              <button
+                onClick={downloadTemplate}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
+              >
+                <Download size={14} />
+                Download Template
+              </button>
+            )}
             <button
               onClick={onClose}
               className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
@@ -229,8 +282,151 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
           </div>
         </div>
 
+        {/* Navigation Tabs */}
+        <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('excel')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'excel'
+                ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200 dark:border-slate-700'
+                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <FileSpreadsheet size={14} />
+            <span>{language === 'am' ? 'የኤክሴል / ሲኤስቪ ፋይል' : 'Excel / CSV Spreadsheet'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('zip')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'zip'
+                ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200 dark:border-slate-700'
+                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <Archive size={14} />
+            <span>{t('catalog.bulkPhotoZipTitle')}</span>
+          </button>
+        </div>
+
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {activeTab === 'zip' ? (
+            /* ZIP Photos Import Flow */
+            <div className="space-y-6">
+              <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-800 dark:text-indigo-200 text-xs flex items-center gap-3">
+                <ImageIcon size={24} className="shrink-0 text-indigo-600 dark:text-indigo-400" />
+                <p>{t('catalog.bulkPhotoZipDesc')}</p>
+              </div>
+
+              {error && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 text-xs flex items-center gap-2">
+                  <AlertCircle size={16} className="shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {!zipFile ? (
+                <div
+                  onClick={() => zipInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-3xl p-10 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 transition group"
+                >
+                  <input
+                    ref={zipInputRef}
+                    type="file"
+                    accept=".zip"
+                    className="hidden"
+                    onChange={(e) => {
+                      const sel = e.target.files?.[0];
+                      if (sel) {
+                        setZipFile(sel);
+                        setZipResult(null);
+                        setError(null);
+                      }
+                    }}
+                  />
+                  <div className="w-16 h-16 rounded-3xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition">
+                    <Archive size={32} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+                    {language === 'am' ? 'የፎቶዎች ZIP ፋይል ይምረጡ' : 'Choose ZIP Archive containing photos'}
+                  </h3>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    {language === 'am'
+                      ? 'ፎቶዎችን በባርኮድ ወይም በSKU ይሰይሙ (ለምሳሌ፡ 690123.jpg, BREAD-01.png)። እስከ 50MB በአንድ ጊዜ።'
+                      : 'Photos should be named with product barcode or SKU (e.g. 690123.jpg, BREAD-01.png). Up to 50MB.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 flex items-center justify-center">
+                      <Archive size={20} />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2">
+                        {zipFile.name}
+                        <span className="text-[10px] text-slate-400 font-normal">
+                          ({(zipFile.size / (1024 * 1024)).toFixed(2)} MB)
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">Ready for automated barcode matching</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setZipFile(null);
+                      setZipResult(null);
+                      setError(null);
+                    }}
+                    className="text-xs text-slate-500 hover:text-rose-500 font-bold transition"
+                  >
+                    Change ZIP
+                  </button>
+                </div>
+              )}
+
+              {/* ZIP Import Results */}
+              {zipResult && (
+                <div className="space-y-4 animate-in fade-in">
+                  <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2 font-bold">
+                    <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+                    <span>
+                      {t('catalog.zipImportSuccess', {
+                        matched: zipResult.matchedCount,
+                        total: zipResult.totalInZip,
+                      })}
+                    </span>
+                  </div>
+
+                  {zipResult.unmatchedCount > 0 && (
+                    <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs space-y-2">
+                      <div className="flex items-center gap-2 font-bold">
+                        <AlertTriangle size={15} className="text-amber-500 shrink-0" />
+                        <span>
+                          {t('catalog.zipUnmatchedNotice', { count: zipResult.unmatchedCount })}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1">
+                        {zipResult.unmatchedFiles.map((f) => (
+                          <span
+                            key={f}
+                            className="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 text-[11px] font-mono text-amber-900 dark:text-amber-300"
+                          >
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Original Excel Spreadsheet Flow */
+            <>
           {/* Upload Drop Area */}
           {!file ? (
             <div
@@ -410,6 +606,8 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
               </div>
             </div>
           )}
+        </>
+      )}
         </div>
 
         {/* Footer */}
@@ -418,17 +616,36 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
           >
-            {language === 'am' ? 'ሰርዝ' : 'Cancel'}
+            {language === 'am' ? 'ዝጋ' : 'Close'}
           </button>
 
-          <button
-            onClick={handleCommit}
-            disabled={committing || rows.length === 0 || totalValid === 0 || (isDuplicateFile && !confirmDuplicate)}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition disabled:opacity-50"
-          >
-            {committing ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-            {committing ? 'Importing...' : `Commit Import (${totalValid} Products)`}
-          </button>
+          {activeTab === 'zip' ? (
+            <button
+              onClick={zipResult ? onClose : handleUploadZip}
+              disabled={zipUploading || !zipFile}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition disabled:opacity-50"
+            >
+              {zipUploading ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <CheckCircle size={14} />
+              )}
+              {zipUploading
+                ? 'Processing ZIP...'
+                : zipResult
+                ? (language === 'am' ? 'ተጠናቋል' : 'Done')
+                : t('catalog.importZipBtn')}
+            </button>
+          ) : (
+            <button
+              onClick={handleCommit}
+              disabled={committing || rows.length === 0 || totalValid === 0 || (isDuplicateFile && !confirmDuplicate)}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition disabled:opacity-50"
+            >
+              {committing ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+              {committing ? 'Importing...' : `Commit Import (${totalValid} Products)`}
+            </button>
+          )}
         </div>
       </div>
     </div>

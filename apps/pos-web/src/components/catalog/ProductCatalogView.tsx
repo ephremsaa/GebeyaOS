@@ -64,6 +64,7 @@ interface ProductItem {
   stock_on_hand?: string | number;
   barcodes?: string[];
   image_url?: string;
+  photo_path?: string | null;
 }
 
 interface CategoryOption {
@@ -381,6 +382,7 @@ export const ProductCatalogView: React.FC = () => {
       is_active: true,
       barcode: '', // Clear barcode for copy
       image_url: p.image_url,
+      photo_path: p.photo_path || null,
       stock_on_hand: 0,
     };
     setDrawerProduct(drawerData);
@@ -454,6 +456,7 @@ export const ProductCatalogView: React.FC = () => {
       is_active: p.is_active,
       barcode: p.barcodes?.[0] || '',
       image_url: p.image_url,
+      photo_path: p.photo_path || null,
       stock_on_hand: Number(p.stock_on_hand || 0),
     };
     setDrawerProduct(drawerData);
@@ -1178,15 +1181,16 @@ export const ProductCatalogView: React.FC = () => {
                           {/* Image thumbnail / Colored initial */}
                           {(() => {
                             const initColor = getInitialColor(p.name_en || 'Product');
+                            const photoSrc = p.photo_path || p.image_url;
                             return (
                               <div
                                 className={`w-10 h-10 rounded-xl ${
-                                  p.image_url ? 'bg-slate-100 dark:bg-slate-800' : initColor.bg
+                                  photoSrc ? 'bg-slate-100 dark:bg-slate-800' : initColor.bg
                                 } border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 shadow-xs`}
                               >
-                                {p.image_url ? (
+                                {photoSrc ? (
                                   <img
-                                    src={p.image_url}
+                                    src={photoSrc}
                                     alt={p.name_en}
                                     className="w-full h-full object-cover"
                                   />

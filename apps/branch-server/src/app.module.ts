@@ -17,6 +17,7 @@ import { SystemModule } from './modules/system/system.module';
 import { PlatformAdminModule } from './modules/platform-admin/platform-admin.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { BranchActivationModule } from './modules/branch-activation/branch-activation.module';
+import { MediaModule } from './modules/media/media.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { BranchActivationModule } from './modules/branch-activation/branch-activ
     PlatformAdminModule,
     OnboardingModule,
     BranchActivationModule,
+    MediaModule,
   ],
 })
 export class AppModule implements NestModule {
