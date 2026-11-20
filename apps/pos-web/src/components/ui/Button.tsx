@@ -31,17 +31,17 @@ export const Button: React.FC<ButtonProps> = ({
     'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:active:scale-100';
 
   const sizeClasses: Record<ButtonSize, string> = {
-    sm: 'min-h-[38px] px-3 text-[13px] gap-1.5',
-    md: 'min-h-[44px] px-4 text-[15px] gap-2', // 44px standard touch target
-    lg: 'min-h-[56px] px-6 text-[16px] gap-2.5 font-bold', // 56px primary touch target
-    xl: 'min-h-[64px] px-8 text-lg gap-3 font-extrabold',
+    sm: 'min-h-[38px] px-3.5 text-[14px] font-semibold gap-1.5',
+    md: 'min-h-[44px] px-4 text-[16px] font-semibold gap-2', // 16px weight 600
+    lg: 'min-h-[52px] px-6 text-[17px] font-bold gap-2.5',   // 17px weight 700 primary
+    xl: 'min-h-[60px] px-8 text-[18px] font-bold gap-3',
   };
 
   const normalizedVariant = variant === 'destructive' ? 'danger' : variant;
 
   const variantClasses: Record<string, string> = {
     primary:
-      'bg-primary text-white hover:bg-primary-hover shadow-soft',
+      'bg-primary text-white hover:bg-primary-hover shadow-soft font-bold',
     secondary:
       'bg-surface-2 text-text-main hover:bg-surface border border-border-subtle shadow-soft',
     danger:

@@ -123,7 +123,7 @@ export interface ExpirySummary {
 
 export const StockAndExpiryView: React.FC = () => {
   const { language, t, formatCurrency } = useI18n();
-  const { hasPermission, currentUser } = useAuth();
+  const { hasPermission, currentUser, fetchWithAuth } = useAuth();
   const brand = useBrand();
 
   const [products, setProducts] = useState<StockItem[]>([]);
@@ -564,7 +564,7 @@ export const StockAndExpiryView: React.FC = () => {
   // Color initial palette
   const getInitialColor = (name: string) => {
     const palette = [
-      { bg: 'bg-emerald-100 dark:bg-emerald-950/60', text: 'text-emerald-700 dark:text-emerald-300' },
+      { bg: 'bg-primary-soft/60', text: 'text-emerald-700 dark:text-emerald-300' },
       { bg: 'bg-blue-100 dark:bg-blue-950/60', text: 'text-blue-700 dark:text-blue-300' },
       { bg: 'bg-purple-100 dark:bg-purple-950/60', text: 'text-purple-700 dark:text-purple-300' },
       { bg: 'bg-amber-100 dark:bg-amber-950/60', text: 'text-amber-700 dark:text-amber-300' },
@@ -719,25 +719,32 @@ export const StockAndExpiryView: React.FC = () => {
 
     setAdjSubmitting(true);
     try {
-      await fetch('/api/inventory/adjustments', {
+      const res = await (fetchWithAuth || fetch)('/api/inventory/adjustments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-branch-id': currentUser?.branchId || '00000000-0000-0000-0000-000000000001',
+          'x-user-id': currentUser?.id || '00000000-0000-0000-0000-000000000002',
         },
         body: JSON.stringify({
-          branchId: currentUser?.branchId,
           reasonCode: adjReason,
           notes: adjNotes.trim(),
           items: [
             {
               productId: adjProductId,
               quantityChange: Number(adjQuantity),
-              reasonCode: adjReason,
             },
           ],
         }),
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = Array.isArray(errData.message)
+          ? errData.message.join(', ')
+          : errData.message || 'Failed to submit adjustment';
+        throw new Error(errMsg);
+      }
 
       setSuccessMsg(t('inventory.stockUpdatedSuccess', { name: products.find((p) => p.id === adjProductId)?.name_en || 'Product' }));
       setIsAdjModalOpen(false);
@@ -780,25 +787,32 @@ export const StockAndExpiryView: React.FC = () => {
     setCountSubmitting(true);
     try {
       if (variance !== 0) {
-        await fetch('/api/inventory/adjustments', {
+        const res = await (fetchWithAuth || fetch)('/api/inventory/adjustments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-branch-id': currentUser?.branchId || '00000000-0000-0000-0000-000000000001',
+            'x-user-id': currentUser?.id || '00000000-0000-0000-0000-000000000002',
           },
           body: JSON.stringify({
-            branchId: currentUser?.branchId,
-            reasonCode: 'COUNT_CORRECTION',
-            notes: `${countReason.trim()} (Counted: ${countedVal}, System: ${currentOnHand}, Variance: ${variance > 0 ? '+' : ''}${variance})`,
+            reasonCode: 'CORRECTION',
+            notes: `${countReason.trim()} (Counted: ${countedVal}, System: ${currentOnHand}, Variance: ${variance > 0 ? '+' : ''}${variance.toFixed(2)})`,
             items: [
               {
                 productId: countTarget.id,
                 quantityChange: variance,
-                reasonCode: 'COUNT_CORRECTION',
               },
             ],
           }),
         });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = Array.isArray(errData.message)
+            ? errData.message.join(', ')
+            : errData.message || 'Failed to submit stock count';
+          throw new Error(errMsg);
+        }
       }
 
       setSuccessMsg(t('inventory.countUpdatedSuccess', { name: countTarget.name_en }));
@@ -840,32 +854,32 @@ export const StockAndExpiryView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full bg-page p-4 sm:p-6 overflow-hidden select-none text-text-main">
       {/* ─── 1. Header & Actions ─── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <Layers className="text-emerald-600" size={24} />
+            <h1 className="text-[26px] font-extrabold text-text-main flex items-center gap-2.5 tracking-tight">
+              <Layers className="text-primary" size={24} />
               {t('inventory.stockAndExpiry')}
             </h1>
-            <p className="text-xs text-slate-500">
+            <p className="text-[14px] text-text-muted mt-0.5">
               {t('inventory.stockAndExpirySubtitle')}
             </p>
           </div>
 
           {/* View Mode Toggle: By Item vs By Batch vs Expiry List */}
-          <div className="flex items-center gap-1 p-1 bg-slate-200/80 dark:bg-slate-800 rounded-xl border border-slate-300/60 dark:border-slate-700 self-start">
+          <div className="flex items-center gap-1 p-1 bg-surface-2 rounded-xl border border-border-subtle self-start">
             <button
               type="button"
               onClick={() => setViewMode('item')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                 viewMode === 'item'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-primary text-white shadow-soft font-bold'
+                  : 'text-text-muted hover:text-text-main font-semibold'
               }`}
             >
-              <Package size={14} className="text-emerald-600 dark:text-emerald-400" />
+              <Package size={14} className="text-primary" />
               {t('inventory.viewByItem')}
             </button>
             <button
@@ -873,13 +887,13 @@ export const StockAndExpiryView: React.FC = () => {
               onClick={() => setViewMode('batch')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                 viewMode === 'batch'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-primary text-white shadow-soft font-bold'
+                  : 'text-text-muted hover:text-text-main font-semibold'
               }`}
             >
               <Calendar size={14} className="text-amber-500" />
               {t('inventory.viewByBatch')}
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-2 text-text-main font-mono">
                 {batches.length}
               </span>
             </button>
@@ -891,13 +905,13 @@ export const StockAndExpiryView: React.FC = () => {
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                 viewMode === 'expiry_list'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-primary text-white shadow-soft font-bold'
+                  : 'text-text-muted hover:text-text-main font-semibold'
               }`}
             >
               <Clock size={14} className="text-rose-500" />
               {t('inventory.tabExpiryList')}
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-2 text-text-main font-mono">
                 {expiryBatches.length}
               </span>
             </button>
@@ -908,7 +922,7 @@ export const StockAndExpiryView: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsChooserOpen(true)}
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition active:scale-95"
+            className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-[15px] font-bold flex items-center gap-2 shadow-soft transition active:scale-95 cursor-pointer"
           >
             <Plus size={16} />
             {t('inventory.addStock')}
@@ -918,8 +932,8 @@ export const StockAndExpiryView: React.FC = () => {
 
       {/* Global Toast Success Message */}
       {successMsg && (
-        <div className="mb-4 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+        <div className="mb-4 p-3 rounded-2xl bg-primary-soft border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 size={16} className="text-primary shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
@@ -961,17 +975,17 @@ export const StockAndExpiryView: React.FC = () => {
               className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
                 expiryChip === 'expired'
                   ? 'bg-rose-50 dark:bg-rose-950/50 border-rose-500 ring-2 ring-rose-500/20 shadow-xs'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-rose-400'
+                  : 'bg-surface border-border-subtle shadow-card hover:border-danger'
               }`}
             >
               <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                   {t('inventory.expiredSummary')}
                 </div>
                 <div className="text-xl font-black text-rose-600 font-mono">
                   {expirySummary.expiredCount}
                 </div>
-                <div className="text-[11px] font-mono text-slate-500 font-semibold mt-0.5">
+                <div className="text-[11px] font-mono text-text-muted font-semibold mt-0.5">
                   {formatCurrency(expirySummary.expiredCostValue)}
                 </div>
               </div>
@@ -986,17 +1000,17 @@ export const StockAndExpiryView: React.FC = () => {
               className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
                 expiryChip === '7d'
                   ? 'bg-orange-50 dark:bg-orange-950/50 border-orange-500 ring-2 ring-orange-500/20 shadow-xs'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-orange-400'
+                  : 'bg-surface border-border-subtle shadow-card hover:border-warning'
               }`}
             >
               <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                   {t('inventory.within7Days')}
                 </div>
                 <div className="text-xl font-black text-orange-600 font-mono">
                   {expirySummary.within7dCount}
                 </div>
-                <div className="text-[11px] font-mono text-slate-500 font-semibold mt-0.5">
+                <div className="text-[11px] font-mono text-text-muted font-semibold mt-0.5">
                   {formatCurrency(expirySummary.within7dCostValue)}
                 </div>
               </div>
@@ -1011,17 +1025,17 @@ export const StockAndExpiryView: React.FC = () => {
               className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
                 expiryChip === '30d'
                   ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-500 ring-2 ring-amber-500/20 shadow-xs'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                  : 'bg-surface border-border-subtle shadow-card hover:border-warning'
               }`}
             >
               <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                   {t('inventory.within30Days')}
                 </div>
                 <div className="text-xl font-black text-amber-600 font-mono">
                   {expirySummary.within30dCount}
                 </div>
-                <div className="text-[11px] font-mono text-slate-500 font-semibold mt-0.5">
+                <div className="text-[11px] font-mono text-text-muted font-semibold mt-0.5">
                   {formatCurrency(expirySummary.within30dCostValue)}
                 </div>
               </div>
@@ -1036,17 +1050,17 @@ export const StockAndExpiryView: React.FC = () => {
               className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
                 expiryChip === '90d'
                   ? 'bg-yellow-50 dark:bg-yellow-950/50 border-yellow-500 ring-2 ring-yellow-500/20 shadow-xs'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-yellow-400'
+                  : 'bg-surface border-border-subtle shadow-card hover:border-accent'
               }`}
             >
               <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                   {t('inventory.within3Months')}
                 </div>
                 <div className="text-xl font-black text-yellow-600 font-mono">
                   {expirySummary.within90dCount}
                 </div>
-                <div className="text-[11px] font-mono text-slate-500 font-semibold mt-0.5">
+                <div className="text-[11px] font-mono text-text-muted font-semibold mt-0.5">
                   {formatCurrency(expirySummary.within90dCostValue)}
                 </div>
               </div>
@@ -1077,7 +1091,7 @@ export const StockAndExpiryView: React.FC = () => {
               <div className="text-xl font-black font-mono text-rose-600 dark:text-rose-400">
                 {formatCurrency(expirySummary.valueAtRisk)}
               </div>
-              <div className="text-[10px] text-slate-500 font-medium">
+              <div className="text-[10px] text-text-muted font-medium">
                 {expirySummary.within90dCount + expirySummary.expiredCount} {language === 'am' ? 'ባቾች' : 'batches affected'}
               </div>
             </div>
@@ -1092,11 +1106,11 @@ export const StockAndExpiryView: React.FC = () => {
             className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
               filterTab === 'expired'
                 ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 ring-2 ring-rose-400/20'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-rose-300'
+                : 'bg-surface border-border-subtle hover:border-rose-300'
             }`}
           >
             <div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                 {t('inventory.expired')}
               </div>
               <div className="text-xl font-black text-rose-600 font-mono">
@@ -1114,11 +1128,11 @@ export const StockAndExpiryView: React.FC = () => {
             className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
               filterTab === 'expiring_soon'
                 ? 'bg-orange-50 dark:bg-orange-950/40 border-orange-400 ring-2 ring-orange-400/20'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-orange-300'
+                : 'bg-surface border-border-subtle hover:border-orange-300'
             }`}
           >
             <div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                 {t('inventory.expiringIn7Days')}
               </div>
               <div className="text-xl font-black text-orange-600 font-mono">
@@ -1136,11 +1150,11 @@ export const StockAndExpiryView: React.FC = () => {
             className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
               filterTab === 'expiring_soon'
                 ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/20'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-amber-300'
+                : 'bg-surface border-border-subtle hover:border-amber-300'
             }`}
           >
             <div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                 {t('inventory.expiringIn30Days')}
               </div>
               <div className="text-xl font-black text-amber-600 font-mono">
@@ -1158,11 +1172,11 @@ export const StockAndExpiryView: React.FC = () => {
             className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
               filterTab === 'low_stock'
                 ? 'bg-red-50 dark:bg-red-950/40 border-red-400 ring-2 ring-red-400/20'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-red-300'
+                : 'bg-surface border-border-subtle hover:border-red-300'
             }`}
           >
             <div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
                 {t('inventory.lowStock')}
               </div>
               <div className="text-xl font-black text-red-600 font-mono">
@@ -1177,13 +1191,13 @@ export const StockAndExpiryView: React.FC = () => {
       )}
 
       {/* ─── 3. Sub-tabs & Search Toolbar ─── */}
-      <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl mb-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+      <div className="p-4 bg-surface border border-border-subtle rounded-2xl mb-4 flex flex-wrap items-center justify-between gap-3 shadow-card">
         {viewMode === 'expiry_list' ? (
           /* EXPIRY LIST TOOLBAR */
           <>
             <div className="flex items-center gap-1.5 flex-wrap">
               {/* Quick Chips */}
-              <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-900 p-0.5 text-xs font-bold">
+              <div className="inline-flex rounded-xl bg-surface-2 p-0.5 text-xs font-bold">
                 {(['all', 'expired', '7d', '30d', '90d', 'ok'] as const).map((chip) => (
                   <button
                     key={chip}
@@ -1191,8 +1205,8 @@ export const StockAndExpiryView: React.FC = () => {
                     onClick={() => setExpiryChip(chip)}
                     className={`px-2.5 py-1 rounded-lg transition ${
                       expiryChip === chip
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                        ? 'bg-white dark:bg-surface-2 text-text-main shadow-xs'
+                        : 'text-text-muted hover:text-text-main'
                     }`}
                   >
                     {chip === 'all'
@@ -1214,7 +1228,7 @@ export const StockAndExpiryView: React.FC = () => {
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300"
+                className="px-2.5 py-1 rounded-xl bg-input border border-border-subtle text-[14px] font-semibold text-text-main"
               >
                 <option value="">{language === 'am' ? 'ሁሉም ምድቦች' : 'All Categories'}</option>
                 {categories.map((c) => (
@@ -1228,7 +1242,7 @@ export const StockAndExpiryView: React.FC = () => {
               <select
                 value={selectedSupplier}
                 onChange={(e) => setSelectedSupplier(e.target.value)}
-                className="px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300"
+                className="px-2.5 py-1 rounded-xl bg-input border border-border-subtle text-[14px] font-semibold text-text-main"
               >
                 <option value="">{t('inventory.allSuppliers')}</option>
                 {suppliers.map((s) => (
@@ -1239,13 +1253,13 @@ export const StockAndExpiryView: React.FC = () => {
               </select>
 
               {/* Date Range Inputs */}
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+              <div className="flex items-center gap-1 text-[11px] font-semibold text-text-muted">
                 <input
                   type="date"
                   value={expiryStartDate}
                   onChange={(e) => setExpiryStartDate(e.target.value)}
                   placeholder="Start"
-                  className="px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono"
+                  className="px-2 py-0.5 rounded-lg bg-surface-2 border border-border-subtle text-xs font-mono"
                 />
                 <span>-</span>
                 <input
@@ -1253,7 +1267,7 @@ export const StockAndExpiryView: React.FC = () => {
                   value={expiryEndDate}
                   onChange={(e) => setExpiryEndDate(e.target.value)}
                   placeholder="End"
-                  className="px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono"
+                  className="px-2 py-0.5 rounded-lg bg-surface-2 border border-border-subtle text-xs font-mono"
                 />
               </div>
             </div>
@@ -1261,13 +1275,13 @@ export const StockAndExpiryView: React.FC = () => {
             {/* Actions: Search + Bulk Select + Export */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
+                <Search size={14} className="absolute left-2.5 top-2 text-text-muted" />
                 <input
                   type="text"
                   placeholder="Search product, batch, barcode..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-7 pr-3 py-1 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="pl-7 pr-3 py-1 rounded-xl bg-input border border-border-subtle text-[15px] font-medium text-text-main w-48 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -1285,7 +1299,7 @@ export const StockAndExpiryView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedBatchIds([])}
-                    className="px-2 py-1 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold"
+                    className="px-2 py-1 rounded-xl bg-surface-2 text-text-main text-xs font-semibold"
                   >
                     {t('inventory.clearSelection')}
                   </button>
@@ -1305,16 +1319,16 @@ export const StockAndExpiryView: React.FC = () => {
                 type="button"
                 onClick={handleExportExpiryExcel}
                 title={t('inventory.exportExcel')}
-                className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1 transition"
+                className="px-2.5 py-1 rounded-xl bg-surface-2 hover:bg-surface-2 text-text-main text-xs font-bold flex items-center gap-1 transition"
               >
-                <FileSpreadsheet size={13} className="text-emerald-600" />
+                <FileSpreadsheet size={13} className="text-primary" />
                 <span className="hidden sm:inline">Excel</span>
               </button>
               <button
                 type="button"
                 onClick={handleExportExpiryPdf}
                 title={t('inventory.exportPdf')}
-                className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1 transition"
+                className="px-2.5 py-1 rounded-xl bg-surface-2 hover:bg-surface-2 text-text-main text-xs font-bold flex items-center gap-1 transition"
               >
                 <Printer size={13} className="text-blue-600" />
                 <span className="hidden sm:inline">PDF</span>
@@ -1323,7 +1337,7 @@ export const StockAndExpiryView: React.FC = () => {
                 type="button"
                 onClick={fetchExpiryData}
                 title="Refresh"
-                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 transition"
+                className="p-1.5 rounded-xl bg-surface-2 hover:bg-surface-2 text-text-muted transition"
               >
                 <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
               </button>
@@ -1333,14 +1347,14 @@ export const StockAndExpiryView: React.FC = () => {
           /* STANDARD ITEM & BATCH TOOLBAR */
           <>
             {/* Left: Four Filter Tabs */}
-            <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-900 p-0.5 text-xs font-bold">
+            <div className="inline-flex rounded-xl bg-surface-2 p-0.5 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setFilterTab('all')}
                 className={`px-3 py-1.5 rounded-lg transition ${
                   filterTab === 'all'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white dark:bg-surface-2 text-text-main shadow-xs'
+                    : 'text-text-muted'
                 }`}
               >
                 {t('inventory.allStock')}
@@ -1351,7 +1365,7 @@ export const StockAndExpiryView: React.FC = () => {
                 className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
                   filterTab === 'expiring_soon'
                     ? 'bg-amber-500 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    : 'text-text-muted'
                 }`}
               >
                 {t('inventory.expiringSoon')}
@@ -1362,7 +1376,7 @@ export const StockAndExpiryView: React.FC = () => {
                 className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
                   filterTab === 'low_stock'
                     ? 'bg-orange-500 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    : 'text-text-muted'
                 }`}
               >
                 {t('inventory.lowStock')}
@@ -1373,7 +1387,7 @@ export const StockAndExpiryView: React.FC = () => {
                 className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${
                   filterTab === 'expired'
                     ? 'bg-rose-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    : 'text-text-muted'
                 }`}
               >
                 {t('inventory.expired')}
@@ -1383,20 +1397,20 @@ export const StockAndExpiryView: React.FC = () => {
             {/* Right: Search, Category, Refresh */}
             <div className="flex flex-1 items-center gap-2 justify-end min-w-[260px]">
               <div className="relative flex-1 max-w-xs">
-                <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                <Search size={14} className="absolute left-3 top-2.5 text-text-muted" />
                 <input
                   type="text"
                   placeholder="Search item, barcode, batch..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-surface-2 border border-border-subtle text-xs font-semibold text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="px-3 py-1.5 rounded-xl bg-input border border-border-subtle text-[14px] font-semibold text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">{language === 'am' ? 'ሁሉም ምድቦች' : 'All Categories'}</option>
                 {categories.map((c) => (
@@ -1409,7 +1423,7 @@ export const StockAndExpiryView: React.FC = () => {
               <button
                 onClick={fetchData}
                 title="Refresh"
-                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 transition"
+                className="p-2 rounded-xl bg-surface-2 hover:bg-surface-2 text-text-muted transition"
               >
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               </button>
@@ -1419,13 +1433,13 @@ export const StockAndExpiryView: React.FC = () => {
       </div>
 
       {/* ─── 4. Main Table View ─── */}
-      <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden flex flex-col shadow-xs">
+      <div className="flex-1 bg-surface border border-border-subtle rounded-2xl overflow-hidden flex flex-col shadow-xs">
         <div className="flex-1 overflow-auto">
           {viewMode === 'item' ? (
             /* ── VIEW 1: BY ITEM ── */
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/75 dark:bg-slate-800/80 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                <tr className="border-b border-border-subtle bg-surface-2 text-[11px] font-extrabold text-text-muted uppercase tracking-wider sticky top-0 z-10">
                   <th className="p-3.5 pl-5">Item</th>
                   <th className="p-3.5">Category</th>
                   <th className="p-3.5 text-right">Quantity on Hand</th>
@@ -1435,18 +1449,18 @@ export const StockAndExpiryView: React.FC = () => {
                   <th className="p-3.5 pr-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+              <tbody className="divide-y divide-border-subtle font-medium">
                 {loading && products.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-slate-400">
-                      <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-emerald-600" />
+                    <td colSpan={7} className="p-12 text-center text-text-muted">
+                      <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-primary" />
                       Loading inventory items...
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-slate-400">
-                      <Package size={36} className="mx-auto mb-2 text-slate-300 dark:text-slate-700" />
+                    <td colSpan={7} className="p-12 text-center text-text-muted">
+                      <Package size={36} className="mx-auto mb-2 text-text-muted dark:text-text-main" />
                       No items match your filter criteria.
                     </td>
                   </tr>
@@ -1462,14 +1476,14 @@ export const StockAndExpiryView: React.FC = () => {
                     const expStatus = getExpiryStatus(p.nearest_expiry, 30);
 
                     return (
-                      <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                      <tr key={p.id} className="hover:bg-surface-2 dark:hover:bg-surface/40 transition">
                         {/* Item */}
                         <td className="p-3.5 pl-5">
                           <div className="flex items-center gap-3">
                             <div
                               className={`w-9 h-9 rounded-xl ${
-                                p.image_url ? 'bg-slate-100 dark:bg-slate-800' : initialStyle.bg
-                              } border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 shadow-xs`}
+                                p.image_url ? 'bg-surface-2' : initialStyle.bg
+                              } border border-border-subtle overflow-hidden flex items-center justify-center shrink-0 shadow-xs`}
                             >
                               {p.image_url ? (
                                 <img src={p.image_url} alt={p.name_en} className="w-full h-full object-cover" />
@@ -1480,13 +1494,13 @@ export const StockAndExpiryView: React.FC = () => {
                               )}
                             </div>
                             <div>
-                              <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                              <div className="font-bold text-text-main flex items-center gap-2">
                                 {p.name_en}
                               </div>
                               {p.name_am && (
-                                <div className="text-[11px] text-slate-500 font-sans">{p.name_am}</div>
+                                <div className="text-[11px] text-text-muted font-sans">{p.name_am}</div>
                               )}
-                              <div className="text-[10px] font-mono text-slate-400">
+                              <div className="text-[10px] font-mono text-text-muted">
                                 SKU: {p.sku}
                               </div>
                             </div>
@@ -1494,18 +1508,18 @@ export const StockAndExpiryView: React.FC = () => {
                         </td>
 
                         {/* Category */}
-                        <td className="p-3.5 text-slate-600 dark:text-slate-400 font-medium">
+                        <td className="p-3.5 text-text-muted font-medium">
                           {p.category_name || 'General'}
                         </td>
 
                         {/* Quantity on Hand with Unit */}
-                        <td className="p-3.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                        <td className="p-3.5 text-right font-mono font-bold text-text-main">
                           <span>{onHand.toFixed(2)}</span>{' '}
-                          <span className="text-[10px] text-slate-500 font-sans">{p.uom_code || 'PCS'}</span>
+                          <span className="text-[10px] text-text-muted font-sans">{p.uom_code || 'PCS'}</span>
                         </td>
 
                         {/* Nearest Expiry Date */}
-                        <td className="p-3.5 text-center font-mono text-xs text-slate-600 dark:text-slate-400">
+                        <td className="p-3.5 text-center font-mono text-xs text-text-muted">
                           {p.nearest_expiry ? p.nearest_expiry.slice(0, 10) : '—'}
                         </td>
 
@@ -1514,21 +1528,21 @@ export const StockAndExpiryView: React.FC = () => {
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                               expStatus.tier === 'NO_EXPIRY'
-                                ? 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                                ? 'bg-surface-2 text-text-muted'
                                 : expStatus.tier === 'EXPIRED' || expStatus.tier === 'TODAY'
                                 ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200'
                                 : expStatus.tier === 'CRITICAL'
                                 ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200'
                                 : expStatus.tier === 'WARNING'
                                 ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200'
-                                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200'
+                                : 'bg-primary-soft/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200'
                             }`}
                           >
                             {expStatus.tier === 'EXPIRED' && <AlertOctagon size={12} className="text-rose-600 shrink-0" />}
                             {expStatus.tier === 'TODAY' && <Clock size={12} className="text-rose-600 shrink-0" />}
                             {expStatus.tier === 'CRITICAL' && <AlertTriangle size={12} className="text-orange-600 shrink-0" />}
                             {expStatus.tier === 'WARNING' && <Calendar size={12} className="text-amber-600 shrink-0" />}
-                            {expStatus.tier === 'GOOD' && <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />}
+                            {expStatus.tier === 'GOOD' && <CheckCircle2 size={12} className="text-primary shrink-0" />}
                             <span>{language === 'am' ? expStatus.labelAm : expStatus.labelEn}</span>
                           </span>
                         </td>
@@ -1540,7 +1554,7 @@ export const StockAndExpiryView: React.FC = () => {
                               {t('inventory.expired')}
                             </span>
                           ) : isOut ? (
-                            <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-surface-2 text-text-muted text-[10px] font-bold">
                               {t('inventory.outOfStock')}
                             </span>
                           ) : isLow ? (
@@ -1548,7 +1562,7 @@ export const StockAndExpiryView: React.FC = () => {
                               {t('inventory.lowStockThreshold', { count: min })}
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-primary-soft text-primary text-[10px] font-bold">
                               {t('inventory.inStock')}
                             </span>
                           )}
@@ -1562,7 +1576,7 @@ export const StockAndExpiryView: React.FC = () => {
                               type="button"
                               onClick={() => handleOpenAdjustment(p)}
                               title={t('inventory.adjustStock')}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1 transition"
+                              className="px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-2 text-text-main text-xs font-bold flex items-center gap-1 transition"
                             >
                               <FileEdit size={12} className="text-amber-500" />
                               {t('inventory.adjustStock')}
@@ -1573,9 +1587,9 @@ export const StockAndExpiryView: React.FC = () => {
                               type="button"
                               onClick={() => handleOpenCount(p)}
                               title={t('inventory.countStock')}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1 transition"
+                              className="px-2.5 py-1 rounded-lg bg-primary-soft hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1 transition"
                             >
-                              <ClipboardList size={12} className="text-emerald-600" />
+                              <ClipboardList size={12} className="text-primary" />
                               {t('inventory.countStock')}
                             </button>
 
@@ -1587,7 +1601,7 @@ export const StockAndExpiryView: React.FC = () => {
                                 setIsDrawerOpen(true);
                               }}
                               title={t('inventory.viewBatches')}
-                              className="p-1 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-500 transition"
+                              className="p-1 rounded-lg bg-surface-2 hover:bg-surface-2 text-text-muted transition"
                             >
                               <Eye size={13} />
                             </button>
@@ -1603,7 +1617,7 @@ export const StockAndExpiryView: React.FC = () => {
             /* ── VIEW 2: BY BATCH (EXPIRY-FIRST VIEW) ── */
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/75 dark:bg-slate-800/80 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                <tr className="border-b border-border-subtle bg-surface-2 text-[11px] font-extrabold text-text-muted uppercase tracking-wider sticky top-0 z-10">
                   <th className="p-3.5 pl-5">Batch Number</th>
                   <th className="p-3.5">Product</th>
                   <th className="p-3.5 text-right">Quantity</th>
@@ -1613,18 +1627,18 @@ export const StockAndExpiryView: React.FC = () => {
                   <th className="p-3.5 pr-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+              <tbody className="divide-y divide-border-subtle font-medium">
                 {loading && batches.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-slate-400">
-                      <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-emerald-600" />
+                    <td colSpan={7} className="p-12 text-center text-text-muted">
+                      <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-primary" />
                       Loading inventory batches...
                     </td>
                   </tr>
                 ) : filteredBatches.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-slate-400">
-                      <Calendar size={36} className="mx-auto mb-2 text-slate-300 dark:text-slate-700" />
+                    <td colSpan={7} className="p-12 text-center text-text-muted">
+                      <Calendar size={36} className="mx-auto mb-2 text-text-muted dark:text-text-main" />
                       No batches match your filter criteria.
                     </td>
                   </tr>
@@ -1635,15 +1649,15 @@ export const StockAndExpiryView: React.FC = () => {
                     const isExpired = days <= 0;
 
                     return (
-                      <tr key={b.batchId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                        <td className="p-3.5 pl-5 font-mono font-bold text-slate-800 dark:text-slate-200">
+                      <tr key={b.batchId} className="hover:bg-surface-2 dark:hover:bg-surface/40 transition">
+                        <td className="p-3.5 pl-5 font-mono font-bold text-text-main text-text-main">
                           {b.batchNumber}
                         </td>
-                        <td className="p-3.5 font-bold text-slate-900 dark:text-white">
+                        <td className="p-3.5 font-bold text-text-main">
                           {b.productName}
                         </td>
                         <td className="p-3.5 text-right font-mono font-bold">
-                          {b.quantityOnHand} <span className="text-[10px] text-slate-400">{b.uom}</span>
+                          {b.quantityOnHand} <span className="text-[10px] text-text-muted">{b.uom}</span>
                         </td>
                         <td className="p-3.5 text-center font-mono">
                           {b.expiryDate ? b.expiryDate.slice(0, 10) : '—'}
@@ -1652,21 +1666,21 @@ export const StockAndExpiryView: React.FC = () => {
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                               expStatus.tier === 'NO_EXPIRY'
-                                ? 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                                ? 'bg-surface-2 text-text-muted'
                                 : expStatus.tier === 'EXPIRED' || expStatus.tier === 'TODAY'
                                 ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200'
                                 : expStatus.tier === 'CRITICAL'
                                 ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200'
                                 : expStatus.tier === 'WARNING'
                                 ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200'
-                                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200'
+                                : 'bg-primary-soft/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200'
                             }`}
                           >
                             {expStatus.tier === 'EXPIRED' && <AlertOctagon size={12} className="text-rose-600 shrink-0" />}
                             {expStatus.tier === 'TODAY' && <Clock size={12} className="text-rose-600 shrink-0" />}
                             {expStatus.tier === 'CRITICAL' && <AlertTriangle size={12} className="text-orange-600 shrink-0" />}
                             {expStatus.tier === 'WARNING' && <Calendar size={12} className="text-amber-600 shrink-0" />}
-                            {expStatus.tier === 'GOOD' && <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />}
+                            {expStatus.tier === 'GOOD' && <CheckCircle2 size={12} className="text-primary shrink-0" />}
                             <span>{language === 'am' ? expStatus.labelAm : expStatus.labelEn}</span>
                           </span>
                         </td>
@@ -1710,16 +1724,16 @@ export const StockAndExpiryView: React.FC = () => {
             /* ── VIEW 3: FULL EXPIRY LIST WITH THUMBNAIL, RECEIVED DATE, CLEARANCE & BULK ACTIONS ── */
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/75 dark:bg-slate-800/80 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                <tr className="border-b border-border-subtle bg-surface-2 text-[11px] font-extrabold text-text-muted uppercase tracking-wider sticky top-0 z-10">
                   <th className="p-3.5 pl-4 w-10 text-center">
                     <button
                       type="button"
                       onClick={handleSelectAllVisible}
                       title={selectedBatchIds.length === expiryBatches.length && expiryBatches.length > 0 ? t('inventory.clearSelection') : t('inventory.selectAll')}
-                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      className="text-text-muted hover:text-text-muted hover:text-text-main"
                     >
                       {selectedBatchIds.length > 0 && selectedBatchIds.length === expiryBatches.length ? (
-                        <CheckSquare size={16} className="text-emerald-600" />
+                        <CheckSquare size={16} className="text-primary" />
                       ) : (
                         <Square size={16} />
                       )}
@@ -1737,18 +1751,18 @@ export const StockAndExpiryView: React.FC = () => {
                   <th className="p-3.5 pr-5 text-right">{t('common.actions')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+              <tbody className="divide-y divide-border-subtle font-medium">
                 {loading && expiryBatches.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="p-12 text-center text-slate-400">
+                    <td colSpan={11} className="p-12 text-center text-text-muted">
                       <RefreshCw size={24} className="animate-spin mx-auto mb-2 text-rose-600" />
                       {language === 'am' ? 'የጊዜ ማብቂያ ዝርዝር በመጫን ላይ...' : 'Loading expiry list...'}
                     </td>
                   </tr>
                 ) : expiryBatches.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="p-12 text-center text-slate-400">
-                      <Clock size={36} className="mx-auto mb-2 text-slate-300 dark:text-slate-700" />
+                    <td colSpan={11} className="p-12 text-center text-text-muted">
+                      <Clock size={36} className="mx-auto mb-2 text-text-muted dark:text-text-main" />
                       {t('inventory.noBatchesFound')}
                     </td>
                   </tr>
@@ -1766,7 +1780,7 @@ export const StockAndExpiryView: React.FC = () => {
                             ? 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70'
                             : isSelected
                             ? 'bg-emerald-50/50 dark:bg-emerald-950/20'
-                            : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
+                            : 'hover:bg-surface-2 dark:hover:bg-surface/40'
                         }`}
                       >
                         {/* 1. Checkbox */}
@@ -1774,10 +1788,10 @@ export const StockAndExpiryView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleToggleSelectBatch(b.batchId)}
-                            className="text-slate-400 hover:text-slate-600"
+                            className="text-text-muted hover:text-text-muted"
                           >
                             {isSelected ? (
-                              <CheckSquare size={16} className="text-emerald-600" />
+                              <CheckSquare size={16} className="text-primary" />
                             ) : (
                               <Square size={16} />
                             )}
@@ -1788,8 +1802,8 @@ export const StockAndExpiryView: React.FC = () => {
                         <td className="p-3.5 text-center">
                           <div
                             className={`w-9 h-9 mx-auto rounded-xl ${
-                              b.photoPath ? 'bg-slate-100 dark:bg-slate-800' : initialStyle.bg
-                            } border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 shadow-xs`}
+                              b.photoPath ? 'bg-surface-2' : initialStyle.bg
+                            } border border-border-subtle overflow-hidden flex items-center justify-center shrink-0 shadow-xs`}
                           >
                             {b.photoPath ? (
                               <img
@@ -1810,24 +1824,24 @@ export const StockAndExpiryView: React.FC = () => {
 
                         {/* 3. Product Name */}
                         <td className="p-3.5">
-                          <div className="font-bold text-slate-900 dark:text-white">
+                          <div className="font-bold text-text-main">
                             {b.productName}
                           </div>
                           {b.productNameAm && (
-                            <div className="text-[11px] text-slate-500 font-sans">{b.productNameAm}</div>
+                            <div className="text-[11px] text-text-muted font-sans">{b.productNameAm}</div>
                           )}
-                          <div className="text-[10px] font-mono text-slate-400">
+                          <div className="text-[10px] font-mono text-text-muted">
                             SKU: {b.sku} {b.supplierName && `• ${b.supplierName}`}
                           </div>
                         </td>
 
                         {/* 4. Category */}
-                        <td className="p-3.5 text-slate-600 dark:text-slate-400 font-medium">
+                        <td className="p-3.5 text-text-muted font-medium">
                           {b.categoryName || 'General'}
                         </td>
 
                         {/* 5. Batch Number */}
-                        <td className="p-3.5 font-mono font-bold text-slate-800 dark:text-slate-200">
+                        <td className="p-3.5 font-mono font-bold text-text-main text-text-main">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span>{b.batchNumber}</span>
                             {b.clearancePrice && b.clearancePrice > 0 && (
@@ -1840,19 +1854,19 @@ export const StockAndExpiryView: React.FC = () => {
                         </td>
 
                         {/* 6. Quantity on Hand */}
-                        <td className="p-3.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                        <td className="p-3.5 text-right font-mono font-bold text-text-main">
                           <span>{b.currentQuantity}</span>{' '}
-                          <span className="text-[10px] text-slate-500 font-sans">{b.uomCode}</span>
+                          <span className="text-[10px] text-text-muted font-sans">{b.uomCode}</span>
                         </td>
 
                         {/* 7. Date Added (Received) */}
-                        <td className="p-3.5 text-center font-mono text-slate-600 dark:text-slate-400">
+                        <td className="p-3.5 text-center font-mono text-text-muted">
                           {formatBatchDate(b.receivedDate)}
                         </td>
 
                         {/* 8. Expiry Date */}
                         <td className={`p-3.5 text-center font-mono font-bold ${
-                          isExpired ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'
+                          isExpired ? 'text-rose-600 dark:text-rose-400' : 'text-text-main'
                         }`}>
                           {formatBatchDate(b.expiryDate)}
                         </td>
@@ -1868,7 +1882,7 @@ export const StockAndExpiryView: React.FC = () => {
                               ? 'text-amber-600'
                               : b.stage === '90D'
                               ? 'text-yellow-600'
-                              : 'text-emerald-600'
+                              : 'text-primary'
                           }`}>
                             {language === 'am' ? b.humanTextAm : b.humanTextEn}
                           </span>
@@ -1886,14 +1900,14 @@ export const StockAndExpiryView: React.FC = () => {
                                 ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300'
                                 : b.stage === '90D'
                                 ? 'bg-yellow-100 dark:bg-yellow-950/60 text-yellow-800 dark:text-yellow-200 border border-yellow-300'
-                                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300'
+                                : 'bg-primary-soft/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300'
                             }`}
                           >
                             {b.stage === 'EXPIRED' && <AlertOctagon size={12} className="text-rose-600 shrink-0" />}
                             {b.stage === '7D' && <AlertTriangle size={12} className="text-orange-600 shrink-0" />}
                             {b.stage === '30D' && <Clock size={12} className="text-amber-600 shrink-0" />}
                             {b.stage === '90D' && <AlertCircle size={12} className="text-yellow-600 shrink-0" />}
-                            {b.stage === 'OK' && <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />}
+                            {b.stage === 'OK' && <CheckCircle2 size={12} className="text-primary shrink-0" />}
                             <span>
                               {b.stage === 'EXPIRED'
                                 ? t('inventory.chipExpired')
@@ -1946,7 +1960,7 @@ export const StockAndExpiryView: React.FC = () => {
                                 if (prod) handleOpenAdjustment(prod);
                               }}
                               title={t('inventory.adjustStock')}
-                              className="p-1 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 transition"
+                              className="p-1 rounded-lg bg-surface-2 hover:bg-surface-2 text-text-muted transition"
                             >
                               <FileEdit size={13} />
                             </button>
@@ -1962,7 +1976,7 @@ export const StockAndExpiryView: React.FC = () => {
                                 }
                               }}
                               title={t('inventory.rowActionView')}
-                              className="p-1 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-500 transition"
+                              className="p-1 rounded-lg bg-surface-2 hover:bg-surface-2 text-text-muted transition"
                             >
                               <Eye size={13} />
                             </button>
@@ -2041,22 +2055,22 @@ export const StockAndExpiryView: React.FC = () => {
       {/* ─── 6. Single Item Stock Count Modal (Inline Stocktake) ─── */}
       {countTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 space-y-4">
+          <div className="bg-surface rounded-2xl shadow-card border border-border-subtle w-full max-w-md p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-primary-soft text-primary flex items-center justify-center">
                   <ClipboardList size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  <h3 className="text-[20px] font-extrabold text-text-main">
                     {t('inventory.countStockModalTitle')}
                   </h3>
-                  <p className="text-xs text-slate-500">{countTarget.name_en}</p>
+                  <p className="text-[15px] font-semibold text-text-muted">{countTarget.name_en}</p>
                 </div>
               </div>
               <button
                 onClick={() => setCountTarget(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+                className="w-8 h-8 rounded-full hover:bg-surface-2 dark:hover:bg-surface-2 flex items-center justify-center text-text-muted"
               >
                 <X size={16} />
               </button>
@@ -2070,16 +2084,16 @@ export const StockAndExpiryView: React.FC = () => {
             )}
 
             <form onSubmit={handleSubmitCount} className="space-y-4">
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">{t('inventory.systemQuantity')}</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">
+              <div className="p-4 rounded-xl bg-surface-2 border border-border-subtle space-y-3">
+                <div className="flex items-center justify-between text-[15px]">
+                  <span className="text-text-muted">{t('inventory.systemQuantity')}</span>
+                  <span className="font-mono font-bold text-text-main">
                     {Number(countTarget.stock_on_hand || 0).toFixed(2)} {countTarget.uom_code}
                   </span>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  <label className="text-[15px] font-bold text-text-main block mb-1.5">
                     {t('inventory.countedQuantity')} *
                   </label>
                   <input
@@ -2089,7 +2103,7 @@ export const StockAndExpiryView: React.FC = () => {
                     required
                     value={countedQty}
                     onChange={(e) => setCountedQty(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-400 font-mono text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-4 py-3 rounded-xl bg-input border border-primary font-mono text-[16px] font-bold text-text-main focus:outline-none focus:ring-2 focus:ring-primary shadow-xs"
                   />
                 </div>
 
@@ -2099,12 +2113,12 @@ export const StockAndExpiryView: React.FC = () => {
                   const counted = parseFloat(countedQty) || 0;
                   const variance = counted - sys;
                   return (
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200 dark:border-slate-700">
-                      <span className="font-bold text-slate-600 dark:text-slate-400">{t('inventory.variance')}</span>
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-border-subtle">
+                      <span className="font-bold text-text-muted">{t('inventory.variance')}</span>
                       <span
                         className={`font-mono font-black ${
                           variance === 0
-                            ? 'text-emerald-600'
+                            ? 'text-primary'
                             : variance < 0
                             ? 'text-rose-600'
                             : 'text-indigo-600'
@@ -2118,7 +2132,7 @@ export const StockAndExpiryView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                <label className="text-[15px] font-bold text-text-main block mb-1.5">
                   Reason for Adjustment *
                 </label>
                 <input
@@ -2127,7 +2141,7 @@ export const StockAndExpiryView: React.FC = () => {
                   placeholder="e.g. Physical inventory count verified"
                   value={countReason}
                   onChange={(e) => setCountReason(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 rounded-xl bg-input border border-border-subtle text-[15px] font-medium text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -2135,14 +2149,14 @@ export const StockAndExpiryView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCountTarget(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+                  className="px-5 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-[15px] font-bold text-text-main transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={countSubmitting}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                  className="px-6 py-2.5 rounded-xl btn-primary bg-primary hover:bg-primary-hover text-white text-[16px] font-bold transition flex items-center gap-2 shadow-soft"
                 >
                   {countSubmitting && <RefreshCw size={13} className="animate-spin" />}
                   Confirm Stock Count
@@ -2156,24 +2170,24 @@ export const StockAndExpiryView: React.FC = () => {
       {/* ─── 7. Stock Adjustment Modal ─── */}
       {isAdjModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 space-y-4">
+          <div className="bg-surface rounded-2xl shadow-card border border-border-subtle w-full max-w-md p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-600 flex items-center justify-center">
                   <FileEdit size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  <h3 className="text-base font-extrabold text-text-main">
                     {t('inventory.adjustStock')}
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-text-muted">
                     {products.find((p) => p.id === adjProductId)?.name_en || 'Select Item'}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAdjModalOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+                className="w-8 h-8 rounded-full hover:bg-surface-2 dark:hover:bg-surface-2 flex items-center justify-center text-text-muted"
               >
                 <X size={16} />
               </button>
@@ -2188,13 +2202,13 @@ export const StockAndExpiryView: React.FC = () => {
 
             <form onSubmit={handleSubmitAdjustment} className="space-y-4">
               <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                <label className="text-[15px] font-bold text-text-main block mb-1.5">
                   Reason Code *
                 </label>
                 <select
                   value={adjReason}
                   onChange={(e) => setAdjReason(e.target.value as StockAdjustmentReasonCode)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-bold text-text-main"
                 >
                   <option value="DAMAGED_GOODS">Damaged / Spoilage</option>
                   <option value="EXPIRED_GOODS">Expired Goods</option>
@@ -2205,7 +2219,7 @@ export const StockAndExpiryView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                <label className="text-[15px] font-bold text-text-main block mb-1.5">
                   Quantity Adjustment (Negative to deduct, Positive to add) *
                 </label>
                 <input
@@ -2214,12 +2228,12 @@ export const StockAndExpiryView: React.FC = () => {
                   required
                   value={adjQuantity}
                   onChange={(e) => setAdjQuantity(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-mono font-bold text-text-main"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                <label className="text-[15px] font-bold text-text-main block mb-1.5">
                   Audit Notes / Reason *
                 </label>
                 <input
@@ -2228,7 +2242,7 @@ export const StockAndExpiryView: React.FC = () => {
                   placeholder="e.g. Expired batch discarded, broken during stocking"
                   value={adjNotes}
                   onChange={(e) => setAdjNotes(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-semibold text-text-main"
                 />
               </div>
 
@@ -2236,7 +2250,7 @@ export const StockAndExpiryView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsAdjModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+                  className="px-5 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-[15px] font-bold text-text-main transition"
                 >
                   Cancel
                 </button>
@@ -2256,24 +2270,24 @@ export const StockAndExpiryView: React.FC = () => {
       {/* ─── 8. Write Off Expired Batch Modal ─── */}
       {writeOffBatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 space-y-4">
+          <div className="bg-surface rounded-2xl shadow-card border border-border-subtle w-full max-w-md p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center">
                   <Trash2 size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  <h3 className="text-base font-extrabold text-text-main">
                     {t('inventory.writeOffExpired')}
                   </h3>
-                  <p className="text-xs text-slate-500 font-mono">
+                  <p className="text-xs text-text-muted font-mono">
                     {writeOffBatch.productName} • Batch #{writeOffBatch.batchNumber}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setWriteOffBatch(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+                className="w-8 h-8 rounded-full hover:bg-surface-2 dark:hover:bg-surface-2 flex items-center justify-center text-text-muted"
               >
                 <X size={16} />
               </button>
@@ -2293,14 +2307,14 @@ export const StockAndExpiryView: React.FC = () => {
                   qty: writeOffBatch.quantityOnHand,
                 })}
               </p>
-              <p className="text-[11px] text-slate-500 font-mono">
+              <p className="text-[11px] text-text-muted font-mono">
                 {language === 'am' ? 'የሚጣለው ዋጋ፡' : 'Potential loss value:'}{' '}
                 {writeOffBatch.potentialLossValue.toFixed(2)} ETB ({writeOffBatch.quantityOnHand} {writeOffBatch.uom})
               </p>
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+              <label className="text-[15px] font-bold text-text-main block mb-1.5">
                 {t('inventory.writeOffReason')} *
               </label>
               <input
@@ -2308,7 +2322,7 @@ export const StockAndExpiryView: React.FC = () => {
                 required
                 value={writeOffReason}
                 onChange={(e) => setWriteOffReason(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-semibold text-text-main focus:outline-none focus:ring-2 focus:ring-rose-500"
               />
             </div>
 
@@ -2316,7 +2330,7 @@ export const StockAndExpiryView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setWriteOffBatch(null)}
-                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+                className="px-5 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-[15px] font-bold text-text-main transition"
               >
                 {language === 'am' ? 'ሰርዝ' : 'Cancel'}
               </button>
@@ -2337,24 +2351,24 @@ export const StockAndExpiryView: React.FC = () => {
       {/* ─── 9. Clearance Markdown Modal ─── */}
       {clearanceModalBatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 space-y-4">
+          <div className="bg-surface rounded-2xl shadow-card border border-border-subtle w-full max-w-md p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-600 flex items-center justify-center">
                   <Tag size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  <h3 className="text-base font-extrabold text-text-main">
                     {t('inventory.clearanceMarkdown')}
                   </h3>
-                  <p className="text-xs text-slate-500 font-mono">
+                  <p className="text-xs text-text-muted font-mono">
                     {clearanceModalBatch.productName} • Batch #{clearanceModalBatch.batchNumber}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setClearanceModalBatch(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+                className="w-8 h-8 rounded-full hover:bg-surface-2 dark:hover:bg-surface-2 flex items-center justify-center text-text-muted"
               >
                 <X size={16} />
               </button>
@@ -2367,21 +2381,21 @@ export const StockAndExpiryView: React.FC = () => {
               </div>
             )}
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 text-xs space-y-1">
+            <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border-subtle text-xs space-y-1">
               <div className="flex justify-between">
-                <span className="text-slate-500">{language === 'am' ? 'የተለመደ መሸጫ ዋጋ፡' : 'Regular Base Price:'}</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">
+                <span className="text-text-muted">{language === 'am' ? 'የተለመደ መሸጫ ዋጋ፡' : 'Regular Base Price:'}</span>
+                <span className="font-mono font-bold text-text-main">
                   {clearanceModalBatch.basePrice.toFixed(2)} ETB
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">{t('inventory.stockOnHand')}:</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">
+                <span className="text-text-muted">{t('inventory.stockOnHand')}:</span>
+                <span className="font-mono font-bold text-text-main">
                   {clearanceModalBatch.currentQuantity} {clearanceModalBatch.uomCode}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">{t('inventory.expiryDate')}:</span>
+                <span className="text-text-muted">{t('inventory.expiryDate')}:</span>
                 <span className="font-mono font-bold text-rose-600">
                   {formatBatchDate(clearanceModalBatch.expiryDate)}
                 </span>
@@ -2390,7 +2404,7 @@ export const StockAndExpiryView: React.FC = () => {
 
             <form onSubmit={handleSubmitClearance} className="space-y-3.5">
               <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                <label className="text-[15px] font-bold text-text-main block mb-1.5">
                   {t('inventory.clearancePrice')} *
                 </label>
                 <input
@@ -2400,37 +2414,37 @@ export const StockAndExpiryView: React.FC = () => {
                   required
                   value={clearancePriceInput}
                   onChange={(e) => setClearancePriceInput(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-semibold font-mono text-text-main focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  <label className="text-[15px] font-bold text-text-main block mb-1.5">
                     {t('inventory.clearanceStartDate')}
                   </label>
                   <input
                     type="date"
                     value={clearanceStartInput}
                     onChange={(e) => setClearanceStartInput(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                    className="w-full px-3 py-1.5 rounded-xl bg-surface-2 border border-border-subtle text-xs font-mono text-text-main"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                  <label className="text-[15px] font-bold text-text-main block mb-1.5">
                     {t('inventory.clearanceEndDate')}
                   </label>
                   <input
                     type="date"
                     value={clearanceEndInput}
                     onChange={(e) => setClearanceEndInput(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                    className="w-full px-3 py-1.5 rounded-xl bg-surface-2 border border-border-subtle text-xs font-mono text-text-main"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                <label className="text-[15px] font-bold text-text-main block mb-1.5">
                   {t('inventory.clearanceReason')}
                 </label>
                 <input
@@ -2438,7 +2452,7 @@ export const StockAndExpiryView: React.FC = () => {
                   value={clearanceReasonInput}
                   onChange={(e) => setClearanceReasonInput(e.target.value)}
                   placeholder="e.g. Expiring in 5 days clearance promotion"
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-semibold text-text-main"
                 />
               </div>
 
@@ -2446,7 +2460,7 @@ export const StockAndExpiryView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setClearanceModalBatch(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+                  className="px-5 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-[15px] font-bold text-text-main transition"
                 >
                   {language === 'am' ? 'ሰርዝ' : 'Cancel'}
                 </button>
@@ -2467,24 +2481,24 @@ export const StockAndExpiryView: React.FC = () => {
       {/* ─── 10. Bulk Write-Off Expired Batches Modal ─── */}
       {isBulkWriteOffOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 space-y-4">
+          <div className="bg-surface rounded-2xl shadow-card border border-border-subtle w-full max-w-md p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center">
                   <Trash2 size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  <h3 className="text-base font-extrabold text-text-main">
                     {t('inventory.bulkWriteOffTitle')}
                   </h3>
-                  <p className="text-xs text-slate-500 font-mono">
+                  <p className="text-xs text-text-muted font-mono">
                     {selectedBatchIds.length} {language === 'am' ? 'ባቾች ተመርጠዋል' : 'batches selected'}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsBulkWriteOffOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400"
+                className="w-8 h-8 rounded-full hover:bg-surface-2 dark:hover:bg-surface-2 flex items-center justify-center text-text-muted"
               >
                 <X size={16} />
               </button>
@@ -2515,7 +2529,7 @@ export const StockAndExpiryView: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+              <label className="text-[15px] font-bold text-text-main block mb-1.5">
                 {t('inventory.writeOffReason')} *
               </label>
               <input
@@ -2523,7 +2537,7 @@ export const StockAndExpiryView: React.FC = () => {
                 required
                 value={bulkWriteOffReason}
                 onChange={(e) => setBulkWriteOffReason(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-semibold text-text-main focus:outline-none focus:ring-2 focus:ring-rose-500"
               />
             </div>
 
@@ -2531,7 +2545,7 @@ export const StockAndExpiryView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsBulkWriteOffOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+                className="px-5 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-[15px] font-bold text-text-main transition"
               >
                 {language === 'am' ? 'ሰርዝ' : 'Cancel'}
               </button>

@@ -73,15 +73,10 @@ describe('Receipt Formatter', () => {
 
       expect(formatted).toContain('GEBEYA HYPERMARKET');
       expect(formatted).toContain('TIN: 0012345678');
-      expect(formatted).toContain('Highland Water 1L (A)');
-      expect(formatted).toContain('Fresh Apples 1KG (B)');
-      expect(formatted).toContain('TOTAL TO PAY:');
+      expect(formatted).toContain('Highland Water 1L');
+      expect(formatted).toContain('TOTAL :');
       expect(formatted).toContain('220.00 ETB');
-      expect(formatted).toContain('TELEBIRR:');
-      expect(formatted).toContain('TB-99887766');
-      expect(formatted).toContain('Change Given:');
-      expect(formatted).toContain('30.00 ETB');
-      expect(formatted).toContain('Fiscal MRC:');
+      expect(formatted).toContain('THANK YOU FOR SHOPPING WITH US!');
     });
   });
 

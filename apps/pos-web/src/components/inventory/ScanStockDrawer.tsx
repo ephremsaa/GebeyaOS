@@ -323,16 +323,16 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
     >
       <div className="modal-content max-w-5xl max-h-[92vh] flex flex-col p-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30">
+            <div className="w-10 h-10 rounded-2xl bg-primary text-white shadow-soft flex items-center justify-center shadow-md shadow-emerald-600/30">
               <Scan size={20} />
             </div>
             <div>
-              <h2 className="modal-title font-bold text-lg text-slate-900 dark:text-white">
+              <h2 className="modal-title font-bold text-lg text-text-main">
                 {language === 'am' ? 'ባርኮድ በመቃኘት ዕቃ ማስገባት' : 'Scan-to-Add Stock'}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-text-muted">
                 {language === 'am'
                   ? 'ባርኮዶችን በተከታታይ በመቃኘት ወይም በመፃፍ በቀጥታ ወደ ክምችት መዝገብ ያስገቡ'
                   : 'Continuous barcode scanning with batch assignment and stock ledger persistence'}
@@ -342,7 +342,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-text-muted hover:text-text-muted transition-colors"
           >
             <X size={18} />
           </button>
@@ -355,7 +355,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
               <input
                 ref={scanInputRef}
                 type="text"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-4 py-2.5 rounded-xl border border-border-subtle bg-surface text-sm font-mono font-bold text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder={
                   language === 'am'
                     ? 'ባርኮድ እዚህ ይቃኙ ወይም ይተይቡ...'
@@ -364,11 +364,11 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
               />
-              <Scan size={18} className="absolute right-3.5 top-3 text-emerald-600 pointer-events-none" />
+              <Scan size={18} className="absolute right-3.5 top-3 text-primary pointer-events-none" />
             </div>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
+              className="px-4 py-2 rounded-xl btn-primary bg-primary hover:bg-primary-hover text-white shadow-soft text-xs font-bold transition"
             >
               {language === 'am' ? 'አክል' : 'Add'}
             </button>
@@ -383,10 +383,10 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
         )}
 
         {/* Scanned Items Table */}
-        <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-700 rounded-2xl min-h-[260px]">
+        <div className="flex-1 overflow-y-auto glass-panel border border-border-subtle rounded-2xl min-h-[260px]">
           {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400 gap-2">
-              <Scan size={36} className="text-slate-300 dark:text-slate-700 animate-pulse" />
+            <div className="flex flex-col items-center justify-center py-16 text-center text-text-muted gap-2">
+              <Scan size={36} className="text-slate-300 dark:text-text-main animate-pulse" />
               <p className="text-sm font-semibold">
                 {language === 'am' ? 'ለመቃኘት ዝግጁ ነው' : 'Ready to scan'}
               </p>
@@ -399,7 +399,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
           ) : (
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-[11px] font-bold text-slate-500 uppercase">
+                <tr className="border-b border-border-subtle bg-surface-2 dark:bg-surface/80 text-[11px] font-bold text-text-muted uppercase">
                   <th className="p-3 pl-4">{language === 'am' ? 'ዕቃ' : 'Product'}</th>
                   <th className="p-3 text-center">{language === 'am' ? 'ብዛት' : 'Quantity'}</th>
                   <th className="p-3 text-right">{language === 'am' ? 'የግዢ ዋጋ' : 'Unit Cost'}</th>
@@ -408,7 +408,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                   <th className="p-3 text-center">{language === 'am' ? 'ተግባር' : 'Action'}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-border-subtle">
                 {items.map((item, idx) => {
                   const dateValidation = item.expiryDate
                     ? validateExpiryDateInput(item.expiryDate)
@@ -417,16 +417,16 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                   return (
                     <tr
                       key={item.barcode + idx}
-                      className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors ${
+                      className={`hover:bg-surface-2/60 dark:hover:bg-surface/30 transition-colors ${
                         item.highlighted ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''
                       }`}
                     >
                       <td className="p-3 pl-4">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-900 dark:text-white">
+                          <span className="font-bold text-text-main">
                             {language === 'am' && item.nameAm ? item.nameAm : item.nameEn}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
+                          <span className="text-[10px] text-text-muted font-mono">
                             {item.barcode} • {item.sku}
                             {item.isPerishable && (
                               <span className="ml-1 text-amber-500 font-bold">
@@ -448,11 +448,11 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                                 ),
                               );
                             }}
-                            className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold"
+                            className="w-6 h-6 rounded-md bg-surface-2 hover:bg-surface-2 dark:bg-slate-700 text-text-main flex items-center justify-center font-bold"
                           >
                             <Minus size={11} />
                           </button>
-                          <span className="w-8 text-center font-mono font-bold text-sm text-slate-900 dark:text-white">
+                          <span className="w-8 text-center font-mono font-bold text-sm text-text-main">
                             {item.quantity}
                           </span>
                           <button
@@ -464,21 +464,21 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                                 ),
                               );
                             }}
-                            className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold"
+                            className="w-6 h-6 rounded-md bg-surface-2 hover:bg-surface-2 dark:bg-slate-700 text-text-main flex items-center justify-center font-bold"
                           >
                             <Plus size={11} />
                           </button>
                         </div>
                       </td>
 
-                      <td className="p-3 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                      <td className="p-3 text-right font-mono font-bold text-text-main text-text-main">
                         {item.unitCost} ETB
                       </td>
 
                       <td className="p-3">
                         <input
                           type="text"
-                          className="w-24 p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-mono"
+                          className="w-24 p-1.5 rounded-lg border border-border-subtle bg-surface text-xs font-mono"
                           value={item.batchNumber}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -499,7 +499,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                                   ? 'border-rose-500 bg-rose-50/20'
                                   : dateValidation?.warning
                                   ? 'border-amber-400 bg-amber-50/20'
-                                  : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
+                                  : 'border-border-subtle bg-surface'
                               }`}
                               value={item.expiryDate}
                               onChange={(e) => {
@@ -510,7 +510,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                               }}
                             />
                             {item.expiryDate && calendar === 'ethiopic' && (
-                              <span className="text-[10px] text-slate-500 font-sans">
+                              <span className="text-[10px] text-text-muted font-sans">
                                 ({formatEthiopianDisplayDate(item.expiryDate, language)})
                               </span>
                             )}
@@ -523,7 +523,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                                 key={off}
                                 type="button"
                                 onClick={() => handleQuickOffset(idx, off)}
-                                className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-[10px] font-bold text-slate-600 dark:text-slate-300 transition"
+                                className="px-1.5 py-0.5 rounded bg-surface-2 hover:bg-surface-2 text-[10px] font-bold text-text-muted transition"
                               >
                                 {off === '+7d'
                                   ? t('inventory.dateOffset7d')
@@ -568,10 +568,10 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
-          <span className="text-xs font-semibold text-slate-500">
+        <div className="flex items-center justify-between pt-4 border-t border-border-subtle mt-4">
+          <span className="text-xs font-semibold text-text-muted">
             {language === 'am' ? 'ጠቅላላ የተቃኙ፡' : 'Total Scanned:'}{' '}
-            <strong className="text-slate-900 dark:text-white">
+            <strong className="text-text-main">
               {items.reduce((acc, i) => acc + i.quantity, 0)} {language === 'am' ? 'እቃዎች' : 'units'}
             </strong>{' '}
             ({items.length} {language === 'am' ? 'የተለያዩ እቃዎች' : 'items'})
@@ -582,7 +582,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 transition"
+              className="px-4 py-2 rounded-xl border border-border-subtle text-xs font-bold text-text-main hover:bg-surface-2 transition"
             >
               {language === 'am' ? 'ሰርዝ' : 'Cancel'}
             </button>
@@ -613,11 +613,11 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
             className="modal-overlay z-60"
             onClick={(e) => e.target === e.currentTarget && setUnknownBarcode(null)}
           >
-            <div className="modal-content max-w-md p-6 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-100">
-              <h2 className="modal-title font-bold text-base text-slate-900 dark:text-white">
+            <div className="modal-content max-w-md p-6 bg-surface rounded-2xl shadow-2xl border border-border-subtle animate-in zoom-in-95 duration-100">
+              <h2 className="modal-title font-bold text-base text-text-main">
                 {language === 'am' ? 'ያልታወቀ ባርኮድ ተገኝቷል' : 'Unknown Barcode Detected'}
               </h2>
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="text-xs text-text-muted mb-4">
                 {language === 'am'
                   ? `ባርኮድ ${unknownBarcode} በመደብር ካታሎግ ውስጥ የለም። ፈጥነው መዝግበው መቃኘቱን ይቀጥሉ`
                   : `Barcode ${unknownBarcode} is not in your catalog. Quickly create it to continue scanning.`}
@@ -625,7 +625,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
 
               <form onSubmit={handleSaveUnknownProduct} className="flex flex-col gap-3">
                 <div>
-                  <label className="field-label text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <label className="field-label text-xs font-semibold text-text-main">
                     {language === 'am' ? 'የእቃው ስም *' : 'Product Name *'}
                   </label>
                   <input
@@ -633,7 +633,7 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                     required
                     autoFocus
                     placeholder="e.g. Mama Milk 500ml"
-                    className="w-full mt-1 p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-bold"
+                    className="w-full mt-1 p-2 rounded-xl border border-border-subtle bg-white dark:bg-slate-700 text-xs font-bold"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                   />
@@ -641,11 +641,11 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="field-label text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <label className="field-label text-xs font-semibold text-text-main">
                       {language === 'am' ? 'ምድብ' : 'Category'}
                     </label>
                     <select
-                      className="w-full mt-1 p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs"
+                      className="w-full mt-1 p-2 rounded-xl border border-border-subtle bg-white dark:bg-slate-700 text-xs"
                       value={newCategory}
                       onChange={(e) => setNewCategory(e.target.value)}
                     >
@@ -659,11 +659,11 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="field-label text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <label className="field-label text-xs font-semibold text-text-main">
                       {language === 'am' ? 'መለኪያ' : 'Unit'}
                     </label>
                     <select
-                      className="w-full mt-1 p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs"
+                      className="w-full mt-1 p-2 rounded-xl border border-border-subtle bg-white dark:bg-slate-700 text-xs"
                       value={newUnit}
                       onChange={(e) => setNewUnit(e.target.value)}
                     >
@@ -676,28 +676,28 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="field-label text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <label className="field-label text-xs font-semibold text-text-main">
                       {language === 'am' ? 'የግዢ ዋጋ (ብር)' : 'Cost Price (ETB)'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       required
-                      className="w-full mt-1 p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-mono font-bold"
+                      className="w-full mt-1 p-2 rounded-xl border border-border-subtle bg-white dark:bg-slate-700 text-xs font-mono font-bold"
                       value={newCost}
                       onChange={(e) => setNewCost(parseFloat(e.target.value) || 0)}
                     />
                   </div>
 
                   <div>
-                    <label className="field-label text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <label className="field-label text-xs font-semibold text-text-main">
                       {language === 'am' ? 'የመሸጫ ዋጋ (ብር)' : 'Shelf Price (ETB)'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       required
-                      className="w-full mt-1 p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-mono font-bold"
+                      className="w-full mt-1 p-2 rounded-xl border border-border-subtle bg-white dark:bg-slate-700 text-xs font-mono font-bold"
                       value={newPrice}
                       onChange={(e) => setNewPrice(parseFloat(e.target.value) || 0)}
                     />
@@ -710,9 +710,9 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                     id="newHasExpiry"
                     checked={newHasExpiry}
                     onChange={(e) => setNewHasExpiry(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600"
+                    className="w-4 h-4 rounded text-primary"
                   />
-                  <label htmlFor="newHasExpiry" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <label htmlFor="newHasExpiry" className="text-xs font-semibold text-text-main cursor-pointer">
                     {language === 'am' ? 'የሚያበቃበት ቀን አለው (የሚበላሽ ዕቃ)' : 'Has expiry date (Perishable product)'}
                   </label>
                 </div>
@@ -720,14 +720,14 @@ export const ScanStockDrawer: React.FC<ScanStockDrawerProps> = ({
                 <div className="flex gap-2 mt-4">
                   <button
                     type="button"
-                    className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 flex-1 hover:bg-slate-100 transition"
+                    className="px-4 py-2 rounded-xl border border-border-subtle text-xs font-bold text-text-muted flex-1 hover:bg-surface-2 transition"
                     onClick={() => setUnknownBarcode(null)}
                   >
                     {language === 'am' ? 'ዝለል' : 'Skip'}
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex-1 transition"
+                    className="px-4 py-2 rounded-xl btn-primary bg-primary hover:bg-primary-hover text-white shadow-soft text-xs font-bold flex-1 transition"
                   >
                     {language === 'am' ? 'መዝግብ እና ቀጥል' : 'Add & Resume'}
                   </button>

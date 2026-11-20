@@ -50,6 +50,7 @@ export interface ProductDrawerData {
   barcode: string;
   pack_multiplier?: number;
   image_url?: string;
+  photo_path?: string | null;
   stock_on_hand?: number;
   has_expiry_date?: boolean;
 }
@@ -479,7 +480,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
           await fetch(`/api/media/products/${product.id}/photo`, {
             method: 'DELETE',
           });
-        } catch {}
+        } catch { }
       }
 
       setFormSuccess(
@@ -538,8 +539,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   {isEdit
                     ? `SKU: ${product?.sku}`
                     : isAm
-                    ? 'ስም፣ ምድብ፣ ባርኮድ እና ዋጋ ያስገቡና ይመዝግቡ'
-                    : 'Enter product name, category, barcode, and price'}
+                      ? 'ስም፣ ምድብ፣ ባርኮድ እና ዋጋ ያስገቡና ይመዝግቡ'
+                      : 'Enter product name, category, barcode, and price'}
                 </p>
               </div>
             </div>
@@ -662,9 +663,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                           type="button"
                           onClick={() => setInlineCatColor(col)}
                           style={{ backgroundColor: col }}
-                          className={`w-6 h-6 rounded-full transition-transform ${
-                            inlineCatColor === col ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''
-                          }`}
+                          className={`w-6 h-6 rounded-full transition-transform ${inlineCatColor === col ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''
+                            }`}
                         />
                       ))}
                     </div>
@@ -729,11 +729,10 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   placeholder={isAm ? 'ባርኮድ ስካን ያድርጉ ወይም ቁጥሩን እዚህ ይፃፉ' : 'Scan barcode or type barcode number'}
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
-                  className={`w-full h-12 px-4 rounded-xl bg-surface border font-mono text-base font-bold text-text-main placeholder-text-dim focus:outline-hidden ${
-                    duplicateWarning?.exists
-                      ? 'border-rose-500 bg-rose-500/10'
-                      : 'border-border-subtle focus:border-primary'
-                  }`}
+                  className={`w-full h-12 px-4 rounded-xl bg-surface border font-mono text-base font-bold text-text-main placeholder-text-dim focus:outline-hidden ${duplicateWarning?.exists
+                    ? 'border-rose-500 bg-rose-500/10'
+                    : 'border-border-subtle focus:border-primary'
+                    }`}
                 />
                 {barcodeChecking && (
                   <div className="absolute right-4 top-3.5">
@@ -930,9 +929,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                       <span className={`font-mono font-bold ${vatBreakdown.isNegativeMargin ? 'text-rose-500' : 'text-emerald-500'}`}>
                         {vatBreakdown.profitMarginBirr > 0 ? '+' : ''}{vatBreakdown.profitMarginBirr.toFixed(2)} ETB
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
-                        vatBreakdown.isNegativeMargin ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${vatBreakdown.isNegativeMargin ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'
+                        }`}>
                         {vatBreakdown.profitMarginPercent.toFixed(1)}%
                       </span>
                     </div>
@@ -1088,8 +1086,8 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                 {saving
                   ? (isAm ? 'በመመዝገብ ላይ...' : 'Saving...')
                   : isEdit
-                  ? (isAm ? 'ለውጦችን መዝግብ' : 'Update Product')
-                  : (isAm ? 'እቃ መዝግብ' : 'Save Product')}
+                    ? (isAm ? 'ለውጦችን መዝግብ' : 'Update Product')
+                    : (isAm ? 'እቃ መዝግብ' : 'Save Product')}
               </button>
             </div>
           </div>

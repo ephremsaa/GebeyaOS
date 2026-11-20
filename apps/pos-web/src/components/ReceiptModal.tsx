@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Printer, RotateCcw, Copy, Check, FileText } from 'lucide-react';
 import { Modal, Button, Input } from './ui';
 import { useI18n } from '../i18n/I18nContext';
@@ -18,7 +18,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   onClose,
   onReprint,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [copied, setCopied] = useState(false);
   const [isReprintPromptOpen, setIsReprintPromptOpen] = useState(false);
   const [reprintReason, setReprintReason] = useState('Customer requested duplicate copy');
@@ -36,6 +36,18 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // Keyboard shortcut: Enter for new sale, Escape to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !isReprintPromptOpen) {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, isReprintPromptOpen]);
 
   const handleExecuteReprint = async () => {
     if (!saleId || !onReprint) return;
@@ -56,45 +68,56 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
       isOpen={true}
       onClose={onClose}
       title={reprintedText ? `${t('checkout.duplicateCopy')}: ${receiptNumber}` : `${t('checkout.receiptNo')}: ${receiptNumber}`}
-      maxWidth="md"
+      maxWidth="lg"
+      bodyPadding="p-4 sm:p-5"
     >
       <div className="flex flex-col gap-4">
         {/* Realistic ESC/POS Thermal Receipt Paper Simulation */}
-        <div className="bg-surface-2 p-4 rounded-xl border border-border-subtle max-h-[460px] overflow-y-auto">
-          <pre className="font-mono text-xs leading-relaxed text-text-main whitespace-pre select-text">
-            {activeText}
-          </pre>
+        <div className="flex justify-center w-full py-1">
+          <div className="bg-white text-slate-950 p-4 sm:p-5 rounded-2xl shadow-md border border-slate-200 w-full max-w-[380px] overflow-x-auto select-text">
+            <pre className="text-[12px] leading-relaxed whitespace-pre font-mono text-slate-950 tracking-tight select-text text-left">
+              {activeText}
+            </pre>
+          </div>
         </div>
 
         {/* Action Buttons */}
         <div className="grid grid-cols-3 gap-2">
+          {/* Copy Button */}
           <Button
             variant="secondary"
             size="md"
-            leftIcon={copied ? <Check size={16} /> : <Copy size={16} />}
+            leftIcon={copied ? <Check size={16} className="text-primary" /> : <Copy size={16} />}
             onClick={handleCopy}
+            className="text-xs sm:text-sm font-bold"
           >
-            {copied ? t('common.copied') : t('common.copy')}
+            {copied ? (language === 'am' ? 'ተቀድቷል!' : 'Copied!') : (language === 'am' ? 'ቅዳ' : 'Copy')}
           </Button>
 
+          {/* Print Button (Primary Emerald) */}
           <Button
-            variant="secondary"
+            variant="primary"
             size="md"
             leftIcon={<Printer size={16} />}
             onClick={handlePrint}
+            className="text-xs sm:text-sm font-bold"
           >
-            {t('printReceipt')}
+            {language === 'am' ? 'ደረሰኝ አትም' : 'Print Receipt'}
           </Button>
 
-          {saleId && onReprint && (
+          {/* Audited Reprint */}
+          {saleId && onReprint ? (
             <Button
               variant="secondary"
               size="md"
-              leftIcon={<RotateCcw size={16} />}
+              leftIcon={<RotateCcw size={15} />}
               onClick={() => setIsReprintPromptOpen(true)}
+              className="text-xs font-bold leading-tight"
             >
-              {t('checkout.auditedReprint')}
+              {language === 'am' ? 'ዳግም ህትመት' : 'Audited Reprint'}
             </Button>
+          ) : (
+            <div />
           )}
         </div>
 
@@ -134,13 +157,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
         )}
 
+        {/* New Sale Button */}
         <Button
-          variant="primary"
+          variant="secondary"
           size="lg"
           fullWidth
           onClick={onClose}
+          className="font-bold text-[15px]"
         >
-          {t('newSale')}
+          {language === 'am' ? 'አዲስ ሽያጭ (Enter)' : 'New Sale (Enter)'}
         </Button>
       </div>
     </Modal>

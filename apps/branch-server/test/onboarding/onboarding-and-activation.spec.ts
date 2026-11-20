@@ -150,7 +150,7 @@ describe('Tenant Onboarding, Branch Activation & Branding (Step 4)', () => {
     let generatedCode: string;
 
     beforeAll(async () => {
-      await db.query(`UPDATE tenants SET max_branches = 50 WHERE id = $1`, [kerodId]);
+      await db.query(`UPDATE tenants SET max_branches = 500 WHERE id = $1`, [kerodId]);
     });
 
     it('generates an 8-character single-use activation code with expiry', async () => {

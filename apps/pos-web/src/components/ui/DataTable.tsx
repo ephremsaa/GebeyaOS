@@ -30,10 +30,10 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className={`w-full overflow-hidden rounded-xl border border-border-subtle bg-surface p-4 ${className}`}>
+      <div className={`w-full overflow-hidden rounded-2xl border border-border-subtle bg-surface p-4 ${className}`}>
         <div className="flex flex-col gap-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-surface-2" />
+            <div key={i} className="h-12 w-full animate-pulse rounded-xl bg-surface-2" />
           ))}
         </div>
       </div>
@@ -42,23 +42,23 @@ export function DataTable<T>({
 
   if (data.length === 0 && emptyState) {
     return (
-      <div className={`w-full overflow-hidden rounded-xl border border-border-subtle bg-surface p-8 ${className}`}>
+      <div className={`w-full overflow-hidden rounded-2xl border border-border-subtle bg-surface p-8 ${className}`}>
         {emptyState}
       </div>
     );
   }
 
   return (
-    <div className={`w-full overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-soft ${className}`}>
+    <div className={`w-full overflow-hidden rounded-2xl border border-border-subtle bg-surface shadow-card ${className}`}>
       <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
-        <table className="w-full border-collapse text-[14px]">
+        <table className="w-full border-collapse text-[16px]">
           <thead className="sticky top-0 z-10 bg-surface-2 border-b border-border-subtle">
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.key}
                   style={{ width: col.width }}
-                  className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted ${
+                  className={`px-4 py-3.5 text-[14px] font-bold uppercase tracking-wider text-text-muted ${
                     col.align === 'right' || col.isNumeric
                       ? 'text-right'
                       : col.align === 'center'
@@ -81,7 +81,7 @@ export function DataTable<T>({
                   key={key}
                   onClick={() => onRowClick?.(item)}
                   className={`transition-colors duration-fast ${
-                    isClickable ? 'cursor-pointer hover:bg-surface-2 active:bg-surface-2/80' : 'hover:bg-surface-2/50'
+                    isClickable ? 'cursor-pointer hover:bg-surface-2/70 active:bg-surface-2' : 'hover:bg-surface-2/40'
                   }`}
                 >
                   {columns.map((col) => {
@@ -91,7 +91,7 @@ export function DataTable<T>({
                     return (
                       <td
                         key={`${key}-${col.key}`}
-                        className={`px-4 py-3.5 text-text-main ${
+                        className={`px-4 py-4 text-[16px] font-medium text-text-main ${
                           col.isNumeric ? 'tabular-nums font-mono' : ''
                         } ${
                           col.align === 'right' || col.isNumeric

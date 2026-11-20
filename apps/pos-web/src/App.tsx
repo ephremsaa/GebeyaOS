@@ -18,7 +18,8 @@ import { TenantOnboardingWizard } from './components/onboarding/TenantOnboarding
 import { RegisterApplicationPage } from './components/auth/RegisterApplicationPage';
 import { GebeyaOSPublicSite } from './components/public/GebeyaOSPublicSite';
 
-// ── The 7 pages ──
+// ── The 7 pages + Dashboard ──
+import { DashboardView } from './components/DashboardView';          // Dashboard (Owner / Manager Home)
 import { PosCheckout } from './components/PosCheckout';        // Sales (checkout + day control)
 import { ProductCatalogView } from './components/catalog/ProductCatalogView'; // Items
 import { StockAndExpiryView } from './components/StockAndExpiryView'; // Stock & Expiry
@@ -44,7 +45,6 @@ const LEGACY_REDIRECT: Partial<Record<NavTabId, NavTabId>> = {
   audit:     'reports',
   backup:    'settings',
   sync:      'settings',
-  dashboard: 'sales',   // manager/owner will override below
 };
 
 /** Resolve the hash fragment (#checkout, #sales …) into a NavTabId.
@@ -71,7 +71,7 @@ function defaultTabForRole(role: string | undefined): NavTabId {
     case 'CASHIER':      return 'sales';
     case 'STOREKEEPER':  return 'items';
     case 'ACCOUNTANT':   return 'reports';
-    default:             return 'sales'; // Manager, Owner, HQ_ADMIN
+    default:             return 'dashboard'; // Manager, Owner, HQ_ADMIN
   }
 }
 
@@ -273,7 +273,10 @@ const MainApp: React.FC = () => {
         />
 
         <main className="flex-1 flex overflow-hidden bg-page">
-          {/* PAGE 1 — Sales (checkout + day control strip added in Step 2) */}
+          {/* HOME — Dashboard (Owner & Manager) */}
+          {activeTab === 'dashboard' && <DashboardView onNavigate={setActiveTab} />}
+
+          {/* PAGE 1 — Sales (checkout + day control strip) */}
           {activeTab === 'sales' && <PosCheckout />}
 
           {/* PAGE 2 — Items (catalog: products + categories) */}

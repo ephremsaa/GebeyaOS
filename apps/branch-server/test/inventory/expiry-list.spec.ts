@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InventoryService } from '../../src/modules/inventory/inventory.service';
 
 describe('InventoryService – Expiry List, Clearance Markdown & Bulk Write-off', () => {
@@ -6,11 +6,17 @@ describe('InventoryService – Expiry List, Clearance Markdown & Bulk Write-off'
   let mockDb: any;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-15T12:00:00Z'));
     mockDb = {
       query: vi.fn(),
       withTransaction: vi.fn(async (cb) => cb(mockDb)),
     };
     service = new InventoryService(mockDb);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('getExpiryList', () => {

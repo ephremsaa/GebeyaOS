@@ -1,5 +1,6 @@
 export * from './Button';
 export * from './Card';
+export * from './KpiCard';
 export * from './Input';
 export * from './SearchInput';
 export * from './Select';

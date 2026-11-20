@@ -1,6 +1,17 @@
 {
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "css.validate": false,
+  "scss.validate": false,
+  "less.validate": false,
+  "css.lint.unknownAtRules": "ignore",
+  "css.lint.importStatement": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "scss.lint.importStatement": "ignore",
+  "less.lint.unknownAtRules": "ignore",
+  "less.lint.importStatement": "ignore"
 }
-

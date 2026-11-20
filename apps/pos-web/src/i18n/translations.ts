@@ -93,6 +93,8 @@ export const TRANSLATIONS = {
     saleCompleted: 'Sale Completed!',
     receiptNo: 'Receipt #',
     printReceipt: 'Print Receipt',
+    copy: 'Copy',
+    copied: 'Copied!',
     newSale: 'New Sale (Enter)',
 
     // Keyboard Shortcuts
@@ -326,6 +328,8 @@ export const TRANSLATIONS = {
     saleCompleted: 'ሽያጩ በተሳካ ሁኔታ ተጠናቋል!',
     receiptNo: 'ደረሰኝ ቁጥር',
     printReceipt: 'ደረሰኝ አትም',
+    copy: 'ቅዳ',
+    copied: 'ተቀድቷል!',
     newSale: 'አዲስ ሽያጭ (Enter)',
 
     // Keyboard Shortcuts

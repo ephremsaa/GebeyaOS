@@ -73,5 +73,6 @@ export const authEn = {
   profileModalTitle: 'User Profile & Settings',
   changePassword: 'Change Password',
   changePin: 'Change PIN',
+  logout: 'Log out',
 };
 

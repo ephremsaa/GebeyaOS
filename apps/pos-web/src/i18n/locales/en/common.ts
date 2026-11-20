@@ -43,6 +43,8 @@ export const commonEn = {
   "export": "Export",
   "import": "Import",
   "print": "Print",
+  "copy": "Copy",
+  "copied": "Copied!",
   "download": "Download",
   "upload": "Upload",
   "clear": "Clear",

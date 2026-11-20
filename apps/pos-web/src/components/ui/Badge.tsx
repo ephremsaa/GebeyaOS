@@ -1,7 +1,7 @@
 import React from 'react';
-import { CheckCircle2, AlertTriangle, AlertCircle, Info, HelpCircle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, AlertCircle, Info } from 'lucide-react';
 
-export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'neutral';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -17,14 +17,15 @@ export const Badge: React.FC<BadgeProps> = ({
   className = '',
   ...props
 }) => {
-  const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-[12px] gap-1' : 'px-2.5 py-1 text-[13px] gap-1.5';
+  const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-[13px] gap-1' : 'px-3 py-1 text-[14px] gap-1.5';
 
   const defaultIcons = {
-    success: <CheckCircle2 size={size === 'sm' ? 12 : 14} className="flex-shrink-0" />,
-    warning: <AlertTriangle size={size === 'sm' ? 12 : 14} className="flex-shrink-0" />,
-    danger: <AlertCircle size={size === 'sm' ? 12 : 14} className="flex-shrink-0" />,
-    info: <Info size={size === 'sm' ? 12 : 14} className="flex-shrink-0" />,
-    neutral: <span className="w-1.5 h-1.5 rounded-full bg-text-muted flex-shrink-0" />,
+    success: <CheckCircle2 size={size === 'sm' ? 13 : 15} className="flex-shrink-0" />,
+    warning: <AlertTriangle size={size === 'sm' ? 13 : 15} className="flex-shrink-0" />,
+    danger: <AlertCircle size={size === 'sm' ? 13 : 15} className="flex-shrink-0" />,
+    info: <Info size={size === 'sm' ? 13 : 15} className="flex-shrink-0" />,
+    purple: <span className="w-2 h-2 rounded-full bg-purple flex-shrink-0" />,
+    neutral: <span className="w-2 h-2 rounded-full bg-text-muted flex-shrink-0" />,
   };
 
   const variantClasses: Record<BadgeVariant, string> = {
@@ -32,6 +33,7 @@ export const Badge: React.FC<BadgeProps> = ({
     warning: 'bg-warning-soft text-warning font-semibold',
     danger: 'bg-danger-soft text-danger font-semibold',
     info: 'bg-info-soft text-info font-semibold',
+    purple: 'bg-purple-soft text-purple font-semibold',
     neutral: 'bg-surface-2 text-text-muted font-medium border border-border-subtle',
   };
 

@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
   Loader2,
+  Check,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { Modal, NumberPad, Button, Input } from './ui';
@@ -55,7 +56,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   completedReceiptNo,
   isSubmitting = false,
 }) => {
-  const { t, formatCurrency } = useI18n();
+  const { t, language, formatCurrency } = useI18n();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodType>('CASH');
   const [tenderedStr, setTenderedStr] = useState<string>('');
   const [refCode, setRefCode] = useState<string>('');
@@ -73,17 +74,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   }, [isOpen, totalAmount, completedReceiptNo]);
 
-  // Keyboard shortcut Enter for new sale when completed
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (completedReceiptNo && e.key === 'Enter') {
-        onNewSale?.();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [completedReceiptNo, onNewSale]);
-
   const tenderedAmount = parseFloat(tenderedStr) || 0;
   const recordedSplitTotal = round2(splitPayments.reduce((sum, p) => sum + p.amount, 0));
   const remainingTarget = Math.max(0, round2(totalAmount - recordedSplitTotal));
@@ -97,6 +87,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const isSufficient = isSplitMode
     ? remainingTarget === 0 || (tenderedAmount >= remainingTarget)
     : selectedMethod !== 'CASH' || tenderedAmount >= totalAmount;
+
+  // Keyboard shortcut F4 and Enter to finalize sale
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+
+      if (completedReceiptNo && e.key === 'Enter') {
+        e.preventDefault();
+        onNewSale?.();
+        return;
+      }
+
+      if ((e.key === 'F4' || (e.key === 'Enter' && (e.target as HTMLElement)?.tagName !== 'INPUT')) && !completedReceiptNo) {
+        if (isSufficient && !isSubmitting) {
+          e.preventDefault();
+          handleComplete();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, completedReceiptNo, isSufficient, isSubmitting, tenderedAmount, currentTarget, selectedMethod]);
 
   const handleDigit = (digit: string) => {
     if (digit === '.' && tenderedStr.includes('.')) return;
@@ -190,12 +203,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     });
   };
 
+  // 4 Payment Methods (Removed CBE Birr as requested)
   const methods: { id: PaymentMethodType; label: string; icon: React.ReactNode }[] = [
-    { id: 'CASH', label: t('cash'), icon: <Banknote size={20} strokeWidth={1.75} /> },
-    { id: 'TELEBIRR', label: t('telebirr'), icon: <Smartphone size={20} strokeWidth={1.75} /> },
-    { id: 'CBE_BIRR', label: t('cbeBirr'), icon: <Smartphone size={20} strokeWidth={1.75} /> },
-    { id: 'CARD', label: t('card'), icon: <CreditCard size={20} strokeWidth={1.75} /> },
-    { id: 'BANK_TRANSFER', label: t('bankTransfer'), icon: <Building size={20} strokeWidth={1.75} /> },
+    { id: 'CASH', label: t('cash'), icon: <Banknote size={19} strokeWidth={2} /> },
+    { id: 'TELEBIRR', label: t('telebirr'), icon: <Smartphone size={19} strokeWidth={2} /> },
+    { id: 'CARD', label: t('card'), icon: <CreditCard size={19} strokeWidth={2} /> },
+    { id: 'BANK_TRANSFER', label: t('bankTransfer'), icon: <Building size={19} strokeWidth={2} /> },
   ];
 
   return (
@@ -203,7 +216,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={completedReceiptNo ? t('saleCompleted') : t('paymentTitle')}
-      maxWidth="xl"
+      maxWidth="3xl"
+      bodyPadding="p-3.5 sm:p-4"
     >
       {completedReceiptNo ? (
         /* Success State */
@@ -246,55 +260,137 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
         </div>
       ) : (
-        /* Payment Selection & Tender Entry */
-        <div className="flex flex-col gap-4">
-          {/* Top Amount Due Header */}
-          <div className="p-4 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between shadow-soft">
-            <div>
-              <span className="text-xs font-semibold text-text-muted uppercase tracking-wider block">
-                {t('amountDue')}
-              </span>
-              {isSplitMode && (
-                <span className="text-xs text-primary font-semibold">
-                  {t('checkout.splitPaidProgress', { paid: formatCurrency(recordedSplitTotal), total: formatCurrency(totalAmount) })}
+        /* 2-Column POS Payment Screen (Zero Scrolling, Fits 100% on Screen) */
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+          {/* ─── Left Column (6 cols): Payment Breakdown, Methods & Complete Sale Button ─── */}
+          <div className="md:col-span-6 flex flex-col justify-between gap-3.5">
+            {/* 1. Total Amount Due Card */}
+            <div className="p-3.5 rounded-2xl bg-surface-2 border border-border-subtle flex items-center justify-between shadow-soft">
+              <div>
+                <span className="text-xs font-bold text-text-muted uppercase tracking-wider block">
+                  {t('amountDue')}
                 </span>
-              )}
+                {isSplitMode && (
+                  <span className="text-xs text-primary font-bold">
+                    {t('checkout.splitPaidProgress', { paid: formatCurrency(recordedSplitTotal), total: formatCurrency(totalAmount) })}
+                  </span>
+                )}
+              </div>
+              <span className="text-3xl font-extrabold text-text-main tabular-nums font-mono">
+                {formatCurrency(currentTarget)}
+              </span>
             </div>
-            <span className="text-3xl font-bold text-text-main tabular-nums font-mono">
-              {formatCurrency(currentTarget)}
-            </span>
-          </div>
 
-          {/* Payment Method Selectors */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {methods.map((m) => {
-              const isSelected = selectedMethod === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedMethod(m.id);
-                    if (m.id !== 'CASH') {
-                      setTenderedStr(currentTarget.toFixed(2));
-                    }
-                  }}
-                  className={`min-h-[56px] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1.5 font-semibold text-[13px] transition-all duration-fast active:scale-95 border cursor-pointer ${
-                    isSelected
-                      ? 'border-primary bg-primary-soft text-primary shadow-soft'
-                      : 'border-border-subtle bg-surface hover:bg-surface-2 text-text-muted hover:text-text-main'
-                  }`}
-                >
-                  <span>{m.icon}</span>
-                  <span className="truncate max-w-full">{m.label}</span>
-                </button>
-              );
-            })}
-          </div>
+            {/* 2. Payment Method Selector (4 Methods in 2x2 Clean Grid) */}
+            <div>
+              <span className="text-xs font-bold text-text-muted uppercase tracking-wider block mb-1.5">
+                {language === 'am' ? 'የክፍያ ዘዴ' : 'Payment Method'}
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {methods.map((m) => {
+                  const isSelected = selectedMethod === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMethod(m.id);
+                        if (m.id !== 'CASH') {
+                          setTenderedStr(currentTarget.toFixed(2));
+                        }
+                      }}
+                      className={`min-h-[46px] rounded-xl px-3 py-2 flex items-center justify-center gap-2 font-bold text-[13px] transition-all duration-fast active:scale-95 border cursor-pointer ${
+                        isSelected
+                          ? 'border-primary bg-primary text-white shadow-soft'
+                          : 'border-border-subtle bg-surface hover:bg-surface-2 text-text-muted hover:text-text-main'
+                      }`}
+                    >
+                      <span>{m.icon}</span>
+                      <span className="truncate">{m.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-          {/* Split Payment Toggle & Active Splits */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between px-1">
+            {/* 3. Tendered & Change / Remaining Display (when Cash) OR Digital Reference */}
+            {selectedMethod === 'CASH' ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Tendered Amount */}
+                  <div className="p-3 rounded-xl bg-surface border border-border-subtle shadow-soft">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-bold text-text-muted uppercase tracking-wide">
+                        {t('amountTendered')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleExact}
+                        className="px-2 py-0.5 rounded text-[11px] font-bold bg-primary-soft text-primary hover:bg-primary-soft/80 cursor-pointer"
+                      >
+                        {t('exact')}
+                      </button>
+                    </div>
+                    <span className="text-xl font-extrabold text-text-main tabular-nums font-mono block">
+                      {formatCurrency(tenderedAmount)}
+                    </span>
+                  </div>
+
+                  {/* Change Due / Remaining */}
+                  <div className="p-3 rounded-xl bg-surface border border-border-subtle shadow-soft">
+                    <span className="text-[11px] font-bold text-text-muted uppercase tracking-wide block mb-1">
+                      {remainingDue > 0 ? t('remainingDue') : t('changeDue')}
+                    </span>
+                    <span
+                      className={`text-xl font-extrabold tabular-nums font-mono block ${
+                        remainingDue > 0 ? 'text-amber-500' : 'text-primary'
+                      }`}
+                    >
+                      {remainingDue > 0 ? formatCurrency(remainingDue) : formatCurrency(changeDue)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Pill for Exact / Change */}
+                <div className="flex items-center justify-between px-1 text-xs">
+                  {tenderedAmount === currentTarget && (
+                    <span className="inline-flex items-center gap-1 text-primary font-bold">
+                      <Check size={14} />
+                      {language === 'am' ? 'ትክክለኛ ልክ (ልዩነት የለም)' : 'Exact Amount (No change)'}
+                    </span>
+                  )}
+                  {tenderedAmount > currentTarget && (
+                    <span className="inline-flex items-center gap-1 text-primary font-bold">
+                      <Check size={14} />
+                      {language === 'am' ? `ተመላሽ መልስ፡ ${formatCurrency(changeDue)}` : `Change to return: ${formatCurrency(changeDue)}`}
+                    </span>
+                  )}
+                  {tenderedAmount < currentTarget && (
+                    <span className="text-amber-500 font-bold">
+                      {language === 'am' ? `የቀረ ክፍያ፡ ${formatCurrency(remainingDue)}` : `Short: ${formatCurrency(remainingDue)}`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Digital Reference Code Entry */
+              <div className="p-3 rounded-xl bg-surface-2 border border-border-subtle space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-text-main">
+                  <ShieldCheck size={16} className="text-primary flex-shrink-0" />
+                  <span>{language === 'am' ? 'የዲጂታል ክፍያ ማረጋገጫ' : 'Digital Payment Verification'}</span>
+                </div>
+                <Input
+                  label={t('referenceCode')}
+                  value={refCode}
+                  onChange={(e) => setRefCode(e.target.value)}
+                  placeholder={language === 'am' ? 'የግብይት ኮድ (አማራጭ)' : 'SMS Transaction Ref (Optional)'}
+                  className="font-mono text-sm"
+                />
+              </div>
+            )}
+
+            {/* 4. Split Mode Toggle */}
+            <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => {
@@ -305,158 +401,140 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     setTenderedStr(totalAmount.toFixed(2));
                   }
                 }}
-                className="text-xs font-medium text-text-muted hover:text-primary flex items-center gap-1.5 cursor-pointer"
+                className="text-xs font-bold text-text-muted hover:text-primary flex items-center gap-1.5 cursor-pointer"
               >
-                <Split size={14} strokeWidth={1.75} />
+                <Split size={14} strokeWidth={2} />
                 <span>{isSplitMode ? t('checkout.cancelSplitPayment') : t('checkout.splitPayment')}</span>
               </button>
             </div>
 
+            {/* Split recorded items if active */}
             {isSplitMode && splitPayments.length > 0 && (
-              <div className="bg-surface-2 rounded-xl p-3 border border-border-subtle flex flex-col gap-2">
-                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
-                  {t('checkout.recordedTenders', { count: splitPayments.length })}
-                </span>
-                <div className="flex flex-col gap-1.5 max-h-28 overflow-y-auto">
-                  {splitPayments.map((p, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-2 rounded-lg bg-surface text-xs font-semibold text-text-main border border-border-subtle"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 rounded bg-surface-2 text-text-muted">
-                          {p.method}
-                        </span>
-                        {p.reference && <span className="font-mono text-text-muted">Ref: {p.reference}</span>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono tabular-nums">{formatCurrency(p.amount)}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSplitTender(idx)}
-                          className="text-danger hover:opacity-80 p-1 cursor-pointer"
-                          aria-label="Remove split"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
+              <div className="bg-surface-2 rounded-xl p-2.5 border border-border-subtle flex flex-col gap-1.5 max-h-24 overflow-y-auto">
+                {splitPayments.map((p, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-1.5 rounded-lg bg-surface text-xs font-semibold text-text-main border border-border-subtle"
+                  >
+                    <span className="font-bold">{p.method}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold">{formatCurrency(p.amount)}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSplitTender(idx)}
+                        className="text-danger hover:opacity-80 p-0.5 cursor-pointer"
+                      >
+                        <Trash2 size={12} />
+                      </button>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ─── 5. PRIMARY COMPLETE SALE BUTTON (ALWAYS VISIBLE WITHOUT SCROLLING!) ─── */}
+            <div className="pt-1">
+              <Button
+                size="lg"
+                variant="primary"
+                fullWidth
+                onClick={handleComplete}
+                disabled={!isSufficient || isSubmitting}
+                className="h-12 text-[16px] font-bold shadow-soft flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>{t('checkout.processingTransaction')}</span>
+                  </span>
+                ) : (
+                  <span>
+                    {language === 'am' ? 'ክፈል' : 'Complete Sale'} · {formatCurrency(currentTarget)} (F4)
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* ─── Right Column (6 cols): Quick Cash & Compact Numeric Keypad ─── */}
+          <div className="md:col-span-6 flex flex-col justify-between gap-3 border-t md:border-t-0 md:border-l border-border-subtle pt-3 md:pt-0 md:pl-5">
+            {selectedMethod === 'CASH' ? (
+              <div className="flex flex-col gap-2.5 h-full justify-between">
+                <div>
+                  <span className="text-xs font-bold text-text-muted uppercase tracking-wider block mb-1.5">
+                    {language === 'am' ? 'ፈጣን ጥሬ ገንዘብ እና ቁጥሮች' : 'Quick Cash & Keypad'}
+                  </span>
+                  <NumberPad
+                    onDigit={handleDigit}
+                    onClear={handleClear}
+                    onBackspace={handleBackspace}
+                    onQuickAmount={handleAddQuickCash}
+                    quickAmounts={[50, 100, 200, 500, 1000]}
+                    showDecimal={true}
+                    compact={true}
+                  />
                 </div>
+
+                {isSplitMode && currentTarget > 0 && tenderedAmount > 0 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    leftIcon={<Plus size={14} />}
+                    onClick={handleAddSplitTender}
+                    className="w-full mt-1"
+                  >
+                    {t('checkout.addCashTender', { amount: formatCurrency(Math.min(tenderedAmount, currentTarget)) })}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              /* Digital Help & Confirmation Info in Right Column */
+              <div className="flex flex-col justify-between h-full space-y-4 py-2">
+                <div className="p-4 rounded-2xl bg-surface-2 border border-border-subtle space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary-soft text-primary flex items-center justify-center">
+                    {selectedMethod === 'TELEBIRR' && <Smartphone size={22} />}
+                    {selectedMethod === 'CARD' && <CreditCard size={22} />}
+                    {selectedMethod === 'BANK_TRANSFER' && <Building size={22} />}
+                  </div>
+                  <div>
+                    <h4 className="text-[15px] font-bold text-text-main">
+                      {selectedMethod === 'TELEBIRR' && (language === 'am' ? 'የቴሌብር ክፍያ' : 'telebirr SuperApp')}
+                      {selectedMethod === 'CARD' && (language === 'am' ? 'የባንክ ካርድ (POS)' : 'Bank Card Terminal')}
+                      {selectedMethod === 'BANK_TRANSFER' && (language === 'am' ? 'የባንክ ማስተላለፍ' : 'Direct Bank Transfer')}
+                    </h4>
+                    <p className="text-[13px] text-text-muted mt-1 leading-relaxed">
+                      {selectedMethod === 'TELEBIRR' && (language === 'am'
+                        ? 'ደንበኛው በቴሌብር የከፈለበትን የኤስኤምኤስ (SMS) ደረሰኝ ወይም የግብይት ኮድ ያረጋግጡ።'
+                        : "Verify the customer's telebirr payment confirmation SMS or transaction ID.")}
+                      {selectedMethod === 'CARD' && (language === 'am'
+                        ? 'ካርዱን በPOS ማሽኑ ላይ ካስተላለፉ በኋላ የክፍያውን ደረሰኝ ያረጋግጡ።'
+                        : 'Swipe or tap customer card on the payment terminal and verify approval.')}
+                      {selectedMethod === 'BANK_TRANSFER' && (language === 'am'
+                        ? 'የባንክ ሂሳብ ማስተላለፍ ማረጋገጫ ደረሰኝን ያረጋግጡ።'
+                        : 'Confirm the bank transfer slip or mobile banking confirmation.')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-primary-soft/50 border border-primary/20 text-xs font-medium text-text-main flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-primary flex-shrink-0" />
+                  <span>
+                    {language === 'am'
+                      ? 'የኢንተርኔት መቆራረጥ በሚኖርበት ጊዜም ክፍያው በደህንነት ይመዘገባል።'
+                      : 'Transaction recorded securely even during local network internet outages.'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedMethod('CASH')}
+                  className="w-full py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-text-muted hover:text-text-main text-xs font-bold transition cursor-pointer"
+                >
+                  &larr; {language === 'am' ? 'ወደ ጥሬ ገንዘብ ተመለስ' : 'Switch back to Cash'}
+                </button>
               </div>
             )}
           </div>
-
-          {/* Tender Entry: Cash Keypad or Reference Input */}
-          {selectedMethod === 'CASH' ? (
-            <div className="flex flex-col gap-3">
-              {/* Tendered and Change readouts */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-xl bg-surface border border-border-subtle shadow-soft">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-text-muted">
-                      {t('amountTendered')}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleExact}
-                      className="px-2.5 py-1 rounded-md text-xs font-bold bg-primary-soft text-primary hover:bg-primary-soft/80 cursor-pointer transition-colors"
-                    >
-                      {t('exact')}
-                    </button>
-                  </div>
-                  <span className="text-2xl font-bold text-text-main tabular-nums font-mono block">
-                    {formatCurrency(tenderedAmount)}
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-surface border border-border-subtle shadow-soft">
-                  <span className="text-xs font-semibold text-text-muted block mb-1">
-                    {remainingDue > 0 ? t('remainingDue') : t('changeDue')}
-                  </span>
-                  <span
-                    className={`text-2xl font-bold tabular-nums font-mono block ${
-                      remainingDue > 0 ? 'text-warning' : 'text-primary'
-                    }`}
-                  >
-                    {remainingDue > 0 ? formatCurrency(remainingDue) : formatCurrency(changeDue)}
-                  </span>
-                </div>
-              </div>
-
-              {/* NumberPad with quick additions & 64px keys */}
-              <NumberPad
-                onDigit={handleDigit}
-                onClear={handleClear}
-                onBackspace={handleBackspace}
-                onQuickAmount={handleAddQuickCash}
-                quickAmounts={[50, 100, 200, 500, 1000]}
-                showDecimal={true}
-              />
-
-              {isSplitMode && currentTarget > 0 && tenderedAmount > 0 && (
-                <Button
-                  size="md"
-                  variant="secondary"
-                  leftIcon={<Plus size={16} />}
-                  onClick={handleAddSplitTender}
-                >
-                  {t('checkout.addCashTender', { amount: formatCurrency(Math.min(tenderedAmount, currentTarget)) })}
-                </Button>
-              )}
-            </div>
-          ) : (
-            /* Digital Payments (Telebirr / CBE Birr / Bank Transfer / Card) */
-            <div className="flex flex-col gap-3 py-2">
-              <div className="p-4 rounded-xl bg-info-soft/40 border border-info/20 flex items-center gap-3">
-                <ShieldCheck size={24} strokeWidth={1.75} className="text-info flex-shrink-0" />
-                <div className="text-[13px] text-text-muted">
-                  <span className="font-semibold block text-text-main mb-0.5">{t('checkout.offlineVerification')}</span>
-                  {t('checkout.offlineVerificationDesc')}
-                </div>
-              </div>
-
-              <Input
-                label={t('referenceCode')}
-                value={refCode}
-                onChange={(e) => setRefCode(e.target.value)}
-                placeholder={t('referenceOptional')}
-                className="font-mono text-base"
-              />
-
-              {isSplitMode && currentTarget > 0 && (
-                <Button
-                  size="md"
-                  variant="secondary"
-                  leftIcon={<Plus size={16} />}
-                  onClick={handleAddSplitTender}
-                >
-                  {t('checkout.addMethodTender', { method: selectedMethod, amount: formatCurrency(currentTarget) })}
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Complete Sale Action Button */}
-          <Button
-            size="lg"
-            variant="primary"
-            fullWidth
-            onClick={handleComplete}
-            disabled={!isSufficient || isSubmitting}
-            className="mt-1"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <Loader2 size={18} className="animate-spin" />
-                <span>{t('checkout.processingTransaction')}</span>
-              </span>
-            ) : (
-              <span>
-                {t('completeSale')} · {formatCurrency(currentTarget)}
-              </span>
-            )}
-          </Button>
         </div>
       )}
     </Modal>

@@ -71,14 +71,14 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
     >
       <div className="modal-content max-w-4xl max-h-[90vh] flex flex-col p-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 rounded-2xl bg-surface-2 dark:bg-surface-2 text-white dark:text-text-main flex items-center justify-center shadow-md">
               <History size={20} />
             </div>
             <div>
               <h2 className="modal-title">Inventory Import History</h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-text-muted">
                 Audit trail of all past bulk imports and manager rollback options
               </p>
             </div>
@@ -86,7 +86,7 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-text-muted hover:text-text-muted transition-colors"
           >
             <X size={18} />
           </button>
@@ -100,7 +100,7 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
         )}
 
         {/* Table */}
-        <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-700 rounded-2xl my-4 min-h-[260px]">
+        <div className="flex-1 overflow-y-auto glass-panel border border-border-subtle rounded-2xl my-4 min-h-[260px]">
           <table className="data-table text-xs">
             <thead>
               <tr>
@@ -117,33 +117,33 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
               {batches.map((b) => {
                 const isReverted = b.status === 'REVERTED';
                 return (
-                  <tr key={b.id} className={isReverted ? 'opacity-60 bg-slate-50/50' : ''}>
+                  <tr key={b.id} className={isReverted ? 'opacity-60 bg-surface-2/50' : ''}>
                     <td>
-                      <span className="font-mono text-slate-500">
+                      <span className="font-mono text-text-muted">
                         {new Date(b.createdAt).toLocaleString()}
                       </span>
                     </td>
                     <td>
-                      <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-                        <FileSpreadsheet size={14} className="text-emerald-600" />
+                      <div className="flex items-center gap-1.5 font-bold text-text-main text-text-main">
+                        <FileSpreadsheet size={14} className="text-primary" />
                         {b.fileName}
                       </div>
                     </td>
                     <td>
                       <div className="flex flex-col">
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        <span className="font-semibold text-text-main">
                           {b.importMode}
                         </span>
-                        <span className="text-[10px] text-slate-400">{b.sourceType}</span>
+                        <span className="text-[10px] text-text-muted">{b.sourceType}</span>
                       </div>
                     </td>
                     <td>
-                      <span className="text-slate-600 dark:text-slate-400">
+                      <span className="text-text-muted">
                         {b.userName || 'Admin'}
                       </span>
                     </td>
                     <td className="text-center">
-                      <span className="font-mono text-slate-600 dark:text-slate-300">
+                      <span className="font-mono text-text-muted">
                         +{b.createdCount} / ~{b.updatedCount} / !{b.errorCount}
                       </span>
                     </td>
@@ -169,7 +169,7 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setConfirmUndoId(null)}
-                                className="px-1.5 py-1 rounded-lg text-slate-400 hover:text-slate-600 text-[10px]"
+                                className="px-1.5 py-1 rounded-lg text-text-muted hover:text-text-muted text-[10px]"
                               >
                                 Cancel
                               </button>
@@ -196,7 +196,7 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end pt-3 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex justify-end pt-3 border-t border-border-subtle">
           <button type="button" onClick={onClose} className="btn-secondary text-xs">
             Close History
           </button>

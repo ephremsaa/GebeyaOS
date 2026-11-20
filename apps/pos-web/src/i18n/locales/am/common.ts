@@ -43,6 +43,8 @@ export const commonAm = {
   "export": "ኤክስፖርት አድርግ",
   "import": "ኢምፖርት አድርግ",
   "print": "አትም",
+  "copy": "ቅዳ",
+  "copied": "ተቀድቷል!",
   "download": "አውርድ",
   "upload": "ጫን",
   "clear": "አጽዳ",

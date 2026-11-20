@@ -12,9 +12,9 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   return (
     <div
-      className={`bg-surface border border-border-subtle rounded-xl shadow-card transition-all duration-150 ${
+      className={`bg-surface border border-border-subtle rounded-2xl shadow-card transition-all duration-150 ${
         interactive
-          ? 'cursor-pointer hover:border-primary/50 hover:shadow-md active:scale-[0.99]'
+          ? 'cursor-pointer hover:border-primary/40 hover:shadow-md active:scale-[0.99]'
           : ''
       } ${className}`}
       {...props}

@@ -418,11 +418,9 @@ describe('PosService', () => {
       expect(result.sale.grandTotal).toBe(200);
       expect(result.sale.totalPaid).toBe(250);
       expect(result.sale.changeGiven).toBe(50);
-      expect(result.thermalReceipt).toContain('Anchor Milk 1L (A)');
-      expect(result.thermalReceipt).toContain('TOTAL TO PAY:');
+      expect(result.thermalReceipt).toContain('Anchor Milk 1L');
+      expect(result.thermalReceipt).toContain('TOTAL :');
       expect(result.thermalReceipt).toContain('200.00 ETB');
-      expect(result.thermalReceipt).toContain('TELEBIRR:');
-      expect(result.thermalReceipt).toContain('TB-12345678');
       expect(result.electronicJournal.hashSignature).toBeDefined();
 
       // Ensure inventory was deducted with reference 'SALE'

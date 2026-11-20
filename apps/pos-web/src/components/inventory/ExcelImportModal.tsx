@@ -215,14 +215,14 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
     >
       <div className="modal-content max-w-5xl max-h-[94vh] flex flex-col p-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30">
+            <div className="w-10 h-10 rounded-2xl bg-primary text-white shadow-soft flex items-center justify-center shadow-md shadow-emerald-600/30">
               <FileSpreadsheet size={20} />
             </div>
             <div>
               <h2 className="modal-title">Bulk Excel / CSV Inventory Import</h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-text-muted">
                 Download verified template, validate rows in-browser, and commit atomic ledger movements
               </p>
             </div>
@@ -230,7 +230,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-text-muted hover:text-text-muted transition-colors"
           >
             <X size={18} />
           </button>
@@ -242,12 +242,12 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             {/* Template Download Card */}
             <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <FileCheck size={28} className="text-emerald-600" />
+                <FileCheck size={28} className="text-primary" />
                 <div className="flex flex-col">
-                  <span className="font-bold text-sm text-slate-900 dark:text-white">
+                  <span className="font-bold text-sm text-text-main">
                     Official Products &amp; Stock Template (.xlsx)
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="text-xs text-text-muted">
                     Includes bilingual instructions, category/unit dropdowns, and example rows.
                   </span>
                 </div>
@@ -265,7 +265,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             {/* Drag & Drop Upload Zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 rounded-3xl p-10 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all bg-slate-50/50 dark:bg-slate-800/20 hover:bg-emerald-50/20"
+              className="border-2 border-dashed border-slate-300 dark:border-border-subtle hover:border-primary dark:hover:border-primary rounded-3xl p-10 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all bg-surface-2/50 dark:bg-surface/20 hover:bg-emerald-50/20"
             >
               <input
                 ref={fileInputRef}
@@ -274,21 +274,21 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                 className="hidden"
                 onChange={handleFileSelect}
               />
-              <div className="w-16 h-16 rounded-3xl bg-white dark:bg-slate-800 text-emerald-600 flex items-center justify-center shadow-md">
+              <div className="w-16 h-16 rounded-3xl bg-surface text-primary flex items-center justify-center shadow-md">
                 <Upload size={32} />
               </div>
               <div className="text-center">
-                <span className="font-bold text-sm text-slate-800 dark:text-slate-200 block">
+                <span className="font-bold text-sm text-text-main text-text-main block">
                   Click to choose file or drag &amp; drop
                 </span>
-                <span className="text-xs text-slate-400 mt-1 block">
+                <span className="text-xs text-text-muted mt-1 block">
                   Supports Microsoft Excel (.xlsx, .xls) and CSV (.csv) up to 10 MB (max 20,000 rows)
                 </span>
               </div>
             </div>
 
             {isProcessing && (
-              <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-600 animate-pulse">
+              <div className="flex items-center justify-center gap-2 text-xs font-bold text-primary animate-pulse">
                 <span>Reading &amp; validating spreadsheet data on server...</span>
               </div>
             )}
@@ -306,10 +306,10 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         {step === 2 && (
           <div className="flex flex-col gap-4 py-2 flex-1 overflow-hidden animate-in fade-in duration-150">
             {/* Summary Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-surface-2/80 border border-border-subtle text-xs">
               <div className="flex items-center gap-3">
-                <span className="font-bold text-slate-800 dark:text-slate-200">
-                  File: <strong className="font-mono text-emerald-600">{fileName}</strong> ({editableRows.length} rows)
+                <span className="font-bold text-text-main text-text-main">
+                  File: <strong className="font-mono text-primary">{fileName}</strong> ({editableRows.length} rows)
                 </span>
                 <div className="h-4 w-px bg-slate-300 dark:bg-slate-600" />
                 <span className="badge-success text-[11px] px-2 py-0.5">{okRowsCount} OK</span>
@@ -345,7 +345,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             </div>
 
             {/* In-Browser Inline Editor Table */}
-            <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-700 rounded-2xl min-h-[300px]">
+            <div className="flex-1 overflow-y-auto glass-panel border border-border-subtle rounded-2xl min-h-[300px]">
               <table className="data-table text-xs">
                 <thead>
                   <tr>
@@ -368,7 +368,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                       key={idx}
                       className={row.status === 'ERROR' ? 'bg-red-50/40 dark:bg-red-950/20' : ''}
                     >
-                      <td className="font-mono text-slate-400">{row.rowNumber}</td>
+                      <td className="font-mono text-text-muted">{row.rowNumber}</td>
                       <td>
                         {row.status === 'OK' && (
                           <span className="badge-success text-[10px] px-2 py-0.5">OK</span>
@@ -404,7 +404,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                           onChange={(e) => handleUpdateRowField(idx, 'nameEn', e.target.value)}
                         />
                       </td>
-                      <td className="text-slate-500">{row.category}</td>
+                      <td className="text-text-muted">{row.category}</td>
                       <td className="text-right">
                         <input
                           type="number"
@@ -431,7 +431,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                         <input
                           type="number"
                           step="0.01"
-                          className="field-input w-20 py-0.5 text-right text-xs font-bold text-emerald-600"
+                          className="field-input w-20 py-0.5 text-right text-xs font-bold text-primary"
                           value={row.sellingPrice}
                           onChange={(e) =>
                             handleUpdateRowField(idx, 'sellingPrice', parseFloat(e.target.value) || 0)
@@ -456,7 +456,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                             {row.issues.join('; ')}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-slate-400">Validated</span>
+                          <span className="text-[10px] text-text-muted">Validated</span>
                         )}
                       </td>
                     </tr>
@@ -484,7 +484,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             )}
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -516,15 +516,15 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         {/* ─── STEP 3: Result Summary & Undo Reversal ─── */}
         {step === 3 && commitResult && (
           <div className="flex flex-col items-center justify-center py-8 gap-5 animate-in zoom-in-95 duration-150 text-center">
-            <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/30">
+            <div className="w-16 h-16 rounded-3xl bg-primary-soft/60 text-primary flex items-center justify-center shadow-lg shadow-emerald-600/30">
               <CheckCircle2 size={36} />
             </div>
 
             <div>
-              <h2 className="text-xl font-black text-slate-900 dark:text-white">
+              <h2 className="text-xl font-black text-text-main">
                 Import Batch Successfully Committed!
               </h2>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-text-muted mt-1">
                 All valid rows have been appended to the store inventory and stock ledger inside an atomic transaction.
               </p>
             </div>
@@ -532,20 +532,20 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             {/* Counters Panel */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-xl my-2">
               <div className="kpi-card text-center">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">Created Products</span>
-                <span className="text-2xl font-black text-emerald-600">{commitResult.createdCount}</span>
+                <span className="text-[10px] text-text-muted font-bold uppercase">Created Products</span>
+                <span className="text-2xl font-black text-primary">{commitResult.createdCount}</span>
               </div>
               <div className="kpi-card text-center">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">Updated Existing</span>
+                <span className="text-[10px] text-text-muted font-bold uppercase">Updated Existing</span>
                 <span className="text-2xl font-black text-blue-600">{commitResult.updatedCount}</span>
               </div>
               <div className="kpi-card text-center">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">Units Added</span>
-                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{commitResult.totalQuantityAdded}</span>
+                <span className="text-[10px] text-text-muted font-bold uppercase">Units Added</span>
+                <span className="text-2xl font-black text-primary">{commitResult.totalQuantityAdded}</span>
               </div>
               <div className="kpi-card text-center">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">Failed / Skipped</span>
-                <span className="text-2xl font-black text-slate-500">{commitResult.failedCount}</span>
+                <span className="text-[10px] text-text-muted font-bold uppercase">Failed / Skipped</span>
+                <span className="text-2xl font-black text-text-muted">{commitResult.failedCount}</span>
               </div>
             </div>
 

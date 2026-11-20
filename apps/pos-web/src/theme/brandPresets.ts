@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// GebeyaOS Dynamic Brand-Color Palette Engine & 8 Supermarket Presets
+// GebeyaOS Dynamic Brand-Color Palette Engine & Supermarket Presets
 // Conforms to WCAG AA Contrast Standards & Generates Complete Palette
+// (Includes Sidebar Gradients, Soft Backgrounds & Contrast Protection)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export interface BrandPreset {
@@ -16,19 +17,19 @@ export interface BrandPreset {
 export const BRAND_PRESETS: BrandPreset[] = [
   {
     id: 'emerald',
-    name: 'Emerald Professional',
-    nameAm: 'ኤመራልድ አረንጓዴ',
-    primaryHex: '#10B981',
-    secondaryHex: '#0F766E',
+    name: 'Emerald Retail',
+    nameAm: 'ኤመራልድ ቸርቻሪ',
+    primaryHex: '#1F8A4C',
+    secondaryHex: '#0E4B2F',
     accentHex: '#F5B942',
-    description: 'Fresh, confident Ethiopian retail standard with deep teal secondary.',
+    description: 'Clean light and deep-green Ethiopian retail dashboard standard.',
   },
   {
     id: 'ocean',
     name: 'Ocean Blue',
     nameAm: 'ውቅያኖስ ሰማያዊ',
     primaryHex: '#0284C7',
-    secondaryHex: '#0369A1',
+    secondaryHex: '#0B3A5D',
     accentHex: '#F5B942',
     description: 'Modern corporate supermarket and clean hypermarket look.',
   },
@@ -37,7 +38,7 @@ export const BRAND_PRESETS: BrandPreset[] = [
     name: 'Royal Violet',
     nameAm: 'ሮያል ቫዮሌት',
     primaryHex: '#7C3AED',
-    secondaryHex: '#6D28D9',
+    secondaryHex: '#38166D',
     accentHex: '#F5B942',
     description: 'Premium boutique and gourmet market elegance.',
   },
@@ -46,7 +47,7 @@ export const BRAND_PRESETS: BrandPreset[] = [
     name: 'Sunset Orange',
     nameAm: 'ጀንበር ብርቱካናማ',
     primaryHex: '#EA580C',
-    secondaryHex: '#C2410C',
+    secondaryHex: '#5C1D05',
     accentHex: '#F5B942',
     description: 'Energetic, warm bakery, grocery, and discount supermarket.',
   },
@@ -55,7 +56,7 @@ export const BRAND_PRESETS: BrandPreset[] = [
     name: 'Ruby Red',
     nameAm: 'ሩቢ ቀይ',
     primaryHex: '#E11D48',
-    secondaryHex: '#BE123C',
+    secondaryHex: '#580A1C',
     accentHex: '#F5B942',
     description: 'Bold, high-visibility retail chain brand identity.',
   },
@@ -64,7 +65,7 @@ export const BRAND_PRESETS: BrandPreset[] = [
     name: 'Deep Teal',
     nameAm: 'ጥልቅ ቲል',
     primaryHex: '#0D9488',
-    secondaryHex: '#0F766E',
+    secondaryHex: '#083D38',
     accentHex: '#F5B942',
     description: 'Sophisticated organic, pharmacy, and wellness retail.',
   },
@@ -73,8 +74,8 @@ export const BRAND_PRESETS: BrandPreset[] = [
     name: 'Warm Gold',
     nameAm: 'ሞቃት ወርቃማ',
     primaryHex: '#D97706',
-    secondaryHex: '#B45309',
-    accentHex: '#10B981',
+    secondaryHex: '#4E2B03',
+    accentHex: '#1F8A4C',
     description: 'Traditional Ethiopian commercial prestige and warmth.',
   },
   {
@@ -82,7 +83,7 @@ export const BRAND_PRESETS: BrandPreset[] = [
     name: 'Modern Slate',
     nameAm: 'ዘመናዊ ስሌት',
     primaryHex: '#475569',
-    secondaryHex: '#334155',
+    secondaryHex: '#1E293B',
     accentHex: '#F5B942',
     description: 'Minimalist industrial and high-end hardware/grocery.',
   },
@@ -101,7 +102,7 @@ export function hexToRgb(hex: string): RgbColor {
     clean = clean.split('').map((c) => c + c).join('');
   }
   const num = parseInt(clean, 16);
-  if (isNaN(num)) return { r: 16, g: 185, b: 129 }; // Fallback emerald
+  if (isNaN(num)) return { r: 31, g: 138, b: 76 }; // Fallback emerald #1F8A4C
   return {
     r: (num >> 16) & 255,
     g: (num >> 8) & 255,
@@ -156,6 +157,10 @@ export interface GeneratedBrandPalette {
   primarySoftDark: string;
   primaryFg: string;
   primaryGlow: string;
+  sidebarFrom: string;
+  sidebarTo: string;
+  sidebarActive: string;
+  sidebarHover: string;
   secondary: string;
   secondaryHover: string;
   secondaryFg: string;
@@ -165,31 +170,59 @@ export interface GeneratedBrandPalette {
 }
 
 export function generateBrandPalette(primaryHex: string, customSecondaryHex?: string): GeneratedBrandPalette {
-  const rgb = hexToRgb(primaryHex);
-
-  // If contrast against white is too low (< 3.0:1), darken slightly for text/button readability
+  let rgb = hexToRgb(primaryHex);
   const whiteRgb: RgbColor = { r: 255, g: 255, b: 255 };
-  const darkRgb: RgbColor = { r: 10, g: 15, b: 28 }; // #0A0F1C
-  
-  // Choose white or dark text on primary for WCAG AA compliance (ratio >= 4.5:1)
-  const contrastWithWhite = getContrastRatio(rgb, whiteRgb);
-  const primaryFg = contrastWithWhite >= 3.8 ? '#FFFFFF' : '#0F172A';
 
-  // Hover variant: darken by 12% in light, brighten slightly for accents
+  // Enforce WCAG AA contrast for primary on white surfaces
+  // If contrast against white is too low (< 3.0:1, e.g. very light yellow or pastel), darken until compliant
+  let primaryContrast = getContrastRatio(rgb, whiteRgb);
+  if (primaryContrast < 3.0) {
+    rgb = darkenRgb(rgb, 0.35);
+  }
+
+  const effectivePrimaryHex = rgbToHex(rgb);
+  const primaryFg = getContrastRatio(rgb, whiteRgb) >= 3.8 ? '#FFFFFF' : '#0F172A';
+
+  // Hover variant: darken by 12% in light
   const hoverRgb = darkenRgb(rgb, 0.12);
   const primaryHover = rgbToHex(hoverRgb);
 
-  // Soft backgrounds: 12-16% tint
+  // Soft backgrounds: 14% tint for light, 20% for dark
   const primarySoftLight = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.14)`;
   const primarySoftDark = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.20)`;
-  const primaryGlow = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`;
+  const primaryGlow = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.30)`;
 
-  // Secondary color (defaults to complementary deep shade if not supplied)
-  const secRgb = customSecondaryHex ? hexToRgb(customSecondaryHex) : darkenRgb(rgb, 0.35);
-  const secondary = customSecondaryHex ? customSecondaryHex.toUpperCase() : rgbToHex(secRgb);
+  // Sidebar Gradient: Auto-generated deep shades from brand color
+  // Default emerald explicitly maps to clean #0E4B2F -> #0A3A25
+  let sidebarFromRgb: RgbColor;
+  let sidebarToRgb: RgbColor;
+
+  if (effectivePrimaryHex.toUpperCase() === '#1F8A4C') {
+    sidebarFromRgb = hexToRgb('#0E4B2F');
+    sidebarToRgb = hexToRgb('#0A3A25');
+  } else {
+    // Auto-generate darker sidebar shades (55% and 68% darker)
+    sidebarFromRgb = darkenRgb(rgb, 0.55);
+    sidebarToRgb = darkenRgb(rgb, 0.68);
+    // Ensure WCAG AA contrast against white text in sidebar (contrast >= 4.5:1)
+    while (getContrastRatio(sidebarFromRgb, whiteRgb) < 4.5) {
+      sidebarFromRgb = darkenRgb(sidebarFromRgb, 0.1);
+    }
+    while (getContrastRatio(sidebarToRgb, whiteRgb) < 4.5) {
+      sidebarToRgb = darkenRgb(sidebarToRgb, 0.1);
+    }
+  }
+
+  const sidebarFrom = rgbToHex(sidebarFromRgb);
+  const sidebarTo = rgbToHex(sidebarToRgb);
+  const sidebarActive = effectivePrimaryHex.toUpperCase();
+  const sidebarHover = 'rgba(255, 255, 255, 0.08)';
+
+  // Secondary color (defaults to sidebarFrom if not supplied)
+  const secRgb = customSecondaryHex ? hexToRgb(customSecondaryHex) : sidebarFromRgb;
+  const secondary = customSecondaryHex ? customSecondaryHex.toUpperCase() : sidebarFrom;
   const secondaryHover = rgbToHex(darkenRgb(secRgb, 0.15));
-  const secContrastWithWhite = getContrastRatio(secRgb, whiteRgb);
-  const secondaryFg = secContrastWithWhite >= 3.5 ? '#FFFFFF' : '#0F172A';
+  const secondaryFg = getContrastRatio(secRgb, whiteRgb) >= 3.5 ? '#FFFFFF' : '#0F172A';
 
   // Warm Gold Accent (#F5B942)
   const accentRgb = hexToRgb('#F5B942');
@@ -198,12 +231,16 @@ export function generateBrandPalette(primaryHex: string, customSecondaryHex?: st
   const accentGlow = `rgba(${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b}, 0.35)`;
 
   return {
-    primary: primaryHex.toUpperCase(),
+    primary: effectivePrimaryHex.toUpperCase(),
     primaryHover,
     primarySoftLight,
     primarySoftDark,
     primaryFg,
     primaryGlow,
+    sidebarFrom,
+    sidebarTo,
+    sidebarActive,
+    sidebarHover,
     secondary,
     secondaryHover,
     secondaryFg,

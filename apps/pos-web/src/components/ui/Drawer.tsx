@@ -59,16 +59,16 @@ export const Drawer: React.FC<DrawerProps> = ({
         {/* Header */}
         <div className="h-16 px-6 border-b border-border-subtle flex items-center justify-between flex-shrink-0 bg-surface">
           <div>
-            <h3 className="text-base font-semibold text-text-main">{title}</h3>
-            {subtitle && <p className="text-[13px] text-text-muted mt-0.5">{subtitle}</p>}
+            <h2 className="text-xl font-bold text-text-main">{title}</h2>
+            {subtitle && <p className="text-[14px] text-text-muted">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
+            className="w-9 h-9 rounded-full hover:bg-surface-2 flex items-center justify-center text-text-muted hover:text-text-main transition-colors"
             aria-label="Close drawer"
           >
-            <X size={18} strokeWidth={1.75} />
+            <X size={18} />
           </button>
         </div>
 

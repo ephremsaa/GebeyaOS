@@ -44,11 +44,12 @@ export function formatEscPosThermalReceipt(data: ThermalReceiptData): string {
 
   // Header
   lines.push('='.repeat(LINE_WIDTH));
-  lines.push(center(data.storeName));
-  lines.push(center(data.branchName));
-  if (data.branchAddress) lines.push(center(data.branchAddress));
+  lines.push(center(data.storeName || 'Gebeya Supermarket'));
+  lines.push(center(data.branchName || 'Bole Medhanialem'));
+  const address = data.branchAddress || 'Ethiopia , Addis Ababa';
+  lines.push(center(address));
   if (data.branchPhone) lines.push(center(`TEL: ${data.branchPhone}`));
-  lines.push(center(`TIN: ${data.storeTin}`));
+  lines.push(center(`TIN: ${data.storeTin || '0012345678'}`));
   if (data.storeVatNumber) lines.push(center(`VAT REG: ${data.storeVatNumber}`));
   lines.push('-'.repeat(LINE_WIDTH));
 
@@ -62,12 +63,19 @@ export function formatEscPosThermalReceipt(data: ThermalReceiptData): string {
   lines.push(row2('ITEM', 'QTY x PRICE   TOTAL'));
   lines.push('-'.repeat(LINE_WIDTH));
 
-  for (const item of data.items) {
-    const vatFlag = item.isVat ? '(A)' : '(B)';
-    lines.push(`${item.name} ${vatFlag}`);
+  let subtotalBeforeVat = 0;
 
-    const qtyPrice = `${item.quantity.toFixed(3)} x ${formatMoney(item.unitPrice)}`;
-    const totalStr = `${formatMoney(item.lineTotal)} ETB`;
+  for (const item of data.items) {
+    lines.push(item.name);
+
+    const isTaxable = item.isVat !== false;
+    const unitPriceBeforeVat = isTaxable ? item.unitPrice / 1.15 : item.unitPrice;
+    const lineTotalBeforeVat = isTaxable ? item.lineTotal / 1.15 : item.lineTotal;
+    subtotalBeforeVat += lineTotalBeforeVat;
+
+    const qtyStr = Number.isInteger(item.quantity) ? `${item.quantity}.` : item.quantity.toFixed(3);
+    const qtyPrice = `${qtyStr} x ${formatMoney(unitPriceBeforeVat)}`;
+    const totalStr = `${formatMoney(lineTotalBeforeVat)} ETB`;
     lines.push(row2(`   ${qtyPrice}`, totalStr));
 
     if (item.discount && item.discount > 0) {
@@ -77,49 +85,18 @@ export function formatEscPosThermalReceipt(data: ThermalReceiptData): string {
 
   lines.push('-'.repeat(LINE_WIDTH));
 
-  // Tax Breakdown
-  lines.push(row2('Subtotal:', `${formatMoney(data.subtotal)} ETB`));
-  if (data.discountTotal > 0) {
-    lines.push(row2('Total Discount:', `-${formatMoney(data.discountTotal)} ETB`));
-  }
-  lines.push(row2('Taxable Subtotal (15%):', `${formatMoney(data.taxableSubtotal)} ETB`));
-  lines.push(row2('VAT Amount (15%):', `${formatMoney(data.vatAmount)} ETB`));
-  if (data.exemptSubtotal > 0) {
-    lines.push(row2('Tax Exempt Subtotal:', `${formatMoney(data.exemptSubtotal)} ETB`));
-  }
+  // Round subtotal to 2 decimals
+  const finalSubtotal = Math.round(subtotalBeforeVat * 100) / 100;
+  const finalVat = Math.max(0, Math.round((data.grandTotal - finalSubtotal) * 100) / 100);
+
+  // Subtotal & VAT Breakdown (VAT-inclusive reconciliation)
+  lines.push(row2('Subtotal:', `${formatMoney(finalSubtotal)} ETB`));
+  lines.push(row2('VAT Amount (15%):', `${formatMoney(finalVat)} ETB`));
   lines.push('-'.repeat(LINE_WIDTH));
 
   // Grand Total
-  lines.push(row2('TOTAL TO PAY:', `${formatMoney(data.grandTotal)} ETB`));
+  lines.push(row2('TOTAL :', `${formatMoney(data.grandTotal)} ETB`));
   lines.push('='.repeat(LINE_WIDTH));
-
-  // Payment Details
-  lines.push('PAYMENT DETAILS:');
-  for (const payment of data.payments) {
-    lines.push(row2(`  ${payment.method}:`, `${formatMoney(payment.amount)} ETB`));
-    if (payment.reference) {
-      lines.push(`    Ref: ${payment.reference}`);
-    }
-  }
-
-  if (data.changeGiven > 0) {
-    lines.push(row2('Change Given:', `${formatMoney(data.changeGiven)} ETB`));
-  }
-  lines.push('-'.repeat(LINE_WIDTH));
-
-  // Fiscal Footer
-  if (data.fiscalMrc) {
-    lines.push(row2('Fiscal MRC:', data.fiscalMrc));
-  }
-  if (data.fiscalReceiptNo) {
-    lines.push(row2('Fiscal Receipt No:', data.fiscalReceiptNo));
-  }
-  if (data.fiscalSignature) {
-    lines.push(`EJ Sig: ${data.fiscalSignature.substring(0, 32)}`);
-  }
-
-  lines.push('='.repeat(LINE_WIDTH));
-  lines.push(center('VAT Flag: (A) = 15% Taxable  (B) = Exempt'));
   lines.push(center('THANK YOU FOR SHOPPING WITH US!'));
   lines.push('='.repeat(LINE_WIDTH));
 

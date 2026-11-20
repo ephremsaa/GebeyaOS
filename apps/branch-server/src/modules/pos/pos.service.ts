@@ -509,17 +509,23 @@ export class PosService {
 
       // 2. Fetch branch and terminal codes
       const branchRes = await client.query<any>(
-        `SELECT code, name_en, tin_number, vat_number, phone, address, settings FROM branches WHERE id = $1`,
+        `SELECT b.code, b.name, b.trade_name, b.tin_number, b.vat_registration_no, b.phone,
+                COALESCE(b.city, '') || CASE WHEN b.subcity IS NOT NULL AND b.subcity != '' THEN ', ' || b.subcity ELSE '' END as address,
+                b.settings, t.name as tenant_name
+         FROM branches b
+         LEFT JOIN tenants t ON b.tenant_id = t.id
+         WHERE b.id = $1`,
         [branchId],
       );
-      const branch = branchRes.rows[0];
+      const branch = branchRes.rows[0] || {};
       const allowNegativeStock = branch?.settings?.allow_negative_stock === true;
 
       const termRes = await client.query<any>(
         `SELECT code FROM terminals WHERE id = $1`,
         [dto.terminalId],
       );
-      const terminalCode = termRes.rows.length > 0 ? termRes.rows[0].code : 'POS01';
+      const terminalCode = termRes.rows.length > 0 ? termRes.rows[0].code : 'POS-01';
+      const cashierName = 'Cashier';
 
       // 3. Sequential receipt number for terminal today
       const countRes = await client.query<{ count: string }>(
@@ -856,16 +862,16 @@ export class PosService {
 
       // 11. Format Thermal Receipt & MOR Electronic Journal
       const receiptData: ThermalReceiptData = {
-        storeName: 'GEBEYA SUPERMARKET',
+        storeName: branch.trade_name || branch.tenant_name || branch.name || 'Gebeya Supermarket',
         storeTin: branch.tin_number || '0012345678',
-        storeVatNumber: branch.vat_number || 'ETH-VAT-001',
-        branchName: branch.name_en,
-        branchAddress: branch.address || undefined,
+        storeVatNumber: branch.vat_registration_no || 'VAT-ET-9921',
+        branchName: branch.name || 'Bole Medhanialem',
+        branchAddress: branch.address || 'Ethiopia , Addis Ababa',
         branchPhone: branch.phone || undefined,
         terminalCode,
-        cashierName: cashierId,
+        cashierName,
         receiptNumber,
-        saleDate: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        saleDate: new Date().toLocaleString('en-US', { timeZone: 'Africa/Addis_Ababa' }),
         items: receiptItems,
         subtotal,
         discountTotal,
@@ -893,8 +899,8 @@ export class PosService {
       // 12. Save fiscal log
       await client.query(
         `INSERT INTO fiscal_receipt_logs (
-           sale_id, branch_id, terminal_id, payload, fiscal_receipt_number
-         ) VALUES ($1, $2, $3, $4, $5)`,
+           sale_id, branch_id, terminal_id, payload, fiscal_receipt_number, status
+         ) VALUES ($1, $2, $3, $4, $5, 'SUCCESS')`,
         [
           saleId,
           branchId,
@@ -1489,22 +1495,27 @@ export class PosService {
         [saleId],
       );
       const branchRes = await client.query<any>(
-        `SELECT code, name_en, tin_number, vat_number, phone, address FROM branches WHERE id = $1`,
+        `SELECT b.code, b.name, b.trade_name, b.tin_number, b.vat_registration_no, b.phone,
+                COALESCE(b.city, '') || CASE WHEN b.subcity IS NOT NULL AND b.subcity != '' THEN ', ' || b.subcity ELSE '' END as address,
+                t.name as tenant_name
+         FROM branches b
+         LEFT JOIN tenants t ON b.tenant_id = t.id
+         WHERE b.id = $1`,
         [branchId],
       );
       const branch = branchRes.rows[0] || {};
 
       const thermalReceipt = formatEscPosThermalReceipt({
-        storeName: 'GEBEYA SUPERMARKET',
+        storeName: branch.trade_name || branch.tenant_name || branch.name || 'Gebeya Supermarket',
         storeTin: branch.tin_number || '0012345678',
-        storeVatNumber: branch.vat_number || 'ETH-VAT-001',
-        branchName: branch.name_en,
-        branchAddress: branch.address || undefined,
+        storeVatNumber: branch.vat_registration_no || 'VAT-ET-9921',
+        branchName: branch.name || 'Bole Medhanialem',
+        branchAddress: branch.address || 'Ethiopia , Addis Ababa',
         branchPhone: branch.phone || undefined,
-        terminalCode: sale.terminal_id || 'POS01',
-        cashierName: cashierId,
+        terminalCode: 'POS-01',
+        cashierName: 'Cashier',
         receiptNumber: `${sale.receipt_number} [COPY #${sale.reprint_count}]`,
-        saleDate: sale.created_at.toISOString().replace('T', ' ').substring(0, 19),
+        saleDate: new Date(sale.created_at).toLocaleString('en-US', { timeZone: 'Africa/Addis_Ababa' }),
         items: itemsRes.rows.map((i: any) => ({
           name: i.item_name_snapshot,
           quantity: parseFloat(i.quantity),

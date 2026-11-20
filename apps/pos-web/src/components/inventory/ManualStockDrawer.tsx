@@ -176,16 +176,16 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
     >
       <div className="modal-content max-w-5xl max-h-[92vh] flex flex-col p-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/30">
               <Edit3 size={20} />
             </div>
             <div>
-              <h2 className="modal-title font-bold text-lg text-slate-900 dark:text-white">
+              <h2 className="modal-title font-bold text-lg text-text-main">
                 {language === 'am' ? 'በመዝገብ ዕቃ ማስገባት' : 'Manual Stock Entry'}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-text-muted">
                 {language === 'am'
                   ? 'እቃዎችን ፈልገው ባች፣ የግዢ ዋጋ፣ እና የሚያበቃበት ቀን በመሙላት ወደ ክምችት ያስገቡ'
                   : 'Add products by search, assign batch numbers, unit costs, and expiry dates'}
@@ -195,7 +195,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-text-muted hover:text-text-muted transition-colors"
           >
             <X size={18} />
           </button>
@@ -203,10 +203,10 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
 
         {/* Searchable Dropdown */}
         <div className="relative my-4">
-          <label className="field-label mb-1 font-semibold text-xs text-slate-700 dark:text-slate-300">
+          <label className="field-label mb-1 font-semibold text-xs text-text-main">
             {language === 'am' ? 'ዕቃ ፈልገው ይምረጡ' : 'Search & Add Product Line'}
           </label>
-          <div className="search-bar-wrapper flex items-center gap-2 p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+          <div className="search-bar-wrapper flex items-center gap-2 p-2 rounded-xl border border-border-subtle bg-surface">
             <Search size={16} className="text-blue-600" />
             <input
               type="text"
@@ -227,7 +227,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-text-muted hover:text-text-muted"
               >
                 <X size={14} />
               </button>
@@ -236,9 +236,9 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
 
           {/* Search Dropdown Results */}
           {isDropdownOpen && searchQuery.length > 0 && (
-            <div className="absolute top-16 left-0 right-0 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
+            <div className="absolute top-16 left-0 right-0 z-50 bg-surface border border-border-subtle rounded-2xl shadow-xl max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
               {searchResults.length === 0 ? (
-                <div className="p-3 text-xs text-center text-slate-400">
+                <div className="p-3 text-xs text-center text-text-muted">
                   {language === 'am' ? 'ምንም የሚዛመድ ዕቃ አልተገኘም' : 'No matching products found.'}
                 </div>
               ) : (
@@ -247,13 +247,13 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                     key={prod.id}
                     type="button"
                     onClick={() => handleSelectProduct(prod)}
-                    className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between text-left text-xs transition-colors"
+                    className="p-2.5 rounded-xl hover:bg-surface-2 dark:hover:bg-surface-2 flex items-center justify-between text-left text-xs transition-colors"
                   >
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-900 dark:text-white">
+                      <span className="font-bold text-text-main">
                         {language === 'am' && prod.name_am ? prod.name_am : prod.name_en || prod.nameEn}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
+                      <span className="text-[10px] text-text-muted font-mono">
                         {prod.sku} • {prod.category_name || prod.category || 'General'}
                         {Boolean(prod.has_expiry_date || prod.hasExpiryDate) && (
                           <span className="ml-1 text-amber-500 font-bold">
@@ -266,7 +266,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                       <span className="font-bold text-blue-600">
                         {prod.cost_price || prod.costPrice || 0} ETB
                       </span>
-                      <span className="block text-[10px] text-slate-400">
+                      <span className="block text-[10px] text-text-muted">
                         On Hand: {prod.stock_on_hand || prod.stockOnHand || 0}
                       </span>
                     </div>
@@ -285,10 +285,10 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
         )}
 
         {/* Draft Lines Table */}
-        <div className="flex-1 overflow-y-auto glass-panel border border-slate-200 dark:border-slate-700 rounded-2xl min-h-[260px]">
+        <div className="flex-1 overflow-y-auto glass-panel border border-border-subtle rounded-2xl min-h-[260px]">
           {rows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400 gap-2">
-              <Edit3 size={36} className="text-slate-300 dark:text-slate-700" />
+            <div className="flex flex-col items-center justify-center py-16 text-center text-text-muted gap-2">
+              <Edit3 size={36} className="text-slate-300 dark:text-text-main" />
               <p className="text-sm font-semibold">
                 {language === 'am' ? 'ምንም ረድፍ አልተጨመረም' : 'No draft lines added.'}
               </p>
@@ -301,7 +301,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
           ) : (
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-[11px] font-bold text-slate-500 uppercase">
+                <tr className="border-b border-border-subtle bg-surface-2 dark:bg-surface/80 text-[11px] font-bold text-text-muted uppercase">
                   <th className="p-3 pl-4">{language === 'am' ? 'ዕቃ' : 'Product Name'}</th>
                   <th className="p-3 text-right">{language === 'am' ? 'የግዢ ዋጋ' : 'Unit Cost'}</th>
                   <th className="p-3 text-center">{language === 'am' ? 'ብዛት' : 'Quantity'}</th>
@@ -310,20 +310,20 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                   <th className="p-3 text-center">{language === 'am' ? 'ተግባር' : 'Action'}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-border-subtle">
                 {rows.map((row, idx) => {
                   const dateValidation = row.expiryDate
                     ? validateExpiryDateInput(row.expiryDate)
                     : null;
 
                   return (
-                    <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                    <tr key={idx} className="hover:bg-surface-2/60 dark:hover:bg-surface/30">
                       <td className="p-3 pl-4">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-900 dark:text-white">
+                          <span className="font-bold text-text-main">
                             {language === 'am' && row.nameAm ? row.nameAm : row.nameEn}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
+                          <span className="text-[10px] text-text-muted font-mono">
                             {row.sku} • {row.category}
                             {row.isPerishable && (
                               <span className="ml-1 text-amber-500 font-bold">
@@ -338,7 +338,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                         <input
                           type="number"
                           step="0.01"
-                          className="w-24 p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-right text-xs font-mono font-bold"
+                          className="w-24 p-1.5 rounded-lg border border-border-subtle bg-surface text-right text-xs font-mono font-bold"
                           value={row.unitCost}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value) || 0;
@@ -355,7 +355,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                             type="number"
                             step="1"
                             min="1"
-                            className="w-16 p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-center font-bold text-xs font-mono"
+                            className="w-16 p-1.5 rounded-lg border border-border-subtle bg-surface text-center font-bold text-xs font-mono"
                             value={row.quantity}
                             onChange={(e) => {
                               const val = Math.max(1, parseInt(e.target.value, 10) || 1);
@@ -364,14 +364,14 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                               );
                             }}
                           />
-                          <span className="text-[10px] text-slate-400 font-bold">{row.unit}</span>
+                          <span className="text-[10px] text-text-muted font-bold">{row.unit}</span>
                         </div>
                       </td>
 
                       <td className="p-3">
                         <input
                           type="text"
-                          className="w-28 p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-mono"
+                          className="w-28 p-1.5 rounded-lg border border-border-subtle bg-surface text-xs font-mono"
                           value={row.batchNumber}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -392,7 +392,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                                   ? 'border-rose-500 bg-rose-50/20'
                                   : dateValidation?.warning
                                   ? 'border-amber-400 bg-amber-50/20'
-                                  : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
+                                  : 'border-border-subtle bg-surface'
                               }`}
                               value={row.expiryDate}
                               onChange={(e) => {
@@ -404,7 +404,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                             />
                             {/* Format hint / Ethiopian calendar */}
                             {row.expiryDate && calendar === 'ethiopic' && (
-                              <span className="text-[10px] text-slate-500 font-sans">
+                              <span className="text-[10px] text-text-muted font-sans">
                                 ({formatEthiopianDisplayDate(row.expiryDate, language)})
                               </span>
                             )}
@@ -417,7 +417,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
                                 key={off}
                                 type="button"
                                 onClick={() => handleQuickOffset(idx, off)}
-                                className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-[10px] font-bold text-slate-600 dark:text-slate-300 transition"
+                                className="px-1.5 py-0.5 rounded bg-surface-2 hover:bg-surface-2 dark:hover:bg-slate-600 text-[10px] font-bold text-text-muted transition"
                               >
                                 {off === '+7d'
                                   ? t('inventory.dateOffset7d')
@@ -463,10 +463,10 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
-          <span className="text-xs font-semibold text-slate-500">
+        <div className="flex items-center justify-between pt-4 border-t border-border-subtle mt-4">
+          <span className="text-xs font-semibold text-text-muted">
             {language === 'am' ? 'ጠቅላላ የሚገባ፡' : 'Total Draft:'}{' '}
-            <strong className="text-slate-900 dark:text-white">
+            <strong className="text-text-main">
               {rows.reduce((acc, r) => acc + r.quantity, 0)} {language === 'am' ? 'እቃዎች' : 'units'}
             </strong>{' '}
             ({rows.length} {language === 'am' ? 'መስመሮች' : 'lines'})
@@ -477,7 +477,7 @@ export const ManualStockDrawer: React.FC<ManualStockDrawerProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 transition"
+              className="px-4 py-2 rounded-xl border border-border-subtle text-xs font-bold text-text-main hover:bg-surface-2 transition"
             >
               {language === 'am' ? 'ሰርዝ' : 'Cancel'}
             </button>

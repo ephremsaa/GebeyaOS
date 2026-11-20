@@ -81,6 +81,7 @@ export interface AuthContextType {
   resetPassword: (companyCode: string, usernameOrPhone: string, code: string, newPassword: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   getUserProfile: () => Promise<any>;
   updateUserProfile: (dto: { fullName?: string; phone?: string; defaultLanguage?: string; themePreference?: string }) => Promise<{ success: boolean; error?: string }>;
+  updateTenantAndBranchInfo: (tenantName: string, branchName?: string) => void;
   getUserSessions: () => Promise<UserSessionInfo[]>;
   revokeSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
   logoutAll: () => Promise<{ success: boolean; error?: string }>;
@@ -650,6 +651,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: false, error: err.message || 'Failed to update profile' };
   };
 
+  const updateTenantAndBranchInfo = useCallback((tenantName: string, branchName?: string) => {
+    setCurrentUser((prev) => {
+      if (!prev) return null;
+      const updated = {
+        ...prev,
+        tenantName,
+        branchName: branchName || prev.branchName,
+      };
+      try {
+        localStorage.setItem('gebeyaos_user', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
+
   const getUserSessions = async (): Promise<UserSessionInfo[]> => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/auth/sessions`);
@@ -786,6 +802,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPassword,
         getUserProfile,
         updateUserProfile,
+        updateTenantAndBranchInfo,
         getUserSessions,
         revokeSession,
         logoutAll,

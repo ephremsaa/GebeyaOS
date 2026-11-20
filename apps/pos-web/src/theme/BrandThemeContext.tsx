@@ -52,7 +52,7 @@ export const BrandThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [customHex, setCustomHex] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_CUSTOM_KEY) || '#10B981';
+    return localStorage.getItem(STORAGE_CUSTOM_KEY) || '#1F8A4C';
   });
 
   // Active preset metadata
@@ -64,7 +64,7 @@ export const BrandThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       name: 'Custom Supermarket Brand',
       nameAm: 'ብጁ የሱቅ ቀለም',
       primaryHex: customHex,
-      secondaryHex: '#0F766E',
+      secondaryHex: '#0E4B2F',
       accentHex: '#F5B942',
       description: 'Custom brand color selected for this supermarket.',
     };
@@ -84,6 +84,12 @@ export const BrandThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     root.style.setProperty('--primary-hover', palette.primaryHover);
     root.style.setProperty('--primary-fg', palette.primaryFg);
     root.style.setProperty('--primary-glow', palette.primaryGlow);
+
+    // Set sidebar gradient & states
+    root.style.setProperty('--sidebar-from', palette.sidebarFrom);
+    root.style.setProperty('--sidebar-to', palette.sidebarTo);
+    root.style.setProperty('--sidebar-active', palette.sidebarActive);
+    root.style.setProperty('--sidebar-hover', palette.sidebarHover);
 
     // Set secondary & variants
     root.style.setProperty('--secondary', palette.secondary);
@@ -125,7 +131,7 @@ export const BrandThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const resetToDefaultBrand = useCallback(() => {
     setBrandPresetId('emerald');
-    setCustomHex('#10B981');
+    setCustomHex('#1F8A4C');
     setAnimationModeState(isLowPowerDevice ? 'reduced' : 'full');
     localStorage.removeItem(STORAGE_PRESET_KEY);
     localStorage.removeItem(STORAGE_CUSTOM_KEY);
@@ -153,10 +159,9 @@ export const BrandThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 };
 
 export const useBrandTheme = (): BrandThemeContextType => {
-  const ctx = useContext(BrandThemeContext);
-  if (!ctx) {
+  const context = useContext(BrandThemeContext);
+  if (!context) {
     throw new Error('useBrandTheme must be used within a BrandThemeProvider');
   }
-  return ctx;
+  return context;
 };
-

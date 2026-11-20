@@ -557,21 +557,21 @@ export const posApi = {
       storeName: (() => {
         try {
           const raw = localStorage.getItem('gebeyaos_brand_cache');
-          if (raw) return JSON.parse(raw).displayName || 'Supermarket';
+          if (raw) return JSON.parse(raw).displayName || 'Gebeya Supermarket';
         } catch {}
-        return 'Supermarket';
+        return 'Gebeya Supermarket';
       })(),
       storeTin: '0012345678',
       storeVatNumber: 'VAT-ET-9921',
       branchName: 'Bole Medhanialem',
-      branchAddress: 'Cameroon St, Addis Ababa',
+      branchAddress: 'Ethiopia , Addis Ababa',
       branchPhone: '+251 11 661 2233',
       terminalCode: 'POS-01',
       cashierName: 'Cashier',
       receiptNumber: receiptNo,
       saleDate: new Date().toLocaleString(),
       items: (offlineSale.items || []).map((i: any) => ({
-        name: 'Item',
+        name: i.name || i.productName || 'Item',
         quantity: i.quantity,
         unitPrice: i.unitPrice,
         discount: i.discountAmount,

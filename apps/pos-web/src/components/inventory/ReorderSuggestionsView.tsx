@@ -163,15 +163,15 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
     .reduce((sum, i) => sum + i.estimatedCost, 0);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full bg-page p-4 sm:p-6 overflow-hidden select-none">
       {/* 1. Header Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
-          <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+          <h1 className="text-xl font-black text-text-main flex items-center gap-2">
             <Truck className="text-amber-500" size={24} />
             {language === 'am' ? 'የእቃ ማዘዣ ጥቆማዎች' : 'Intelligent Reorder Suggestions'}
           </h1>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-text-muted">
             {language === 'am'
               ? 'በቀን የሽያጭ ፍጥነት እና በአነስተኛ ክምችት ላይ ተመስርቶ የተሰላ አውቶማቲክ ማዘዣ'
               : 'Auto-calculated PO recommendations based on reorder points, current stock on hand, and 30-day sales velocity.'}
@@ -180,7 +180,7 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
 
         <button
           onClick={fetchData}
-          className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 flex items-center gap-1.5 transition self-start sm:self-auto"
+          className="px-3 py-2 rounded-xl bg-surface border border-border-subtle text-text-main text-xs font-bold hover:bg-surface-2 flex items-center gap-1.5 transition self-start sm:self-auto"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           {language === 'am' ? 'አድስ' : 'Refresh'}
@@ -223,16 +223,16 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
       )}
 
       {/* 2. Reorder Action Toolbar */}
-      <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+      <div className="p-4 bg-surface rounded-2xl border border-border-subtle mb-4 flex flex-wrap items-center justify-between gap-4 shadow-xs">
         <div className="flex items-center gap-4">
           <div>
-            <label className="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">
+            <label className="text-[10px] font-extrabold uppercase text-text-muted block mb-1">
               Target Supplier
             </label>
             <select
               value={selectedSupplierId}
               onChange={(e) => setSelectedSupplierId(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold focus:outline-hidden"
+              className="px-3 py-1.5 rounded-xl bg-surface-2 dark:bg-surface border border-border-subtle text-xs font-semibold focus:outline-hidden"
             >
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -242,21 +242,21 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
             </select>
           </div>
 
-          <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+          <div className="h-8 w-px bg-surface-2 dark:bg-slate-700 hidden sm:block" />
 
           <div>
-            <span className="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">
+            <span className="text-[10px] font-extrabold uppercase text-text-muted block mb-1">
               Selected SKUs
             </span>
-            <span className="font-mono font-black text-slate-900 dark:text-white text-sm">
+            <span className="font-mono font-black text-text-main text-sm">
               {selectedCount} / {items.length} items
             </span>
           </div>
 
-          <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+          <div className="h-8 w-px bg-surface-2 dark:bg-slate-700 hidden sm:block" />
 
           <div>
-            <span className="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">
+            <span className="text-[10px] font-extrabold uppercase text-text-muted block mb-1">
               Total Estimated PO Cost
             </span>
             <span className="font-mono font-black text-amber-600 dark:text-amber-400 text-sm">
@@ -276,10 +276,10 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
       </div>
 
       {/* 3. Items Table */}
-      <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col">
+      <div className="flex-1 bg-surface rounded-2xl border border-border-subtle shadow-xs overflow-hidden flex flex-col">
         <div className="flex-1 overflow-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 font-extrabold text-slate-500 uppercase tracking-wider text-[10px]">
+            <thead className="bg-surface-2 dark:bg-surface/80 sticky top-0 z-10 border-b border-border-subtle font-extrabold text-text-muted uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="py-3 px-4 w-10 text-center">
                   <input
@@ -306,17 +306,17 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
                 <th className="py-3 px-4 text-right">Est. Cost</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-subtle">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-text-muted">
                     <RefreshCw className="animate-spin inline-block mr-2" size={16} />
                     Calculating replenishment recommendations...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-text-muted">
                     <CheckCircle2 className="inline-block text-emerald-500 mr-2" size={18} />
                     All stock levels healthy! No products currently below reorder thresholds.
                   </td>
@@ -329,7 +329,7 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
                   return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition ${
+                      className={`hover:bg-surface-2 dark:hover:bg-surface/50 transition ${
                         isSelected ? 'bg-amber-50/20 dark:bg-amber-950/10' : ''
                       }`}
                     >
@@ -342,14 +342,14 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
                         />
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white">
+                        <div className="font-bold text-text-main">
                           {item.nameEn}
                         </div>
-                        <div className="font-mono text-[10px] text-slate-400">
+                        <div className="font-mono text-[10px] text-text-muted">
                           {item.sku} • {item.categoryName || 'General'}
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-center font-bold text-slate-400">
+                      <td className="py-3 px-4 text-center font-bold text-text-muted">
                         {item.uomCode}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold">
@@ -357,10 +357,10 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
                           {item.stockOnHand}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-500">
+                      <td className="py-3 px-4 text-right font-mono text-text-muted">
                         {item.minStockLevel}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-500">
+                      <td className="py-3 px-4 text-right font-mono text-text-muted">
                         {item.dailySalesRate > 0 ? `${item.dailySalesRate}/day` : '0/day'}
                       </td>
                       <td className="py-3 px-4 text-center">
@@ -382,13 +382,13 @@ export const ReorderSuggestionsView: React.FC<ReorderSuggestionsViewProps> = ({
                           onChange={(e) =>
                             handleUpdateQty(item.id, parseInt(e.target.value) || 1)
                           }
-                          className="w-20 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-center font-mono font-bold text-xs"
+                          className="w-20 px-2 py-1 rounded-lg border border-slate-300 dark:border-border-subtle bg-surface text-center font-mono font-bold text-xs"
                         />
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-500">
+                      <td className="py-3 px-4 text-right font-mono text-text-muted">
                         {item.costPrice.toFixed(2)}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-black text-slate-900 dark:text-white">
+                      <td className="py-3 px-4 text-right font-mono font-black text-text-main">
                         {item.estimatedCost.toFixed(2)} ETB
                       </td>
                     </tr>

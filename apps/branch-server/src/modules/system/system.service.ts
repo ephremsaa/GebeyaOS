@@ -41,6 +41,40 @@ export interface DashboardSummary {
     thresholdAlert: boolean;
     maxThreshold: number;
   };
+  recentSales?: Array<{
+    id: string;
+    receiptNumber: string;
+    cashierName: string;
+    grandTotal: number;
+    paymentStatus: string;
+    createdAt: string;
+  }>;
+  weeklyTrend?: {
+    thisWeek: Array<{ day: string; amount: number; count: number }>;
+    lastWeek: Array<{ day: string; amount: number; count: number }>;
+    growthPercentage: number;
+  };
+  salesByCategory?: Array<{
+    categoryId: string;
+    categoryName: string;
+    amount: number;
+    percentage: number;
+  }>;
+  alerts?: Array<{
+    id: string;
+    productId: string;
+    productName: string;
+    sku: string;
+    type: 'LOW_STOCK' | 'EXPIRING' | 'OUT_OF_STOCK';
+    severity: 'WARNING' | 'DANGER';
+    currentStock: number;
+    uom: string;
+    expiryDate?: string | null;
+  }>;
+  kpis?: {
+    salesGrowthPercent: number;
+    ordersGrowthPercent: number;
+  };
 }
 
 export interface NotificationItem {
@@ -148,6 +182,103 @@ export class SystemService {
     const maxThreshold = 50000; // 50,000 ETB default safe threshold
     const thresholdAlert = cashCollected >= maxThreshold;
 
+    // 7. Recent Sales
+    let recentSales: any[] = [];
+    try {
+      const recentSalesRes = await this.db.query(
+        `SELECT s.id, s.receipt_number, s.grand_total, s.payment_status, s.created_at,
+                COALESCE(u.full_name, 'Cashier') as cashier_name
+         FROM sales s
+         LEFT JOIN users u ON s.cashier_id = u.id
+         WHERE s.branch_id = $1
+         ORDER BY s.created_at DESC
+         LIMIT 6`,
+        [branchId],
+      );
+      recentSales = recentSalesRes.rows.map((r: any) => ({
+        id: r.id,
+        receiptNumber: r.receipt_number,
+        cashierName: r.cashier_name,
+        grandTotal: parseFloat(r.grand_total) || 0,
+        paymentStatus: r.payment_status,
+        createdAt: r.created_at,
+      }));
+    } catch (e) {
+      this.logger.warn(`Failed to fetch recent sales for dashboard: ${e}`);
+    }
+
+    // 8. Sales by Category
+    let salesByCategory: any[] = [];
+    try {
+      const catRes = await this.db.query(
+        `SELECT c.id, c.name_en, COALESCE(SUM(si.line_total), 0) as total
+         FROM categories c
+         LEFT JOIN products p ON p.category_id = c.id
+         LEFT JOIN sale_items si ON si.product_id = p.id
+         GROUP BY c.id, c.name_en
+         ORDER BY total DESC
+         LIMIT 5`,
+      );
+      const totalCatRevenue = catRes.rows.reduce(
+        (sum: number, r: any) => sum + (parseFloat(r.total) || 0),
+        0,
+      );
+      salesByCategory = catRes.rows.map((r: any) => {
+        const amt = parseFloat(r.total) || 0;
+        return {
+          categoryId: r.id,
+          categoryName: r.name_en || 'General',
+          amount: amt,
+          percentage: totalCatRevenue > 0 ? Math.round((amt / totalCatRevenue) * 100) : 0,
+        };
+      });
+    } catch (e) {
+      this.logger.warn(`Failed to fetch category sales for dashboard: ${e}`);
+    }
+
+    // 9. Stock & Expiry Alerts
+    let alerts: any[] = [];
+    try {
+      const alertsRes = await this.db.query(
+        `SELECT p.id, p.name_en, p.sku, p.uom_code, p.min_stock_level,
+                COALESCE(stock.soh, 0) as current_stock
+         FROM products p
+         LEFT JOIN (
+           SELECT product_id, SUM(quantity_change) as soh
+           FROM stock_ledger
+           WHERE branch_id = $1
+           GROUP BY product_id
+         ) stock ON p.id = stock.product_id
+         WHERE p.is_active = TRUE
+           AND (COALESCE(stock.soh, 0) <= p.min_stock_level)
+         ORDER BY current_stock ASC
+         LIMIT 6`,
+        [branchId],
+      );
+      alerts = alertsRes.rows.map((r: any) => {
+        const stockVal = parseFloat(r.current_stock) || 0;
+        const isOut = stockVal <= 0;
+        return {
+          id: r.id,
+          productId: r.id,
+          productName: r.name_en,
+          sku: r.sku || 'SKU',
+          type: isOut ? 'OUT_OF_STOCK' : 'LOW_STOCK',
+          severity: isOut ? 'DANGER' : 'WARNING',
+          currentStock: stockVal,
+          uom: r.uom_code || 'PCS',
+          expiryDate: null,
+        };
+      });
+    } catch (e) {
+      this.logger.warn(`Failed to fetch inventory alerts for dashboard: ${e}`);
+    }
+
+    // 10. Weekly Trend & Growth
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const thisWeek = dayNames.map((d) => ({ day: d, amount: 0, count: 0 }));
+    const lastWeek = dayNames.map((d) => ({ day: d, amount: 0, count: 0 }));
+
     return {
       todaySales: {
         grossSales: parseFloat(sRow.gross_sales) || 0,
@@ -173,6 +304,18 @@ export class SystemService {
         thresholdAlert,
         maxThreshold,
       },
+      recentSales,
+      weeklyTrend: {
+        thisWeek,
+        lastWeek,
+        growthPercentage: 0,
+      },
+      salesByCategory,
+      alerts,
+      kpis: {
+        salesGrowthPercent: 0,
+        ordersGrowthPercent: 0,
+      },
     };
   }
 
@@ -189,11 +332,20 @@ export class SystemService {
       settingsMap[row.key] = row.value;
     }
 
+    // Overlay general_config if present so all sub-sections are available
+    if (settingsMap['general_config']) {
+      const gc = settingsMap['general_config'];
+      if (gc.store_info) settingsMap['store_info'] = { ...(settingsMap['store_info'] || {}), ...gc.store_info };
+      if (gc.receipt_config) settingsMap['receipt_config'] = { ...(settingsMap['receipt_config'] || {}), ...gc.receipt_config };
+      if (gc.sales_config) settingsMap['sales_config'] = { ...(settingsMap['sales_config'] || {}), ...gc.sales_config };
+      if (gc.stock_config) settingsMap['stock_config'] = { ...(settingsMap['stock_config'] || {}), ...gc.stock_config };
+    }
+
     const bId = branchId || '01a19309-1d43-7444-b260-5b2ffac3e40c';
     const branchRes = await this.db.query<any>(
       `SELECT b.id, b.code, b.name, b.trade_name, b.tin_number, b.vat_registration_no, b.phone,
               COALESCE(b.city, '') || CASE WHEN b.subcity IS NOT NULL THEN ', ' || b.subcity ELSE '' END as address,
-              t.name as tenant_name
+              t.name as tenant_name, t.logo_url, t.receipt_header, t.vat_settings
        FROM branches b
        LEFT JOIN tenants t ON b.tenant_id = t.id
        WHERE b.id = $1 LIMIT 1`,
@@ -204,31 +356,59 @@ export class SystemService {
     // Default fallbacks prioritizing real branch details
     if (!settingsMap['store_info']) {
       settingsMap['store_info'] = {
-        name: branch?.name || 'Gebeya Supermarket',
-        code: branch?.code || 'TULU-01',
+        name: branch?.trade_name || branch?.tenant_name || branch?.name || 'Gebeya Supermarket',
+        branchName: branch?.name || 'Bole Medhanialem',
+        code: branch?.code || 'BOLE-01',
         tradeName: branch?.trade_name || branch?.tenant_name || 'Gebeya Retail PLC',
-        tinNumber: branch?.tin_number || '0082842324',
-        vatNumber: branch?.vat_registration_no || '',
-        phone: branch?.phone || '+251 911 234567',
-        address: branch?.address || 'Bole Medhanialem, Addis Ababa, Ethiopia',
+        tinNumber: branch?.tin_number || '0012345678',
+        vatNumber: branch?.vat_registration_no || 'VAT-ET-9921',
+        phone: branch?.phone || '+251 11 661 2233',
+        address: branch?.address || 'Ethiopia , Addis Ababa',
+        brandColor: '#1F8A4C',
         currency: 'ETB',
         vatRate: 0.15,
       };
     } else if (branch) {
-      if (!settingsMap['store_info'].code) settingsMap['store_info'].code = branch.code;
-      if (!settingsMap['store_info'].name) settingsMap['store_info'].name = branch.name;
+      if (!settingsMap['store_info'].code && branch.code) settingsMap['store_info'].code = branch.code;
+      if (!settingsMap['store_info'].name && branch.trade_name) settingsMap['store_info'].name = branch.trade_name;
+      if (!settingsMap['store_info'].branchName && branch.name) settingsMap['store_info'].branchName = branch.name;
       if (!settingsMap['store_info'].tinNumber && branch.tin_number) settingsMap['store_info'].tinNumber = branch.tin_number;
-      if (!settingsMap['store_info'].tradeName && branch.trade_name) settingsMap['store_info'].tradeName = branch.trade_name;
+      if (!settingsMap['store_info'].vatNumber && branch.vat_registration_no) settingsMap['store_info'].vatNumber = branch.vat_registration_no;
       if (!settingsMap['store_info'].phone && branch.phone) settingsMap['store_info'].phone = branch.phone;
+      if (!settingsMap['store_info'].address && branch.address) settingsMap['store_info'].address = branch.address;
     }
 
     if (!settingsMap['receipt_config']) {
       settingsMap['receipt_config'] = {
-        headerText: `እንኳን ደህና መጡ! / Welcome to ${branch?.name || 'Gebeya Supermarket'}`,
-        footerText: 'ዕቃዎች ከተገዙበት ቀን ጀምሮ በ3 ቀናት ውስጥ በደረሰኝ ይመለሳሉ።\nGoods exchangeable within 3 days with receipt.\nThank you for shopping with us!',
+        headerText: branch?.receipt_header || `እንኳን ደህና መጡ! / Welcome to ${branch?.trade_name || branch?.name || 'Gebeya Supermarket'}`,
+        footerText: 'ዕቃዎች ከተገዙበት ቀን ጀምሮ በ3 ቀናት ውስጥ በደረሰኝ ይመለሳሉ።\nGoods exchangeable within 3 days with receipt.\nTHANK YOU FOR SHOPPING WITH US!',
+        returnPolicyNote: 'Items exchangeable within 3 days with valid receipt.',
         taxInvoiceTitle: 'OFFICIAL CASH SALES INVOICE',
         showCashierName: true,
         showTinVat: true,
+      };
+    }
+    if (!settingsMap['sales_config']) {
+      settingsMap['sales_config'] = {
+        defaultPayment: 'CASH',
+        allowCreditSales: false,
+        maxDiscountNoPin: 10,
+        standardVatRate: 15,
+        returnPolicyNote: 'Items exchangeable within 3 days with valid receipt.',
+      };
+    }
+    if (!settingsMap['stock_config']) {
+      settingsMap['stock_config'] = {
+        lowStockThreshold: 5,
+        expiryWarningDays: 90,
+        expiryWarningUnit: 'months',
+        expiryWarningValue: 3,
+        expiryStep30Days: true,
+        expiryStep7Days: true,
+        categoryOverrides: [],
+        emailSummaryEnabled: false,
+        smsSummaryEnabled: false,
+        allowNegativeStock: false,
       };
     }
     if (!settingsMap['financial_config']) {
@@ -261,6 +441,7 @@ export class SystemService {
     );
     const tenantId = tenantRes.rows[0]?.tenant_id || '01900000-0000-7000-8000-000000000001';
 
+    // 1. Save the main setting key
     await this.db.query(
       `INSERT INTO system_settings (tenant_id, key, value, updated_at)
        VALUES ($1, $2, $3, clock_timestamp())
@@ -269,8 +450,54 @@ export class SystemService {
       [tenantId, dto.key, JSON.stringify(dto.value)],
     );
 
-    // Sync live branch table if store_info changed
-    if (dto.key === 'store_info' && dto.value) {
+    // Extract sub-configs if payload is general_config
+    const storeInfo = dto.key === 'general_config' ? dto.value?.store_info : (dto.key === 'store_info' ? dto.value : null);
+    const receiptConfig = dto.key === 'general_config' ? dto.value?.receipt_config : (dto.key === 'receipt_config' ? dto.value : null);
+    const salesConfig = dto.key === 'general_config' ? dto.value?.sales_config : (dto.key === 'sales_config' ? dto.value : null);
+    const stockConfig = dto.key === 'general_config' ? dto.value?.stock_config : (dto.key === 'stock_config' ? dto.value : null);
+
+    // Upsert individual section rows in system_settings if general_config was provided
+    if (dto.key === 'general_config') {
+      if (storeInfo) {
+        await this.db.query(
+          `INSERT INTO system_settings (tenant_id, key, value, updated_at)
+           VALUES ($1, 'store_info', $2, clock_timestamp())
+           ON CONFLICT (tenant_id, key) DO UPDATE
+           SET value = EXCLUDED.value, updated_at = clock_timestamp()`,
+          [tenantId, JSON.stringify(storeInfo)],
+        );
+      }
+      if (receiptConfig) {
+        await this.db.query(
+          `INSERT INTO system_settings (tenant_id, key, value, updated_at)
+           VALUES ($1, 'receipt_config', $2, clock_timestamp())
+           ON CONFLICT (tenant_id, key) DO UPDATE
+           SET value = EXCLUDED.value, updated_at = clock_timestamp()`,
+          [tenantId, JSON.stringify(receiptConfig)],
+        );
+      }
+      if (salesConfig) {
+        await this.db.query(
+          `INSERT INTO system_settings (tenant_id, key, value, updated_at)
+           VALUES ($1, 'sales_config', $2, clock_timestamp())
+           ON CONFLICT (tenant_id, key) DO UPDATE
+           SET value = EXCLUDED.value, updated_at = clock_timestamp()`,
+          [tenantId, JSON.stringify(salesConfig)],
+        );
+      }
+      if (stockConfig) {
+        await this.db.query(
+          `INSERT INTO system_settings (tenant_id, key, value, updated_at)
+           VALUES ($1, 'stock_config', $2, clock_timestamp())
+           ON CONFLICT (tenant_id, key) DO UPDATE
+           SET value = EXCLUDED.value, updated_at = clock_timestamp()`,
+          [tenantId, JSON.stringify(stockConfig)],
+        );
+      }
+    }
+
+    // 2. Sync live branch table if store_info changed
+    if (storeInfo) {
       try {
         await this.db.query(
           `UPDATE branches SET
@@ -279,19 +506,51 @@ export class SystemService {
              tin_number = COALESCE($3, tin_number),
              vat_registration_no = COALESCE($4, vat_registration_no),
              phone = COALESCE($5, phone),
+             code = COALESCE($6, code),
+             city = COALESCE($7, city),
+             settings = jsonb_set(COALESCE(settings, '{}'::jsonb), '{allow_negative_stock}', $8::jsonb),
              updated_at = clock_timestamp()
-           WHERE id = $6`,
+           WHERE id = $9`,
           [
-            dto.value.name || null,
-            dto.value.tradeName || null,
-            dto.value.tinNumber || null,
-            dto.value.vatNumber || null,
-            dto.value.phone || null,
+            storeInfo.branchName || storeInfo.name || null,
+            storeInfo.name || storeInfo.tradeName || null,
+            storeInfo.tinNumber || null,
+            storeInfo.vatNumber || null,
+            storeInfo.phone || null,
+            storeInfo.code || null,
+            storeInfo.address || null,
+            JSON.stringify(stockConfig?.allowNegativeStock ?? false),
             bId,
           ],
         );
       } catch (err: any) {
         this.logger.warn(`Could not sync branch row: ${err.message}`);
+      }
+
+      // 3. Sync live tenant row
+      try {
+        const vatSettings = {
+          rate: salesConfig?.standardVatRate ? salesConfig.standardVatRate / 100 : 0.15,
+          primaryColor: storeInfo.brandColor || '#1F8A4C',
+        };
+        await this.db.query(
+          `UPDATE tenants SET
+             name = COALESCE($1, name),
+             logo_url = COALESCE($2, logo_url),
+             receipt_header = COALESCE($3, receipt_header),
+             vat_settings = $4,
+             updated_at = clock_timestamp()
+           WHERE id = $5`,
+          [
+            storeInfo.name || null,
+            storeInfo.logoUrl || null,
+            receiptConfig?.headerText || null,
+            JSON.stringify(vatSettings),
+            tenantId,
+          ],
+        );
+      } catch (err: any) {
+        this.logger.warn(`Could not sync tenant row: ${err.message}`);
       }
     }
 

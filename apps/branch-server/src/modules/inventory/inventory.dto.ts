@@ -65,12 +65,16 @@ export class CreateAdjustmentItemDto {
   @IsNumber()
   @IsOptional()
   unitCost?: number;
+
+  @IsString()
+  @IsOptional()
+  reasonCode?: string;
 }
 
 export class CreateStockAdjustmentDto {
-  @IsEnum(['DAMAGED_GOODS', 'EXPIRED', 'INTERNAL_USE', 'CORRECTION', 'THEFT'], {
+  @IsEnum(['DAMAGED_GOODS', 'EXPIRED', 'INTERNAL_USE', 'CORRECTION', 'THEFT', 'COUNT_CORRECTION', 'FOUND_STOCK', 'RESTOCK'], {
     message:
-      'Reason code must be one of: DAMAGED_GOODS, EXPIRED, INTERNAL_USE, CORRECTION, THEFT',
+      'Reason code must be one of: DAMAGED_GOODS, EXPIRED, INTERNAL_USE, CORRECTION, THEFT, COUNT_CORRECTION, FOUND_STOCK, RESTOCK',
   })
   @IsNotEmpty()
   reasonCode!: StockAdjustmentReasonCode;
@@ -86,6 +90,10 @@ export class CreateStockAdjustmentDto {
   @IsString()
   @IsOptional()
   managerPin?: string;
+
+  @IsString()
+  @IsOptional()
+  branchId?: string;
 
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

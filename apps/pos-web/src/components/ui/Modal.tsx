@@ -6,7 +6,8 @@ export interface ModalProps {
   onClose: () => void;
   title: string;
   subtitle?: string;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
+  bodyPadding?: string;
   children: React.ReactNode;
 }
 
@@ -16,6 +17,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   subtitle,
   maxWidth = 'lg',
+  bodyPadding = 'p-6',
   children,
 }) => {
   useEffect(() => {
@@ -42,38 +44,37 @@ export const Modal: React.FC<ModalProps> = ({
     lg: 'max-w-lg',
     xl: 'max-w-xl',
     '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
     full: 'max-w-4xl',
   }[maxWidth];
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs transition-opacity duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs transition-opacity duration-200"
       onClick={onClose}
     >
       <div
-        className={`w-full ${maxWidthClasses} bg-surface rounded-2xl shadow-modal border border-border-subtle overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] transition-transform duration-200 scale-100`}
+        className={`w-full ${maxWidthClasses} bg-surface rounded-3xl shadow-modal border border-border-subtle overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[90vh] transition-transform duration-200 scale-100`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-border-subtle flex items-center justify-between flex-shrink-0 bg-surface">
+        <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-border-subtle flex items-center justify-between flex-shrink-0 bg-surface">
           <div>
-            <h2 className="text-lg font-semibold text-text-main leading-snug">{title}</h2>
-            {subtitle && (
-              <p className="text-[13px] text-text-muted mt-0.5">{subtitle}</p>
-            )}
+            <h2 className="text-xl font-bold text-text-main leading-snug">{title}</h2>
+            {subtitle && <p className="text-[14px] text-text-muted mt-0.5">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
-            aria-label="Close"
+            className="w-9 h-9 rounded-full hover:bg-surface-2 flex items-center justify-center text-text-muted hover:text-text-main transition-colors"
+            aria-label="Close modal"
           >
-            <X size={18} strokeWidth={1.75} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1">{children}</div>
+        <div className={`flex-1 overflow-y-auto ${bodyPadding}`}>{children}</div>
       </div>
     </div>
   );

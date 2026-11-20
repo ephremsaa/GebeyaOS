@@ -73,5 +73,6 @@ export const authAm = {
   profileModalTitle: 'የተጠቃሚ መገለጫ እና ቅንብሮች',
   changePassword: 'የይለፍ ቃል ቀይር',
   changePin: 'ፒን ቀይር',
+  logout: 'ውጣ',
 };
 

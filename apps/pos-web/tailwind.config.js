@@ -21,7 +21,13 @@ export default {
           glow: 'var(--accent-glow)',
         },
         page: 'var(--bg-page)',
-        sidebar: 'var(--bg-sidebar)',
+        sidebar: {
+          DEFAULT: 'var(--bg-sidebar)',
+          from: 'var(--sidebar-from)',
+          to: 'var(--sidebar-to)',
+          active: 'var(--sidebar-active)',
+          hover: 'var(--sidebar-hover)',
+        },
         card: 'var(--bg-card)',
         surface: 'var(--bg-surface)',
         'surface-2': 'var(--bg-surface-2)',
@@ -74,6 +80,11 @@ export default {
           DEFAULT: 'var(--danger)',
           soft: 'var(--danger-soft)',
           fg: 'var(--danger-fg)',
+        },
+        purple: {
+          DEFAULT: 'var(--purple)',
+          soft: 'var(--purple-soft)',
+          fg: 'var(--purple-fg)',
         },
         info: {
           DEFAULT: 'var(--info)',
