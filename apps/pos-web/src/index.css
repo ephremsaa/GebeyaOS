@@ -333,6 +333,7 @@
     justify-content: center;
     gap: 0.5rem;
     font-weight: 600;
+    -webkit-user-select: none;
     user-select: none;
     cursor: pointer;
     border: 1px solid transparent;

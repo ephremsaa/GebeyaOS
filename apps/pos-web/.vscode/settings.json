@@ -1,5 +1,6 @@
 {
   "typescript.tsdk": "../../node_modules/typescript/lib",
+  "vscode-edge-devtools.webhint": false,
   "files.associations": {
     "*.css": "tailwindcss"
   },
