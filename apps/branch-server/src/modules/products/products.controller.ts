@@ -35,7 +35,8 @@ export class ProductsController {
     @Query() query: ProductQueryDto,
     @Headers('x-branch-id') branchIdHeader?: string,
   ) {
-    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const isAll = !branchIdHeader || branchIdHeader.toUpperCase() === 'ALL' || branchIdHeader === '00000000-0000-0000-0000-000000000001';
+    const branchId = isAll ? 'ALL' : branchIdHeader;
     return this.productsService.getProducts(branchId, query);
   }
 

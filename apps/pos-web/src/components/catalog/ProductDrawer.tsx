@@ -102,6 +102,9 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
   const [categoriesList, setCategoriesList] = useState(initialCategories);
   useEffect(() => {
     setCategoriesList(initialCategories);
+    if (!categoryId && initialCategories.length > 0) {
+      setCategoryId(initialCategories[0].id);
+    }
   }, [initialCategories]);
 
   // Form state
@@ -259,7 +262,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setSku(`SKU-${Date.now().toString().slice(-6)}`);
       setNameEn('');
       setNameAm('');
-      setCategoryId(categoriesList[0]?.id || '');
+      setCategoryId(categoriesList[0]?.id || initialCategories[0]?.id || '');
       setUomCode('PCS');
       setPackMultiplier(1);
       setPriceBeforeVat('0.00');
@@ -413,7 +416,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
         sku: finalSku,
         name_en: effectiveNameEn,
         name_am: nameAm.trim() || undefined,
-        category_id: categoryId || categoriesList[0]?.id,
+        category_id: categoryId || categoriesList[0]?.id || initialCategories[0]?.id || undefined,
         uom_code: uomCode,
         base_price: finalSellingPrice,
         cost_price: Number(costPrice) || 0,

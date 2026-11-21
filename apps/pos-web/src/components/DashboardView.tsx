@@ -295,33 +295,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => setDateRange('today')}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-bold transition cursor-pointer ${
-                dateRange === 'today'
+              className={`px-3 py-1.5 rounded-lg text-[13px] font-bold transition cursor-pointer ${dateRange === 'today'
                   ? 'bg-primary text-white shadow-xs'
                   : 'text-text-muted hover:text-text-main hover:bg-surface-2'
-              }`}
+                }`}
             >
               {language === 'am' ? 'ዛሬ' : 'Today'}
             </button>
             <button
               type="button"
               onClick={() => setDateRange('week')}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-bold transition cursor-pointer ${
-                dateRange === 'week'
+              className={`px-3 py-1.5 rounded-lg text-[13px] font-bold transition cursor-pointer ${dateRange === 'week'
                   ? 'bg-primary text-white shadow-xs'
                   : 'text-text-muted hover:text-text-main hover:bg-surface-2'
-              }`}
+                }`}
             >
               {language === 'am' ? 'በዚህ ሳምንት' : 'This week'}
             </button>
             <button
               type="button"
               onClick={() => setDateRange('month')}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-bold transition cursor-pointer ${
-                dateRange === 'month'
+              className={`px-3 py-1.5 rounded-lg text-[13px] font-bold transition cursor-pointer ${dateRange === 'month'
                   ? 'bg-primary text-white shadow-xs'
                   : 'text-text-muted hover:text-text-main hover:bg-surface-2'
-              }`}
+                }`}
             >
               {language === 'am' ? 'በዚህ ወር' : 'This month'}
             </button>
@@ -979,11 +976,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 >
                   <div className="flex items-center gap-3 truncate">
                     <div
-                      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        item.severity === 'DANGER'
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${item.severity === 'DANGER'
                           ? 'bg-rose-50 text-rose-600'
                           : 'bg-amber-50 text-amber-600'
-                      }`}
+                        }`}
                     >
                       {item.severity === 'DANGER' ? (
                         <AlertCircle size={18} />
@@ -1003,11 +999,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   <div className="text-right flex-shrink-0">
                     <span
-                      className={`inline-block px-2 py-0.5 rounded-md text-[12px] font-extrabold font-mono ${
-                        item.currentStock <= 0
+                      className={`inline-block px-2 py-0.5 rounded-md text-[12px] font-extrabold font-mono ${item.currentStock <= 0
                           ? 'bg-rose-100 text-rose-800'
                           : 'bg-amber-100 text-amber-800'
-                      }`}
+                        }`}
                     >
                       {item.currentStock} {item.uom}
                     </span>

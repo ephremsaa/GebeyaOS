@@ -26,8 +26,8 @@ export class CreateProductDto {
   name_am?: string;
 
   @IsUUID()
-  @IsNotEmpty()
-  category_id!: string;
+  @IsOptional()
+  category_id?: string;
 
   @IsString()
   @IsNotEmpty()

@@ -123,7 +123,10 @@ export const SettingsView: React.FC = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('gebeyaos_access_token');
-      const branchId = currentUser?.branchId || localStorage.getItem('gebeyaos_branch_id') || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+      const rawBranchId = currentUser?.branchId || localStorage.getItem('gebeyaos_branch_id');
+      const branchId = (!rawBranchId || rawBranchId.toUpperCase() === 'ALL' || rawBranchId === '00000000-0000-0000-0000-000000000001')
+        ? '01a19309-1d43-7444-b260-5b2ffac3e40c'
+        : rawBranchId;
       const res = await fetch('/api/system/settings', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -210,7 +213,10 @@ export const SettingsView: React.FC = () => {
     setErrorToast(null);
     try {
       const token = localStorage.getItem('gebeyaos_access_token');
-      const branchId = currentUser?.branchId || localStorage.getItem('gebeyaos_branch_id') || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+      const rawBranchId = currentUser?.branchId || localStorage.getItem('gebeyaos_branch_id');
+      const branchId = (!rawBranchId || rawBranchId.toUpperCase() === 'ALL' || rawBranchId === '00000000-0000-0000-0000-000000000001')
+        ? '01a19309-1d43-7444-b260-5b2ffac3e40c'
+        : rawBranchId;
       const userId = currentUser?.id || localStorage.getItem('gebeyaos_user_id') || '01900000-0000-7000-8000-000000000002';
 
       const payload: any = {

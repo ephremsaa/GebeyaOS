@@ -63,6 +63,14 @@ export class ProductsService {
     const allowDiscount = dto.allow_discount ?? true;
     const hasExpiryDate = dto.has_expiry_date ?? false;
 
+    let categoryId = dto.category_id;
+    if (!categoryId || categoryId === '') {
+      const defaultCat = await this.db.query<{ id: string }>(
+        'SELECT id FROM categories WHERE is_active = TRUE ORDER BY code ASC LIMIT 1',
+      );
+      categoryId = defaultCat.rows[0]?.id || '01a1a2a5-8698-7d58-ae4c-b6ef9455f1a1';
+    }
+
     try {
       const result = await this.db.query<Product>(
         `INSERT INTO products (
@@ -77,7 +85,7 @@ export class ProductsService {
           dto.sku,
           dto.name_en,
           dto.name_am || null,
-          dto.category_id,
+          categoryId,
           dto.uom_code,
           dto.base_price,
           costPrice,
@@ -404,9 +412,10 @@ export class ProductsService {
     branchId: string,
     query: ProductQueryDto,
   ): Promise<{ total: number; rows: any[] }> {
+    const isAllBranches = !branchId || branchId.toUpperCase() === 'ALL' || branchId === '00000000-0000-0000-0000-000000000001';
     let whereClauses = ['1=1'];
-    const params: any[] = [branchId];
-    let idx = 2;
+    const params: any[] = isAllBranches ? [] : [branchId];
+    let idx = isAllBranches ? 1 : 2;
 
     if (query.active_only !== false) {
       whereClauses.push(`p.is_active = TRUE`);
@@ -436,7 +445,7 @@ export class ProductsService {
       SELECT COUNT(*) as count FROM (
         SELECT p.id
         FROM products p
-        LEFT JOIN stock_ledger l ON p.id = l.product_id AND l.branch_id = $1
+        LEFT JOIN stock_ledger l ON p.id = l.product_id ${isAllBranches ? '' : 'AND l.branch_id = $1'}
         WHERE ${whereSql}
         GROUP BY p.id
         ${havingSql}
@@ -458,7 +467,7 @@ export class ProductsService {
         (SELECT MIN(bt.expiry_date) FROM batches bt WHERE bt.product_id = p.id AND bt.current_quantity > 0) as nearest_expiry
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN stock_ledger l ON p.id = l.product_id AND l.branch_id = $1
+      LEFT JOIN stock_ledger l ON p.id = l.product_id ${isAllBranches ? '' : 'AND l.branch_id = $1'}
       LEFT JOIN product_barcodes b ON p.id = b.product_id
       WHERE ${whereSql}
       GROUP BY p.id, c.name_en, c.name_am

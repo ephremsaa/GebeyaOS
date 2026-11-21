@@ -380,7 +380,8 @@ export class SystemService {
       if (gc.stock_config) settingsMap['stock_config'] = { ...(settingsMap['stock_config'] || {}), ...gc.stock_config };
     }
 
-    const bId = branchId || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    const isAll = !branchId || branchId.toUpperCase() === 'ALL' || branchId === '00000000-0000-0000-0000-000000000001';
+    const bId = isAll ? '01a19309-1d43-7444-b260-5b2ffac3e40c' : branchId;
     const branchRes = await this.db.query<any>(
       `SELECT b.id, b.code, b.name, b.trade_name, b.tin_number, b.vat_registration_no, b.phone,
               COALESCE(b.city, '') || CASE WHEN b.subcity IS NOT NULL THEN ', ' || b.subcity ELSE '' END as address,
@@ -473,7 +474,8 @@ export class SystemService {
    * Saves or updates a system setting key.
    */
   async saveSetting(dto: UpdateSystemSettingDto, userId?: string, branchId?: string): Promise<void> {
-    const bId = branchId || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    const isAll = !branchId || branchId.toUpperCase() === 'ALL' || branchId === '00000000-0000-0000-0000-000000000001';
+    const bId = isAll ? '01a19309-1d43-7444-b260-5b2ffac3e40c' : branchId;
     const tenantRes = await this.db.query<{ tenant_id: string }>(
       `SELECT tenant_id FROM branches WHERE id = $1 UNION SELECT id as tenant_id FROM tenants LIMIT 1`,
       [bId],

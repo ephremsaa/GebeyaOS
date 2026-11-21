@@ -901,7 +901,13 @@ export const posApi = {
     if (params.offset) q.append('offset', String(params.offset));
 
     const headers: Record<string, string> = {};
-    if (params.branchId) headers['x-branch-id'] = params.branchId;
+    const token = localStorage.getItem('gebeyaos_access_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const rawBranchId = params.branchId || localStorage.getItem('gebeyaos_branch_id');
+    const bId = (!rawBranchId || rawBranchId.toUpperCase() === 'ALL' || rawBranchId === '00000000-0000-0000-0000-000000000001')
+      ? 'ALL'
+      : rawBranchId;
+    headers['x-branch-id'] = bId;
 
     const res = await fetch(`${API_BASE}/products?${q.toString()}`, { headers });
     if (!res.ok) throw new Error('Failed to load products');
@@ -913,7 +919,13 @@ export const posApi = {
    */
   async createProduct(dto: any, branchId?: string): Promise<any> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (branchId) headers['x-branch-id'] = branchId;
+    const token = localStorage.getItem('gebeyaos_access_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const rawBranchId = branchId || localStorage.getItem('gebeyaos_branch_id');
+    const bId = (!rawBranchId || rawBranchId.toUpperCase() === 'ALL' || rawBranchId === '00000000-0000-0000-0000-000000000001')
+      ? '01a19309-1d43-7444-b260-5b2ffac3e40c'
+      : rawBranchId;
+    headers['x-branch-id'] = bId;
 
     const res = await fetch(`${API_BASE}/products`, {
       method: 'POST',
@@ -932,7 +944,13 @@ export const posApi = {
    */
   async updateProduct(id: string, dto: any, branchId?: string): Promise<{ product: any; stockWarning?: string }> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (branchId) headers['x-branch-id'] = branchId;
+    const token = localStorage.getItem('gebeyaos_access_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const rawBranchId = branchId || localStorage.getItem('gebeyaos_branch_id');
+    const bId = (!rawBranchId || rawBranchId.toUpperCase() === 'ALL' || rawBranchId === '00000000-0000-0000-0000-000000000001')
+      ? '01a19309-1d43-7444-b260-5b2ffac3e40c'
+      : rawBranchId;
+    headers['x-branch-id'] = bId;
 
     const res = await fetch(`${API_BASE}/products/${encodeURIComponent(id)}`, {
       method: 'PUT',

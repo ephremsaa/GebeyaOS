@@ -1203,6 +1203,10 @@ export class PosService {
    * Retrieves product catalog for POS with branch overrides, nearest FEFO expiry status, and current stock.
    */
   async getCatalog(branchId: string): Promise<any[]> {
+    const isAllBranches = !branchId || branchId.toUpperCase() === 'ALL' || branchId === '00000000-0000-0000-0000-000000000001';
+    const primaryBranchId = '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    const effectiveBranchId = isAllBranches ? primaryBranchId : branchId;
+
     const query = `
       SELECT 
         p.id,
@@ -1240,19 +1244,19 @@ export class PosService {
       LEFT JOIN LATERAL (
         SELECT COALESCE(SUM(quantity_change), 0) as current_stock
         FROM stock_ledger
-        WHERE branch_id = $1 AND product_id = p.id
+        WHERE ${isAllBranches ? '1=1' : 'branch_id = $1'} AND product_id = p.id
       ) sl ON TRUE
       LEFT JOIN LATERAL (
         SELECT b.batch_number, b.expiry_date, b.clearance_price, b.clearance_start_date, b.clearance_end_date
         FROM batches b
-        WHERE b.product_id = p.id AND b.branch_id = $1 AND b.current_quantity > 0
+        WHERE b.product_id = p.id ${isAllBranches ? '' : 'AND b.branch_id = $1'} AND b.current_quantity > 0
         ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC
         LIMIT 1
       ) nb ON TRUE
       WHERE p.is_active = TRUE
       ORDER BY p.name_en ASC
     `;
-    const res = await this.db.query<any>(query, [branchId]);
+    const res = await this.db.query<any>(query, [effectiveBranchId]);
     const today = new Date().toISOString().slice(0, 10);
 
     return res.rows.map((r) => {
