@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     GebeyaOS – Database Restore Script (Windows)
 

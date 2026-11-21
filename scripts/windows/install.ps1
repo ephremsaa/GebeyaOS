@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     GebeyaOS Branch Server – Windows Installer
     Installs and configures the GebeyaOS Point-of-Sale system on a Windows shop PC.

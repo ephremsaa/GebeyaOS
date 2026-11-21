@@ -34,6 +34,8 @@ test-results/
 playwright-report/
 
 # Backups and local databases
+dist-release/
+backups/*.dump
 backups/*.sql.gz
 backups/*.log
 backups/*.tar

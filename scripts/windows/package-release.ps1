@@ -1,5 +1,4 @@
-﻿#Requires -RunAsAdministrator
-<#
+﻿<#
 .SYNOPSIS
     GebeyaOS – Production Release Packager (Windows)
     Builds the production release zip bundle for offline supermarket shop deployment.
@@ -91,11 +90,11 @@ if (Test-Path "docs\deploy") {
     Copy-Item "docs\deploy\*" "$BundleDir\docs\deploy\" -Force
 }
 
-# 4. Install production dependencies inside the bundle
-Write-Host "▶ Installing production-only node_modules..." -ForegroundColor Yellow
-Set-Location $targetBranch
-npm install --omit=dev --no-audit --no-fund
-Set-Location $RepoRoot
+# 4. Include production dependencies inside the bundle
+Write-Host "▶ Bundling production dependencies..." -ForegroundColor Yellow
+Copy-Item "$RepoRoot\package.json" "$BundleDir\package.json"
+if (Test-Path "$RepoRoot\package-lock.json") { Copy-Item "$RepoRoot\package-lock.json" "$BundleDir\package-lock.json" }
+Copy-Item "$RepoRoot\node_modules" "$BundleDir\node_modules" -Recurse -Force
 
 # 5. Compress to ZIP
 Write-Host "▶ Compressing bundle to $ZipFile..." -ForegroundColor Yellow

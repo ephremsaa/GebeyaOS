@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GebeyaOS – Cashier Terminal Shortcut Creator
     Creates a Chrome/Edge kiosk-mode shortcut for cashier tablets.
@@ -54,10 +54,10 @@ if (-not $browser) {
 # Build arguments
 if ($KioskMode) {
     $args = "--kiosk --kiosk-printing --no-first-run --disable-translate --disable-extensions --disable-pinch --overscroll-history-navigation=0 $Url"
-    $shortcutName = "GebeyaOS – Cashier POS"
+    $shortcutName = "GebeyaOS - Cashier POS"
 } else {
     $args = "--app=$Url --new-window --no-first-run"
-    $shortcutName = "GebeyaOS – Manager Window"
+    $shortcutName = "GebeyaOS - Manager Window"
 }
 
 # Create shortcut
@@ -71,7 +71,7 @@ $shortcut.IconLocation = $browser.Exe
 $shortcut.Save()
 
 Write-Host ""
-Write-Host "  ✓ Shortcut created on Desktop: '$shortcutName'" -ForegroundColor Green
+Write-Host "  [OK] Shortcut created on Desktop: '$shortcutName'" -ForegroundColor Green
 Write-Host "    Browser: $($browser.Name)" -ForegroundColor Gray
 Write-Host "    URL: $Url" -ForegroundColor Gray
 if ($KioskMode) {
