@@ -27,8 +27,11 @@ export class SystemController {
   constructor(private readonly systemService: SystemService) {}
 
   @Get('dashboard-summary')
-  async getDashboardSummary(@Headers('x-branch-id') branchIdHeader?: string) {
-    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+  async getDashboardSummary(
+    @Headers('x-branch-id') branchIdHeader?: string,
+    @Query('branchId') branchIdQuery?: string,
+  ) {
+    const branchId = branchIdQuery || branchIdHeader || process.env.BRANCH_ID || 'ALL';
     return this.systemService.getDashboardSummary(branchId);
   }
 

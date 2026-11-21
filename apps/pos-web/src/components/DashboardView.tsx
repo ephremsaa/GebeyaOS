@@ -121,7 +121,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/system/dashboard-summary');
+      const effectiveBranch = currentUser?.branchId || 'ALL';
+      const headers: Record<string, string> = {
+        'x-branch-id': effectiveBranch,
+      };
+      const token = localStorage.getItem('gebeyaos_access_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`/api/system/dashboard-summary?branchId=${encodeURIComponent(effectiveBranch)}`, {
+        headers,
+      });
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -135,9 +146,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   useEffect(() => {
     fetchDashboardData();
-    const timer = setInterval(fetchDashboardData, 30000); // 30s auto-refresh
-    return () => clearInterval(timer);
-  }, []);
+    const timer = setInterval(fetchDashboardData, 15000); // 15s auto-refresh
+    const onSaleCompleted = () => fetchDashboardData();
+    window.addEventListener('gebeyaos:sale-completed', onSaleCompleted);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('gebeyaos:sale-completed', onSaleCompleted);
+    };
+  }, [currentUser?.branchId]);
 
   // Time-of-day greeting
   const greeting = useMemo(() => {

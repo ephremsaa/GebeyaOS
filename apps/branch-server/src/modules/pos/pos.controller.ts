@@ -106,8 +106,8 @@ export class PosController {
     @Headers('x-branch-id') branchIdHeader?: string,
     @Headers('x-user-id') userIdHeader?: string,
   ) {
-    const branchId = branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
-    const cashierId = userIdHeader || '00000000-0000-0000-0000-000000000002';
+    const branchId = branchIdHeader || dto.branchId || process.env.BRANCH_ID || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    const cashierId = userIdHeader || '01a19309-1e78-7e91-a0a7-56edac4beb90';
     return this.posService.checkoutSale(branchId, cashierId, dto);
   }
 

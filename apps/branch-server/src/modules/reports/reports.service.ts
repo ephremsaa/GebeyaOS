@@ -778,7 +778,7 @@ export class ReportsService {
     endDate?: string,
     period?: string,
   ) {
-    const targetBranch = branchId || '00000000-0000-0000-0000-000000000001';
+    const targetBranch = branchId || 'ALL';
 
     const [dailySales, profitability, valuation, expiring, cashiers, freshness] =
       await Promise.all([

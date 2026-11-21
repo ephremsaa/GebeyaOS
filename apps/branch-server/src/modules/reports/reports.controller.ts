@@ -16,7 +16,7 @@ export class ReportsController {
     @Query() query: DateRangeQueryDto,
     @Headers('x-branch-id') branchIdHeader?: string,
   ) {
-    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || 'ALL';
     return this.reportsService.getComprehensiveReport(
       branchId,
       query.startDate,
@@ -30,7 +30,7 @@ export class ReportsController {
     @Query() query: DateRangeQueryDto,
     @Headers('x-branch-id') branchIdHeader?: string,
   ) {
-    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || 'ALL';
     return this.reportsService.getDailySalesReport(
       branchId,
       query.startDate,
@@ -44,7 +44,7 @@ export class ReportsController {
     @Query() query: DateRangeQueryDto,
     @Headers('x-branch-id') branchIdHeader?: string,
   ) {
-    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || 'ALL';
     return this.reportsService.getProductProfitabilityReport(
       branchId,
       query.startDate,
@@ -58,7 +58,7 @@ export class ReportsController {
     @Query() query: DateRangeQueryDto,
     @Headers('x-branch-id') branchIdHeader?: string,
   ) {
-    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || 'ALL';
     return this.reportsService.getStockValuationReport(branchId);
   }
 
@@ -67,7 +67,7 @@ export class ReportsController {
     @Query() query: ExpiringStockQueryDto,
     @Headers('x-branch-id') branchIdHeader?: string,
   ) {
-    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || 'ALL';
     return this.reportsService.getExpiringStockReport(
       branchId,
       query.days ?? 30,
@@ -79,7 +79,7 @@ export class ReportsController {
     @Query() query: DateRangeQueryDto,
     @Headers('x-branch-id') branchIdHeader?: string,
   ) {
-    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || '00000000-0000-0000-0000-000000000001';
+    const branchId = query.branchId || branchIdHeader || process.env.BRANCH_ID || 'ALL';
     return this.reportsService.getCashierPerformanceReport(
       branchId,
       query.startDate,

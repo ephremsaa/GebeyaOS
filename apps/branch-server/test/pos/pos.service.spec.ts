@@ -435,6 +435,116 @@ describe('PosService', () => {
       );
     });
 
+    it('processes checkout using lines and method for backwards frontend compatibility', async () => {
+      // 1. Verify shift
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ id: 'shift-01', shift_number: 1 }],
+      });
+      // 2. Fetch branch info
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ code: 'BOLE01', name_en: 'Bole Medhanialem' }],
+      });
+      // 3. Fetch terminal info
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ code: 'POS01' }],
+      });
+      // 4. Sequential count
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ count: '2' }],
+      });
+      // 5. Generate sale ID
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ id: 'sale-lines-01' }],
+      });
+      // 6. Product lookup
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'prod-bread',
+            name_en: 'Special Bread',
+            base_price: '50.00',
+            cost_price: '35.00',
+            is_vat_applicable: true,
+            effective_price: '50.00',
+          },
+        ],
+      });
+      // 7. Insert sale
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sale-lines-01',
+            branch_id: 'b-01',
+            terminal_id: 'term-01',
+            shift_id: 'shift-01',
+            receipt_number: 'REC-002',
+            cashier_id: 'cashier-01',
+            subtotal: '43.48',
+            discount_total: '0.00',
+            taxable_subtotal: '43.48',
+            tax_exempt_subtotal: '0.00',
+            tax_total: '6.52',
+            grand_total: '50.00',
+            total_paid: '50.00',
+            change_given: '0.00',
+            payment_status: 'PAID',
+            fiscal_status: 'FISCALIZED',
+            fiscal_receipt_no: 'FRN-REC-002',
+            fiscal_mrc: 'MOR-BOLE01-POS01',
+            reprint_count: 0,
+            client_timestamp: new Date('2026-10-21T14:00:00Z'),
+            server_timestamp: new Date('2026-10-21T14:00:01Z'),
+            created_at: new Date('2026-10-21T14:00:01Z'),
+          },
+        ],
+      });
+      // 8. Insert item
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'item-01',
+            sale_id: 'sale-lines-01',
+            product_id: 'prod-bread',
+            quantity: '1',
+            unit_price: '50.00',
+            unit_cost: '35.00',
+            discount_amount: '0',
+            tax_rate: '0.15',
+            tax_amount: '6.52',
+            line_total: '50.00',
+            created_at: new Date(),
+          },
+        ],
+      });
+      // 9. Insert payment
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'pay-01',
+            sale_id: 'sale-lines-01',
+            payment_method: 'CASH',
+            amount: '50.00',
+            created_at: new Date(),
+          },
+        ],
+      });
+      // 10. Outbox event
+      mockClient.query.mockResolvedValueOnce({
+        rows: [{ id: 'outbox-01' }],
+      });
+
+      const result = await service.checkoutSale('b-01', 'cashier-01', {
+        terminalId: 'term-01',
+        shiftId: 'shift-01',
+        lines: [{ productId: 'prod-bread', quantity: 1, unitPrice: 50 }],
+        payments: [{ method: 'CASH', amount: 50, reference: 'REF-1' }],
+      } as any);
+
+      expect(result.sale).toBeDefined();
+      expect(result.sale.grandTotal).toBe(50);
+      expect(result.thermalReceipt).toContain('Special Bread');
+    });
+
     it('rejects checkout when payment is underpaid', async () => {
       // 1. Shift
       mockClient.query.mockResolvedValueOnce({

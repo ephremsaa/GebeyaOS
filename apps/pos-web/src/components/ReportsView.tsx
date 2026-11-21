@@ -42,15 +42,8 @@ interface BranchOption {
   nameAm?: string;
 }
 
-const AVAILABLE_BRANCHES: BranchOption[] = [
-  { id: 'ALL', code: 'ALL', name: 'All Branches (Consolidated HQ)', nameAm: 'ሁሉም ቅርንጫፎች (የዋና መስሪያ ቤት)' },
-  { id: '00000000-0000-0000-0000-000000000001', code: 'BOLE-01', name: 'Bole Medhanialem Supermarket', nameAm: 'ቦሌ መድኃኔዓለም ሱፐርማርኬት' },
-  { id: '00000000-0000-0000-0000-000000000002', code: 'CMC-02', name: 'CMC Mega Hypermarket', nameAm: 'ሲኤምሲ ሜጋ ሃይፐርማርኬት' },
-  { id: '00000000-0000-0000-0000-000000000003', code: 'PIAZZA-03', name: 'Piazza Express Store', nameAm: 'ፒያሳ ኤክስፕረስ መደብር' },
-];
-
 export const ReportsView: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, assignedBranches } = useAuth();
   const { t, language } = useI18n();
   const brand = useBrand();
 
@@ -58,9 +51,7 @@ export const ReportsView: React.FC = () => {
   const isHqUser = currentUser?.role === 'OWNER' || currentUser?.role === 'HQ_ADMIN';
 
   // Filters state
-  const [selectedBranch, setSelectedBranch] = useState<string>(
-    isHqUser ? 'ALL' : currentUser?.branchId || '00000000-0000-0000-0000-000000000001',
-  );
+  const [selectedBranch, setSelectedBranch] = useState<string>('ALL');
   const [timeRange, setTimeRange] = useState<ReportTimeRange>('today');
   const [customStartDate, setCustomStartDate] = useState<string>('2026-10-01');
   const [customEndDate, setCustomEndDate] = useState<string>('2026-10-30');
@@ -82,6 +73,35 @@ export const ReportsView: React.FC = () => {
   const [expiring, setExpiring] = useState<ExpiringStockReport | null>(null);
   const [cashiers, setCashiers] = useState<CashierPerformanceItem[]>([]);
   const [branchFreshness, setBranchFreshness] = useState<BranchSyncFreshness[]>([]);
+
+  // Dynamic available branches
+  const availableBranches = useMemo<BranchOption[]>(() => {
+    const list: BranchOption[] = [
+      { id: 'ALL', code: 'ALL', name: 'All Branches (Consolidated HQ)', nameAm: 'ሁሉም ቅርንጫፎች (የዋና መስሪያ ቤት)' },
+    ];
+    if (assignedBranches && assignedBranches.length > 0) {
+      assignedBranches.forEach((b) => {
+        if (!list.some((item) => item.id === b.id)) {
+          list.push({ id: b.id, code: b.code, name: b.name });
+        }
+      });
+    }
+    if (branchFreshness && branchFreshness.length > 0) {
+      branchFreshness.forEach((f) => {
+        if (!list.some((item) => item.id === f.branchId)) {
+          list.push({ id: f.branchId, code: f.branchCode, name: f.branchName });
+        }
+      });
+    }
+    if (currentUser?.branchId && !list.some((item) => item.id === currentUser.branchId)) {
+      list.push({
+        id: currentUser.branchId,
+        code: currentUser.branchCode || 'BRANCH',
+        name: currentUser.branchName || 'Current Branch',
+      });
+    }
+    return list;
+  }, [assignedBranches, branchFreshness, currentUser]);
 
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -108,7 +128,16 @@ export const ReportsView: React.FC = () => {
         params.append('endDate', customEndDate);
       }
 
-      const res = await fetch(`/api/reports/summary?${params.toString()}`);
+      const headers: Record<string, string> = {};
+      const token = localStorage.getItem('gebeyaos_access_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      if (selectedBranch && selectedBranch !== 'ALL') {
+        headers['x-branch-id'] = selectedBranch;
+      }
+
+      const res = await fetch(`/api/reports/summary?${params.toString()}`, { headers });
       if (res.ok) {
         const data = await res.json();
         setDailySales(data.dailySales);
@@ -130,6 +159,9 @@ export const ReportsView: React.FC = () => {
 
   useEffect(() => {
     fetchReportData();
+    const onSaleCompleted = () => fetchReportData();
+    window.addEventListener('gebeyaos:sale-completed', onSaleCompleted);
+    return () => window.removeEventListener('gebeyaos:sale-completed', onSaleCompleted);
   }, [selectedBranch, timeRange, customStartDate, customEndDate]);
 
   // Formatter helpers
@@ -161,7 +193,7 @@ export const ReportsView: React.FC = () => {
 
   // Helper for branch name localized
   const getBranchDisplayName = (branchId: string) => {
-    const b = AVAILABLE_BRANCHES.find((item) => item.id === branchId);
+    const b = availableBranches.find((item) => item.id === branchId);
     if (!b) return currentUser?.branchName || 'Bole Branch';
     if (b.id === 'ALL') return t('reports.allBranches');
     return language === 'am' && b.nameAm ? b.nameAm : b.name;
@@ -270,7 +302,7 @@ export const ReportsView: React.FC = () => {
                 onChange={(e) => setSelectedBranch(e.target.value)}
                 style={{ color: 'var(--text-main)' }}
               >
-                {AVAILABLE_BRANCHES.map((b) => (
+                {availableBranches.map((b) => (
                   <option key={b.id} value={b.id} className="bg-slate-900 text-slate-100">
                     {b.id === 'ALL'
                       ? t('reports.allBranches')

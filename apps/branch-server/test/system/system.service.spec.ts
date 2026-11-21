@@ -70,6 +70,29 @@ describe('SystemService', () => {
       expect(summary.syncStatus.pendingOutboxCount).toBe(5);
       expect(summary.cashDrawer.thresholdAlert).toBe(false);
     });
+
+    it('aggregates consolidated sales across ALL branches when branchId is ALL or omitted', async () => {
+      (mockDb.query as any).mockImplementation((sql: string) => {
+        if (sql.includes('COALESCE(SUM(grand_total), 0) as gross_sales')) {
+          expect(sql).toContain('1=1');
+          return Promise.resolve({
+            rows: [{ gross_sales: '12000.00', net_sales: '10434.78', transaction_count: '15', tax_total: '1565.22' }],
+          });
+        }
+        if (sql.includes('sale_payments sp')) {
+          expect(sql).toContain('1=1');
+          return Promise.resolve({
+            rows: [{ payment_method: 'CASH', total_amount: '12000.00' }],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const summary = await service.getDashboardSummary('ALL');
+      expect(summary.todaySales.grossSales).toBe(12000);
+      expect(summary.todaySales.transactionCount).toBe(15);
+      expect(summary.todaySales.cashCollected).toBe(12000);
+    });
   });
 
   describe('createBackup & restoreBackup', () => {

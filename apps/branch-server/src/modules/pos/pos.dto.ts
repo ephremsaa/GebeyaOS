@@ -112,20 +112,60 @@ export class SaleLineItemDto {
   @IsString()
   @IsOptional()
   discountReason?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isVat?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isVatApplicable?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  vatRate?: number;
+
+  @IsNumber()
+  @IsOptional()
+  vatAmount?: number;
+
+  @IsNumber()
+  @IsOptional()
+  lineTotal?: number;
+
+  @IsNumber()
+  @IsOptional()
+  scaleWeightGrams?: number;
 }
 
 export class SalePaymentDto {
   @IsEnum(['CASH', 'TELEBIRR', 'CBE_BIRR', 'CARD_POS', 'BANK_TRANSFER'])
-  @IsNotEmpty()
-  paymentMethod!: PaymentMethod;
+  @IsOptional()
+  paymentMethod?: PaymentMethod;
+
+  @IsEnum(['CASH', 'TELEBIRR', 'CBE_BIRR', 'CARD_POS', 'BANK_TRANSFER'])
+  @IsOptional()
+  method?: PaymentMethod;
 
   @IsNumber()
   @Min(0.01)
   amount!: number;
 
+  @IsNumber()
+  @IsOptional()
+  tendered?: number;
+
+  @IsNumber()
+  @IsOptional()
+  change?: number;
+
   @IsString()
   @IsOptional()
   providerReference?: string;
+
+  @IsString()
+  @IsOptional()
+  reference?: string;
 
   @IsBoolean()
   @IsOptional()
@@ -137,8 +177,12 @@ export class SalePaymentDto {
 
 export class CreateSaleDto {
   @IsUUID()
-  @IsNotEmpty()
-  terminalId!: string;
+  @IsOptional()
+  branchId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  terminalId?: string;
 
   @IsUUID()
   @IsNotEmpty()
@@ -152,15 +196,44 @@ export class CreateSaleDto {
   @IsOptional()
   clientTimestamp?: string;
 
-  @ArrayMinSize(1)
+  @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => SaleLineItemDto)
-  items!: SaleLineItemDto[];
+  items?: SaleLineItemDto[];
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => SaleLineItemDto)
+  lines?: SaleLineItemDto[];
 
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => SalePaymentDto)
   payments!: SalePaymentDto[];
+
+  @IsNumber()
+  @IsOptional()
+  subtotal?: number;
+
+  @IsNumber()
+  @IsOptional()
+  taxTotal?: number;
+
+  @IsNumber()
+  @IsOptional()
+  discountTotal?: number;
+
+  @IsNumber()
+  @IsOptional()
+  grandTotal?: number;
+
+  @IsString()
+  @IsOptional()
+  customerTIN?: string;
+
+  @IsString()
+  @IsOptional()
+  offlineReceiptNumber?: string;
 
   @IsBoolean()
   @IsOptional()

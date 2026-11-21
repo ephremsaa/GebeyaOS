@@ -473,22 +473,84 @@ export const posApi = {
     cashierId: string,
     payload: any,
   ): Promise<{ sale: SaleRecord; thermalReceipt: string; electronicJournal: any }> {
+    const rawItems = payload.items || payload.lines || [];
+    const formattedItems = rawItems.map((l: any) => ({
+      productId: l.productId,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      discountAmount: l.discountAmount || l.discount || 0,
+      discountReason: l.discountReason,
+    }));
+
+    const rawPayments = payload.payments || [];
+    const formattedPayments = rawPayments.map((p: any) => ({
+      paymentMethod: p.paymentMethod || (p.method === 'CARD' ? 'CARD_POS' : p.method),
+      method: p.method || p.paymentMethod,
+      amount: p.amount,
+      providerReference: p.providerReference || p.reference || undefined,
+      reference: p.reference || p.providerReference || undefined,
+      isOfflineVerified: p.isOfflineVerified,
+      metadata: p.metadata,
+    }));
+
+    const resolvedTerminalId =
+      payload.terminalId ||
+      localStorage.getItem('gebeyaos_terminal_id') ||
+      '01a19309-1d46-799e-8dbe-200bdd7ce436';
+
+    const normalizedBody = {
+      branchId,
+      terminalId: resolvedTerminalId,
+      shiftId: payload.shiftId,
+      idempotencyKey: payload.idempotencyKey,
+      clientTimestamp: payload.clientTimestamp,
+      items: formattedItems,
+      lines: formattedItems,
+      payments: formattedPayments,
+      managerOverrideExpired: payload.managerOverrideExpired,
+      overrideReason: payload.overrideReason,
+      bypassFiscal: payload.bypassFiscal,
+    };
+
     try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-branch-id': branchId,
+        'x-user-id': cashierId,
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${API_BASE}/pos/sales`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-branch-id': branchId,
-          'x-user-id': cashierId,
-        },
-        body: JSON.stringify(payload),
+        headers,
+        body: JSON.stringify(normalizedBody),
       });
 
       if (res.ok) {
         return await res.json();
       }
-    } catch {
-      // Local server offline; fall through to offline checkout
+
+      // If server responded with an error, throw it so invalid requests are not silently masked
+      const errJson = await res.json().catch(() => ({}));
+      const errMsg = Array.isArray(errJson.message)
+        ? errJson.message.join(', ')
+        : errJson.message || `Sale failed with status ${res.status}`;
+      throw new Error(errMsg);
+    } catch (err: any) {
+      // If error is an actual application/server error, rethrow it
+      if (
+        err.message &&
+        !err.message.includes('Failed to fetch') &&
+        !err.message.includes('NetworkError') &&
+        !err.message.includes('ECONNREFUSED') &&
+        !err.message.includes('network')
+      ) {
+        throw err;
+      }
+      // Only proceed to offline fallback when network is truly down
     }
 
     // Offline Checkout Transaction

@@ -529,6 +529,22 @@ export const PosCheckout: React.FC = () => {
       const basketDiscountAmt = round2(basketDiscount ? basketDiscount.amount : 0);
       const totalDiscounts = round2(lineDiscountsTotal + basketDiscountAmt);
 
+      const saleItems = cart.map((i) => ({
+        productId: i.product.id,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        discountAmount: i.discount || 0,
+        isVatApplicable: i.isVat,
+      }));
+
+      const salePayments = details.payments.map((p) => ({
+        paymentMethod: p.method === 'CARD' ? 'CARD_POS' : p.method,
+        method: p.method === 'CARD' ? 'CARD_POS' : p.method,
+        amount: p.amount,
+        providerReference: p.reference,
+        reference: p.reference,
+      }));
+
       const payload = {
         branchId,
         terminalId,
@@ -536,18 +552,9 @@ export const PosCheckout: React.FC = () => {
         idempotencyKey,
         managerOverrideExpired: hasOverriddenExpiredItems || cart.some((i) => i.product.isExpired),
         discountTotal: totalDiscounts,
-        lines: cart.map((i) => ({
-          productId: i.product.id,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
-          discountAmount: i.discount || 0,
-          isVatApplicable: i.isVat,
-        })),
-        payments: details.payments.map((p) => ({
-          method: p.method === 'CARD' ? 'CARD_POS' : p.method,
-          amount: p.amount,
-          reference: p.reference,
-        })),
+        items: saleItems,
+        lines: saleItems,
+        payments: salePayments,
       };
 
       const result = await posApi.checkoutSale(branchId, cashierId, payload);
@@ -555,6 +562,11 @@ export const PosCheckout: React.FC = () => {
       setCompletedReceiptText(result.thermalReceipt);
       setCompletedSaleId(result.sale.id);
       setIsPaymentOpen(false);
+
+      // Notify dashboard and reports that a new sale was completed
+      try {
+        window.dispatchEvent(new CustomEvent('gebeyaos:sale-completed', { detail: { saleId: result.sale.id } }));
+      } catch {}
 
       // Refresh inventory levels in the background
       posApi.getCatalog(branchId).then(setCatalog).catch(() => {});

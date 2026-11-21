@@ -97,8 +97,19 @@ export class SystemService {
    * Aggregates real-time KPIs for the Home Dashboard.
    */
   async getDashboardSummary(branchId: string): Promise<DashboardSummary> {
-    const todayMidnight = new Date();
-    todayMidnight.setHours(0, 0, 0, 0);
+    const isAllBranches =
+      !branchId ||
+      branchId.toUpperCase() === 'ALL' ||
+      branchId === '00000000-0000-0000-0000-000000000001';
+
+    // Addis Ababa (UTC+3) business day midnight: 00:00:00 EAT corresponds to 21:00:00 UTC previous day
+    const now = new Date();
+    const eatOffsetMs = 3 * 60 * 60 * 1000;
+    const addisNow = new Date(now.getTime() + eatOffsetMs);
+    const year = addisNow.getUTCFullYear();
+    const month = addisNow.getUTCMonth();
+    const date = addisNow.getUTCDate();
+    const todayMidnight = new Date(Date.UTC(year, month, date, -3, 0, 0, 0));
 
     // 1. Sales totals for today
     const salesRes = await this.db.query(
@@ -108,10 +119,10 @@ export class SystemService {
          COUNT(id) as transaction_count,
          COALESCE(SUM(tax_total), 0) as tax_total
        FROM sales
-       WHERE branch_id = $1
-         AND created_at >= $2
+       WHERE ${isAllBranches ? '1=1' : 'branch_id = $1'}
+         AND created_at >= ${isAllBranches ? '$1' : '$2'}
          AND payment_status IN ('PAID', 'PARTIALLY_REFUNDED')`,
-      [branchId, todayMidnight.toISOString()],
+      isAllBranches ? [todayMidnight.toISOString()] : [branchId, todayMidnight.toISOString()],
     );
     const sRow = salesRes.rows[0] || {};
 
@@ -122,11 +133,11 @@ export class SystemService {
          COALESCE(SUM(sp.amount), 0) as total_amount
        FROM sale_payments sp
        JOIN sales s ON sp.sale_id = s.id
-       WHERE s.branch_id = $1
-         AND s.created_at >= $2
+       WHERE ${isAllBranches ? '1=1' : 's.branch_id = $1'}
+         AND s.created_at >= ${isAllBranches ? '$1' : '$2'}
          AND s.payment_status IN ('PAID', 'PARTIALLY_REFUNDED')
        GROUP BY sp.payment_method`,
-      [branchId, todayMidnight.toISOString()],
+      isAllBranches ? [todayMidnight.toISOString()] : [branchId, todayMidnight.toISOString()],
     );
 
     let cashCollected = 0;
@@ -150,11 +161,11 @@ export class SystemService {
        LEFT JOIN (
          SELECT product_id, SUM(quantity_change) as soh
          FROM stock_ledger
-         WHERE branch_id = $1
+         WHERE ${isAllBranches ? '1=1' : 'branch_id = $1'}
          GROUP BY product_id
        ) stock ON p.id = stock.product_id
        WHERE p.is_active = TRUE`,
-      [branchId],
+      isAllBranches ? [] : [branchId],
     );
     const pRow = productsRes.rows[0] || {};
 
@@ -164,11 +175,11 @@ export class SystemService {
     const expiringRes = await this.db.query(
       `SELECT COUNT(id) as count
        FROM batches
-       WHERE branch_id = $1
+       WHERE ${isAllBranches ? '1=1' : 'branch_id = $1'}
          AND expiry_date IS NOT NULL
-         AND expiry_date <= $2
+         AND expiry_date <= ${isAllBranches ? '$1' : '$2'}
          AND current_quantity > 0`,
-      [branchId, in30Days.toISOString().slice(0, 10)],
+      isAllBranches ? [in30Days.toISOString().slice(0, 10)] : [branchId, in30Days.toISOString().slice(0, 10)],
     );
     const expiringCount = parseInt(expiringRes.rows[0]?.count || '0', 10);
 
@@ -190,10 +201,10 @@ export class SystemService {
                 COALESCE(u.full_name, 'Cashier') as cashier_name
          FROM sales s
          LEFT JOIN users u ON s.cashier_id = u.id
-         WHERE s.branch_id = $1
+         WHERE ${isAllBranches ? '1=1' : 's.branch_id = $1'}
          ORDER BY s.created_at DESC
          LIMIT 6`,
-        [branchId],
+        isAllBranches ? [] : [branchId],
       );
       recentSales = recentSalesRes.rows.map((r: any) => ({
         id: r.id,
@@ -246,14 +257,14 @@ export class SystemService {
          LEFT JOIN (
            SELECT product_id, SUM(quantity_change) as soh
            FROM stock_ledger
-           WHERE branch_id = $1
+           WHERE ${isAllBranches ? '1=1' : 'branch_id = $1'}
            GROUP BY product_id
          ) stock ON p.id = stock.product_id
          WHERE p.is_active = TRUE
            AND (COALESCE(stock.soh, 0) <= p.min_stock_level)
          ORDER BY current_stock ASC
          LIMIT 6`,
-        [branchId],
+        isAllBranches ? [] : [branchId],
       );
       alerts = alertsRes.rows.map((r: any) => {
         const stockVal = parseFloat(r.current_stock) || 0;
@@ -278,6 +289,34 @@ export class SystemService {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const thisWeek = dayNames.map((d) => ({ day: d, amount: 0, count: 0 }));
     const lastWeek = dayNames.map((d) => ({ day: d, amount: 0, count: 0 }));
+
+    try {
+      const sevenDaysAgo = new Date(todayMidnight.getTime() - 6 * 24 * 60 * 60 * 1000);
+      const trendRes = await this.db.query(
+        `SELECT
+           EXTRACT(DOW FROM (created_at AT TIME ZONE 'Africa/Addis_Ababa')) as dow,
+           COALESCE(SUM(grand_total), 0) as total_amount,
+           COUNT(id) as count
+         FROM sales
+         WHERE ${isAllBranches ? '1=1' : 'branch_id = $1'}
+           AND created_at >= ${isAllBranches ? '$1' : '$2'}
+           AND payment_status IN ('PAID', 'PARTIALLY_REFUNDED')
+         GROUP BY dow`,
+        isAllBranches ? [sevenDaysAgo.toISOString()] : [branchId, sevenDaysAgo.toISOString()],
+      );
+      // DOW: 0=Sun, 1=Mon, ..., 6=Sat
+      const dowToIdx: Record<number, number> = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
+      for (const row of trendRes.rows) {
+        const dow = parseInt(row.dow, 10);
+        const idx = dowToIdx[dow];
+        if (idx !== undefined && thisWeek[idx]) {
+          thisWeek[idx].amount = parseFloat(row.total_amount) || 0;
+          thisWeek[idx].count = parseInt(row.count, 10) || 0;
+        }
+      }
+    } catch (e) {
+      this.logger.warn(`Failed to calculate weekly trend: ${e}`);
+    }
 
     return {
       todaySales: {

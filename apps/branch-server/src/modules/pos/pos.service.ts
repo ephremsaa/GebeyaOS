@@ -22,6 +22,7 @@ import {
   SaleItemRecord,
   SalePaymentRecord,
   HeldBasketRecord,
+  PaymentMethod,
   computeDaysLeftInAddis,
 } from '@gebeyaos/shared-types';
 import {
@@ -498,14 +499,24 @@ export class PosService {
       }
 
       // 1. Verify shift is open
-      const shiftRes = await client.query<any>(
+      let shiftRes = await client.query<any>(
         `SELECT * FROM shifts WHERE id = $1 AND branch_id = $2 AND status = 'OPEN'`,
         [dto.shiftId, branchId],
       );
       if (shiftRes.rows.length === 0) {
+        shiftRes = await client.query<any>(
+          `SELECT * FROM shifts WHERE id = $1 AND status = 'OPEN'`,
+          [dto.shiftId],
+        );
+        if (shiftRes.rows.length > 0) {
+          branchId = shiftRes.rows[0].branch_id;
+        }
+      }
+      if (shiftRes.rows.length === 0) {
         throw new BadRequestException('Cashier shift is not open or not found');
       }
       const shift = shiftRes.rows[0];
+      const terminalId = dto.terminalId || shift.terminal_id;
 
       // 2. Fetch branch and terminal codes
       const branchRes = await client.query<any>(
@@ -522,7 +533,7 @@ export class PosService {
 
       const termRes = await client.query<any>(
         `SELECT code FROM terminals WHERE id = $1`,
-        [dto.terminalId],
+        [terminalId],
       );
       const terminalCode = termRes.rows.length > 0 ? termRes.rows[0].code : 'POS-01';
       const cashierName = 'Cashier';
@@ -531,7 +542,7 @@ export class PosService {
       const countRes = await client.query<{ count: string }>(
         `SELECT COUNT(*) as count FROM sales
          WHERE branch_id = $1 AND terminal_id = $2 AND created_at >= CURRENT_DATE`,
-        [branchId, dto.terminalId],
+        [branchId, terminalId],
       );
       const seq = parseInt(countRes.rows[0].count, 10) + 1;
       const receiptNumber = generateReceiptNumber(
@@ -566,7 +577,12 @@ export class PosService {
         isVat: boolean;
       }> = [];
 
-      for (const item of dto.items) {
+      const saleItemsToProcess = dto.items || (dto as any).lines || [];
+      if (saleItemsToProcess.length === 0) {
+        throw new BadRequestException('Sale must have at least one line item');
+      }
+
+      for (const item of saleItemsToProcess) {
         // Fetch product & override
         const prodRes = await client.query<any>(
           `SELECT p.id, p.name_en, p.base_price, p.cost_price, p.is_vat_applicable, p.vat_rate,
@@ -689,7 +705,8 @@ export class PosService {
       let cashPaid = 0;
       for (const p of dto.payments) {
         totalPaid += p.amount;
-        if (p.paymentMethod === 'CASH') {
+        const method = p.paymentMethod || (p as any).method;
+        if (method === 'CASH') {
           cashPaid += p.amount;
         }
       }
@@ -732,7 +749,7 @@ export class PosService {
         [
           saleId,
           branchId,
-          dto.terminalId,
+          terminalId,
           dto.shiftId,
           receiptNumber,
           cashierId,
@@ -804,6 +821,8 @@ export class PosService {
       // 10. Insert sale payments
       const savedPayments: SalePaymentRecord[] = [];
       for (const p of dto.payments) {
+        const paymentMethod = p.paymentMethod || (p as any).method || 'CASH';
+        const providerReference = p.providerReference || (p as any).reference || null;
         const payRes = await client.query<any>(
           `INSERT INTO sale_payments (
              sale_id, payment_method, amount, provider_reference, is_offline_verified, metadata
@@ -811,9 +830,9 @@ export class PosService {
            RETURNING *`,
           [
             saleId,
-            p.paymentMethod,
+            paymentMethod,
             p.amount,
-            p.providerReference || null,
+            providerReference,
             p.isOfflineVerified ?? false,
             p.metadata ? JSON.stringify(p.metadata) : null,
           ],
@@ -880,9 +899,9 @@ export class PosService {
         exemptSubtotal: taxExemptSubtotal,
         grandTotal,
         payments: dto.payments.map((p) => ({
-          method: p.paymentMethod,
+          method: (p.paymentMethod || (p as any).method || 'CASH') as PaymentMethod,
           amount: p.amount,
-          reference: p.providerReference,
+          reference: p.providerReference || (p as any).reference || undefined,
         })),
         changeGiven,
         fiscalMrc,
@@ -961,7 +980,12 @@ export class PosService {
       let totalTaxRefund = 0;
       const refundItemsToInsert: any[] = [];
 
-      for (const item of dto.items) {
+      const saleItemsToProcess = dto.items || (dto as any).lines || [];
+      if (saleItemsToProcess.length === 0) {
+        throw new BadRequestException('Sale must have at least one line item');
+      }
+
+      for (const item of saleItemsToProcess) {
         const itemRes = await client.query<any>(
           `SELECT * FROM sale_items WHERE id = $1 AND sale_id = $2`,
           [item.originalSaleItemId, dto.originalSaleId],
