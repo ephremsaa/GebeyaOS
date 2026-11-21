@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     GebeyaOS – Production Release Packager (Windows)
     Builds the production release zip bundle for offline supermarket shop deployment.

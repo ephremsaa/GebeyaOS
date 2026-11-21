@@ -25,7 +25,9 @@ import { validateEnv } from './config/env.validation';
 const candidateEnvPaths = [
   process.env.ENV_FILE,
   path.resolve(process.cwd(), '.env'),
-  path.resolve(process.cwd(), '../../.env'),
+  path.resolve(process.cwd(), 'apps/branch-server/.env'),
+  path.resolve(__dirname, '../.env'),
+  path.resolve(__dirname, '../../.env'),
   'C:\\GebeyaOS\\.env',
 ].filter(Boolean) as string[];
 

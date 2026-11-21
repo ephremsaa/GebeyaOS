@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     GebeyaOS – Cashier Terminal Shortcut Creator
     Creates a Chrome/Edge kiosk-mode shortcut for cashier tablets.
