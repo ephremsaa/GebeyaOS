@@ -5,6 +5,12 @@
  * while preserving system reference tables and platform admin credentials.
  */
 
+if (process.env.NODE_ENV === 'production' && !process.argv.includes('--force-production-reset')) {
+  console.error('CRITICAL: reset-supermarkets is blocked in production to prevent accidental data loss.');
+  console.error('If you absolutely intend to reset a production environment, pass --force-production-reset.');
+  process.exit(1);
+}
+
 const path = require('path');
 const { Client } = require(path.resolve(process.cwd(), 'node_modules/pg'));
 

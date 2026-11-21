@@ -172,7 +172,10 @@ async function main() {
   console.log('[2/4] Generating 160-bit TOTP secret and 10 single-use backup codes...');
   const secretBytes = crypto.randomBytes(20);
   const totpSecret = base32Encode(secretBytes);
-  const masterEncryptionKey = process.env.TOTP_ENCRYPTION_KEY || 'gebeyaos-totp-master-encryption-key-2026';
+  if (process.env.NODE_ENV === 'production' && !process.env.TOTP_ENCRYPTION_KEY) {
+    throw new Error('TOTP_ENCRYPTION_KEY is required in production environment (cannot use default key)');
+  }
+  const masterEncryptionKey = process.env.TOTP_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY || 'gebeyaos-totp-master-encryption-key-2026';
   const totpSecretEncrypted = encryptSecret(totpSecret, masterEncryptionKey);
 
   const plainBackupCodes = [];

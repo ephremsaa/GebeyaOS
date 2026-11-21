@@ -1,0 +1,76 @@
+# ============================================================
+# GebeyaOS – Branch Server Dockerfile (Part 0, Fix #1 & #5)
+# Monorepo-aware multi-stage build.
+# Context: repo root (docker build -f docker/Dockerfile.branch-server .)
+# ============================================================
+
+# ── Stage 1: builder ──────────────────────────────────────────
+FROM node:20-alpine AS builder
+WORKDIR /build
+
+# Copy workspace manifests first (better layer caching)
+COPY package.json package-lock.json* ./
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/sync-protocol/package.json ./packages/sync-protocol/
+COPY apps/branch-server/package.json ./apps/branch-server/
+
+# Install ALL deps (including devDeps for the build step)
+RUN npm ci --workspace=packages/shared-types \
+           --workspace=packages/sync-protocol \
+           --workspace=apps/branch-server \
+    || npm install --workspace=packages/shared-types \
+                   --workspace=packages/sync-protocol \
+                   --workspace=apps/branch-server
+
+# Copy source
+COPY packages/ ./packages/
+COPY apps/branch-server/ ./apps/branch-server/
+
+# Build shared packages then the server
+RUN cd packages/shared-types && npx tsc -p tsconfig.json || true
+RUN cd packages/sync-protocol && npx tsc -p tsconfig.json || true
+RUN cd apps/branch-server && npm run build
+
+# ── Stage 2: production runtime ───────────────────────────────
+FROM node:20-alpine AS runtime
+
+# Non-root user for security
+RUN addgroup -S gebeyaos && adduser -S gebeyaos -G gebeyaos
+
+WORKDIR /app
+
+# Install only production deps
+COPY package.json package-lock.json* ./
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/sync-protocol/package.json ./packages/sync-protocol/
+COPY apps/branch-server/package.json ./apps/branch-server/
+
+RUN npm ci --omit=dev --workspace=packages/shared-types \
+                      --workspace=packages/sync-protocol \
+                      --workspace=apps/branch-server \
+    || npm install --omit=dev --workspace=packages/shared-types \
+                              --workspace=packages/sync-protocol \
+                              --workspace=apps/branch-server
+
+# Copy compiled output from builder
+COPY --from=builder /build/packages/shared-types/dist ./packages/shared-types/dist
+COPY --from=builder /build/packages/sync-protocol/dist ./packages/sync-protocol/dist
+COPY --from=builder /build/apps/branch-server/dist ./apps/branch-server/dist
+
+# Copy migrations (needed for health check / startup)
+COPY database/migrations/ ./database/migrations/
+
+WORKDIR /app/apps/branch-server
+
+# Uploads directory (can be mounted as a volume)
+RUN mkdir -p uploads && chown -R gebeyaos:gebeyaos /app
+
+USER gebeyaos
+
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:3001/health | grep -q '"status":"ok"' || exit 1
+
+CMD ["node", "dist/main.js"]

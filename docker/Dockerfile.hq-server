@@ -1,0 +1,65 @@
+# ============================================================
+# GebeyaOS – HQ Server Dockerfile
+# Monorepo-aware multi-stage build.
+# Context: repo root (docker build -f docker/Dockerfile.hq-server .)
+# ============================================================
+
+# ── Stage 1: builder ──────────────────────────────────────────
+FROM node:20-alpine AS builder
+WORKDIR /build
+
+COPY package.json package-lock.json* ./
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/sync-protocol/package.json ./packages/sync-protocol/
+COPY apps/hq-server/package.json ./apps/hq-server/
+
+RUN npm ci --workspace=packages/shared-types \
+           --workspace=packages/sync-protocol \
+           --workspace=apps/hq-server \
+    || npm install --workspace=packages/shared-types \
+                   --workspace=packages/sync-protocol \
+                   --workspace=apps/hq-server
+
+COPY packages/ ./packages/
+COPY apps/hq-server/ ./apps/hq-server/
+
+RUN cd packages/shared-types && npx tsc -p tsconfig.json || true
+RUN cd packages/sync-protocol && npx tsc -p tsconfig.json || true
+RUN cd apps/hq-server && npm run build
+
+# ── Stage 2: production runtime ───────────────────────────────
+FROM node:20-alpine AS runtime
+
+RUN addgroup -S gebeyaos && adduser -S gebeyaos -G gebeyaos
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/sync-protocol/package.json ./packages/sync-protocol/
+COPY apps/hq-server/package.json ./apps/hq-server/
+
+RUN npm ci --omit=dev --workspace=packages/shared-types \
+                      --workspace=packages/sync-protocol \
+                      --workspace=apps/hq-server \
+    || npm install --omit=dev --workspace=packages/shared-types \
+                              --workspace=packages/sync-protocol \
+                              --workspace=apps/hq-server
+
+COPY --from=builder /build/packages/shared-types/dist ./packages/shared-types/dist
+COPY --from=builder /build/packages/sync-protocol/dist ./packages/sync-protocol/dist
+COPY --from=builder /build/apps/hq-server/dist ./apps/hq-server/dist
+COPY database/migrations/ ./database/migrations/
+
+WORKDIR /app/apps/hq-server
+
+RUN chown -R gebeyaos:gebeyaos /app
+
+USER gebeyaos
+
+EXPOSE 4000
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:4000/health | grep -q '"status":"ok"' || exit 1
+
+CMD ["node", "dist/main.js"]

@@ -1,0 +1,42 @@
+# Caddyfile – GebeyaOS HQ reverse proxy
+# Replace admin.gebeyaos.et with your actual domain.
+# Caddy automatically obtains and renews TLS certificates from Let's Encrypt.
+
+admin.gebeyaos.et {
+    # API
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy hq-server:4000
+    }
+
+    # Health checks (no auth required)
+    handle /health {
+        reverse_proxy hq-server:4000
+    }
+    handle /ready {
+        reverse_proxy hq-server:4000
+    }
+
+    # Everything else → platform admin SPA
+    handle {
+        root * /srv/admin
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        -Server
+    }
+
+    encode gzip zstd
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}

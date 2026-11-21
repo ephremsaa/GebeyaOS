@@ -1,3 +1,12 @@
+# ============================================================
+# GebeyaOS – HQ Server Docker Compose (Production)
+# Part 0 safety fixes applied:
+#   • PostgreSQL port 5433 NOT exposed to public internet
+#   • Caddy for automatic HTTPS + reverse proxy
+#   • seed-dev is NOT wired here
+#   • All secrets required via environment (no defaults for passwords)
+# ============================================================
+
 services:
   hq-db:
     image: postgres:16-alpine
@@ -5,29 +14,31 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${HQ_DB_NAME:-gebeyaos_central}
-      POSTGRES_USER: ${HQ_DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${HQ_DB_PASSWORD:-postgres}
+      POSTGRES_USER: ${HQ_DB_USER:-gebeyaos_hq}
+      POSTGRES_PASSWORD: ${HQ_DB_PASSWORD:?HQ_DB_PASSWORD is required}
     volumes:
       - hq-db-data:/var/lib/postgresql/data
-      - ../database/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
-      - ../database/seeds/001_initial_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    # NO ports mapping – db is reachable only inside the hq-internal network
     command: >
       postgres -c max_connections=200
-               -c shared_buffers=2GB
-               -c effective_cache_size=6GB
-               -c work_mem=16MB
-               -c maintenance_work_mem=512MB
-    ports:
-      - "5433:5432"
+               -c shared_buffers=512MB
+               -c effective_cache_size=1GB
+               -c work_mem=8MB
+               -c maintenance_work_mem=128MB
+               -c fsync=on
+               -c synchronous_commit=on
+               -c wal_level=replica
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HQ_DB_USER:-postgres} -d ${HQ_DB_NAME:-gebeyaos_central}"]
+      test: ["CMD-SHELL", "pg_isready -U ${HQ_DB_USER:-gebeyaos_hq} -d ${HQ_DB_NAME:-gebeyaos_central}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - hq-internal
 
   hq-server:
     build:
-      context: ../
+      context: ..
       dockerfile: docker/Dockerfile.hq-server
     container_name: gebeyaos-hq-server
     restart: unless-stopped
@@ -39,13 +50,55 @@ services:
       PORT: 4000
       DB_HOST: hq-db
       DB_PORT: 5432
-      DB_USER: ${HQ_DB_USER:-postgres}
-      DB_PASSWORD: ${HQ_DB_PASSWORD:-postgres}
+      DB_USER: ${HQ_DB_USER:-gebeyaos_hq}
+      DB_PASSWORD: ${HQ_DB_PASSWORD:?HQ_DB_PASSWORD is required}
       DB_NAME: ${HQ_DB_NAME:-gebeyaos_central}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://admin.gebeyaos.et}
       IS_HQ: "true"
+      TZ: Africa/Addis_Ababa
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+    # hq-server not exposed directly – Caddy handles all external traffic
+    networks:
+      - hq-internal
+      - hq-external
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/ready | grep -q '\"status\":\"ok\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: gebeyaos-caddy
+    restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - hq-external
+    depends_on:
+      hq-server:
+        condition: service_healthy
 
 volumes:
   hq-db-data:
     driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local
+
+networks:
+  hq-internal:
+    driver: bridge
+    internal: true      # hq-db completely isolated from outside
+  hq-external:
+    driver: bridge

@@ -1,3 +1,10 @@
+# GebeyaOS – Branch Server Docker Compose (Production)
+# Part 0 safety fixes applied:
+#   • PostgreSQL port 5432 is NOT published to the host (private network only)
+#   • API port corrected to 3001 (matches branch-server/src/main.ts)
+#   • Dockerfile path updated to docker/Dockerfile.branch-server (monorepo-aware)
+#   • seed-dev is NOT wired to this compose file
+
 services:
   branch-db:
     image: postgres:16-alpine
@@ -5,12 +12,12 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-gebeyaos_branch}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_USER: ${DB_USER:-gebeyaos_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - branch-db-data:/var/lib/postgresql/data
-      - ./database/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
-      - ./database/seeds/001_initial_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    # PostgreSQL binds to the private docker network only – NOT exposed to host or LAN
+    # (no ports: mapping = not reachable from outside the container network)
     command: >
       postgres -c wal_level=replica
                -c max_wal_size=2GB
@@ -18,18 +25,19 @@ services:
                -c checkpoint_completion_target=0.9
                -c fsync=on
                -c synchronous_commit=on
-    ports:
-      - "5432:5432"
+               -c listen_addresses=localhost,branch-db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-gebeyaos_branch}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gebeyaos_app} -d ${DB_NAME:-gebeyaos_branch}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - branch-internal
 
   branch-server:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/Dockerfile.branch-server
     container_name: gebeyaos-branch-server
     restart: unless-stopped
     depends_on:
@@ -37,17 +45,26 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      PORT: 3000
+      PORT: 3001
       DB_HOST: branch-db
       DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_USER: ${DB_USER:-gebeyaos_app}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_NAME: ${DB_NAME:-gebeyaos_branch}
-      BRANCH_CODE: ${BRANCH_CODE:-BOLE-01}
-      IS_HQ: "false"
-      HQ_SYNC_URL: ${HQ_SYNC_URL:-https://hq.gebeyaos.et/api/sync}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      TZ: Africa/Addis_Ababa
     ports:
-      - "3000:3000"
+      - "${API_PORT:-3001}:3001"
+    networks:
+      - branch-internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/ready | grep -q '\"status\":\"ok\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   branch-backup:
     image: postgres:16-alpine
@@ -58,8 +75,8 @@ services:
         condition: service_healthy
     environment:
       PGHOST: branch-db
-      PGUSER: ${DB_USER:-postgres}
-      PGPASSWORD: ${DB_PASSWORD:-postgres}
+      PGUSER: ${DB_USER:-gebeyaos_app}
+      PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       PGDATABASE: ${DB_NAME:-gebeyaos_branch}
       BACKUP_DIR: /backups
     volumes:
@@ -69,7 +86,14 @@ services:
       sh -c "chmod +x /usr/local/bin/backup.sh &&
              echo '0 1 * * * /usr/local/bin/backup.sh >> /backups/backup.log 2>&1' > /etc/crontabs/root &&
              crond -f -l 2"
+    networks:
+      - branch-internal
 
 volumes:
   branch-db-data:
     driver: local
+
+networks:
+  branch-internal:
+    driver: bridge
+    internal: false   # branch-server needs LAN access; db stays internal via no-ports-mapping
