@@ -29,6 +29,7 @@ import {
   MoreVertical,
   Lock,
   RotateCcw,
+  Trash2,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
@@ -162,6 +163,14 @@ export const ProductCatalogView: React.FC = () => {
 
   // Row dropdown menu state
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+
+  // Delete Modals & Actions
+  const [deleteTarget, setDeleteTarget] = useState<ProductItem | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState<boolean>(false);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState<boolean>(false);
+  const [deleteAllConfirmInput, setDeleteAllConfirmInput] = useState<string>('');
+  const [deleteNotice, setDeleteNotice] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
 
   // Quick chip: Needs Attention (Missing barcode, Out of stock, Selling below cost)
   const [needsAttentionFilter, setNeedsAttentionFilter] = useState<boolean>(false);
@@ -506,6 +515,101 @@ export const ProductCatalogView: React.FC = () => {
     }
   };
 
+  // Single Delete
+  const handleInitiateDeleteSingle = (p: ProductItem) => {
+    setDeleteTarget(p);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDeleteSingle = async () => {
+    if (!deleteTarget) return;
+    setActionInProgress(true);
+    try {
+      const res = await posApi.deleteProduct(deleteTarget.id, true);
+      setIsDeleteModalOpen(false);
+      setDeleteTarget(null);
+      if (res?.mode === 'soft') {
+        setDeleteNotice({
+          message: language === 'am'
+            ? 'እቃው ቀደም ሲል የተመዘገበ ሽያጭ ስላለው የፋይናንስ ታሪክን ለመጠበቅ ደብቋል (Archived)።'
+            : 'Item has recorded sales; it was archived and deactivated instead of deleted to protect fiscal audit history.',
+          type: 'warning',
+        });
+      } else {
+        setDeleteNotice({
+          message: language === 'am' ? 'እቃው በተሳካ ሁኔታ ተሰርዟል!' : 'Product deleted successfully!',
+          type: 'success',
+        });
+      }
+      fetchProducts();
+      fetchDropdowns();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete product');
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  // Bulk Delete
+  const handleInitiateBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    setIsBulkDeleteModalOpen(true);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    setActionInProgress(true);
+    try {
+      const res = await posApi.bulkDeleteProducts(selectedIds, true);
+      setIsBulkDeleteModalOpen(false);
+      setSelectedIds([]);
+      setDeleteNotice({
+        message: language === 'am'
+          ? `የተሰረዙ፡ ${res.hardDeleted}፣ የተደበቁ (ሽያጭ ያላቸው)፡ ${res.softDeleted}`
+          : `Bulk delete complete: ${res.hardDeleted} deleted permanently, ${res.softDeleted} archived (had sales).`,
+        type: 'success',
+      });
+      fetchProducts();
+      fetchDropdowns();
+    } catch (err: any) {
+      alert(err.message || 'Failed to bulk delete products');
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  // Delete All / Clear Catalog
+  const handleInitiateDeleteAll = () => {
+    setDeleteAllConfirmInput('');
+    setIsDeleteAllModalOpen(true);
+  };
+
+  const handleConfirmDeleteAll = async () => {
+    if (deleteAllConfirmInput.trim().toUpperCase() !== 'DELETE ALL') {
+      alert(language === 'am' ? 'እባክዎ በትክክል "DELETE ALL" ብለው ይጻፉ' : 'Please type "DELETE ALL" exactly to confirm.');
+      return;
+    }
+    setActionInProgress(true);
+    try {
+      const res = await posApi.deleteAllProducts('DELETE ALL');
+      setIsDeleteAllModalOpen(false);
+      setDeleteAllConfirmInput('');
+      setSelectedIds([]);
+      setDeleteNotice({
+        message: language === 'am'
+          ? `ካታሎግ ፀድቷል፡ ${res.hardDeleted} እቃዎች ተሰርዘዋል፣ ${res.softDeleted} እቃዎች ተደብቀዋል (ሽያጭ ስላላቸው)።`
+          : `Catalog cleared: ${res.hardDeleted} deleted permanently, ${res.softDeleted} archived (had sales).`,
+        type: 'success',
+      });
+      fetchProducts();
+      fetchDropdowns();
+    } catch (err: any) {
+      alert(err.message || 'Failed to clear catalog');
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
   // Bulk Actions
   const handleBulkPrintLabels = () => {
     const selected = products.filter((p) => selectedIds.includes(p.id));
@@ -789,6 +893,17 @@ export const ProductCatalogView: React.FC = () => {
             <Download size={15} className="text-text-muted" />
             {t('catalog.exportCsv')}
           </button>
+
+          {canEditCatalog && products.length > 0 && (
+            <button
+              onClick={handleInitiateDeleteAll}
+              className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-300 text-[14px] font-semibold flex items-center gap-2 shadow-soft transition active:scale-95 cursor-pointer"
+              title={language === 'am' ? 'ሁሉንም እቃዎች አጥፋ' : 'Delete All Catalog Items'}
+            >
+              <Trash2 size={15} />
+              {language === 'am' ? 'ሁሉንም አጥፋ' : 'Delete All'}
+            </button>
+          )}
 
           <button
             onClick={handleOpenAdd}
@@ -1080,6 +1195,16 @@ export const ProductCatalogView: React.FC = () => {
               <Archive size={14} />
               {t('catalog.archiveSelected')}
             </button>
+
+            {canEditCatalog && (
+              <button
+                onClick={handleInitiateBulkDelete}
+                className="px-3 py-1.5 rounded-xl bg-surface hover:bg-rose-950 text-rose-400 text-xs font-bold flex items-center gap-1.5 transition"
+              >
+                <Trash2 size={14} />
+                {language === 'am' ? `የተመረጡትን አጥፋ (${selectedIds.length})` : `Delete Selected (${selectedIds.length})`}
+              </button>
+            )}
 
             <button
               onClick={() => handleExportCsv(true)}
@@ -1574,6 +1699,20 @@ export const ProductCatalogView: React.FC = () => {
                                   <Archive size={13} />
                                   <span>{p.is_active ? t('catalog.archiveCategoryAction') : t('catalog.unarchiveSelected')}</span>
                                 </button>
+
+                                {canEditCatalog && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null);
+                                      handleInitiateDeleteSingle(p);
+                                    }}
+                                    className="w-full px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                  >
+                                    <Trash2 size={13} />
+                                    <span>{language === 'am' ? 'እቃውን ሰርዝ' : 'Delete Product'}</span>
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1816,6 +1955,10 @@ export const ProductCatalogView: React.FC = () => {
           fetchProducts();
           fetchDropdowns();
         }}
+        onDeleted={() => {
+          fetchProducts();
+          fetchDropdowns();
+        }}
         onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
       />
 
@@ -1936,6 +2079,198 @@ export const ProductCatalogView: React.FC = () => {
           </button>
           <button
             onClick={() => setUndoToast(null)}
+            className="text-text-muted hover:text-white p-1 cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* 1. Single Item Delete Confirmation Modal */}
+      {isDeleteModalOpen && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
+          <div className="bg-surface rounded-3xl shadow-2xl border border-border-subtle w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center font-bold">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-text-main">
+                  {language === 'am' ? 'እቃውን መሰረዝ ይፈልጋሉ?' : 'Delete Product?'}
+                </h3>
+                <p className="text-xs text-text-muted">{deleteTarget.name_en} ({deleteTarget.sku})</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs space-y-2">
+              <p>
+                {language === 'am'
+                  ? 'እቃው ቀደም ሲል የተመዘገበ የሽያጭ ደረሰኝ ከሌለው ሙሉ በሙሉ ከሲስተሙ ይጠፋል። ሽያጭ ካለው ግን የፋይናንስ ኦዲትን ለመጠበቅ በራስ-ሰር ይደበቃል (Archive ይሆናል)።'
+                  : 'If this product has never been sold, it will be permanently deleted along with its barcodes and ledger entries. If it has recorded sales, it will be safely deactivated/archived to protect fiscal audit history.'}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={actionInProgress}
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setDeleteTarget(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-surface-2 dark:bg-surface hover:bg-surface-2 text-xs font-bold text-text-main transition cursor-pointer"
+              >
+                {language === 'am' ? 'ይቅር' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={actionInProgress}
+                onClick={handleConfirmDeleteSingle}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                {actionInProgress && <RefreshCw size={13} className="animate-spin" />}
+                {language === 'am' ? 'አጥፋ' : 'Delete Product'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Bulk Delete Confirmation Modal */}
+      {isBulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
+          <div className="bg-surface rounded-3xl shadow-2xl border border-border-subtle w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center font-bold">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-text-main">
+                  {language === 'am' ? 'የተመረጡትን እቃዎች ሰርዝ' : 'Delete Selected Products'}
+                </h3>
+                <p className="text-xs text-text-muted">
+                  {language === 'am' ? `${selectedIds.length} እቃዎች ተመርጠዋል` : `${selectedIds.length} items selected`}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs space-y-2">
+              <p>
+                {language === 'am'
+                  ? `እርግጠኛ ነዎት ${selectedIds.length} የተመረጡትን እቃዎች መሰረዝ ይፈልጋሉ? ሽያጭ የሌላቸው እቃዎች ሙሉ በሙሉ ሲጠፉ፤ ሽያጭ ያላቸው ግን በራስ-ሰር ይደበቃሉ (Archive ይሆናሉ)።`
+                  : `Are you sure you want to delete ${selectedIds.length} selected items? Items without sales will be permanently deleted; items with recorded sales will be safely deactivated/archived.`}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={actionInProgress}
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-surface-2 dark:bg-surface hover:bg-surface-2 text-xs font-bold text-text-main transition cursor-pointer"
+              >
+                {language === 'am' ? 'ይቅር' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={actionInProgress}
+                onClick={handleConfirmBulkDelete}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                {actionInProgress && <RefreshCw size={13} className="animate-spin" />}
+                {language === 'am' ? `ሰርዝ (${selectedIds.length})` : `Delete Selected (${selectedIds.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Delete All / Clear Catalog Confirmation Modal */}
+      {isDeleteAllModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
+          <div className="bg-surface rounded-3xl shadow-2xl border border-rose-300 dark:border-rose-900 w-full max-w-lg p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-bold shadow-lg">
+                <AlertTriangle size={26} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-rose-600 dark:text-rose-400">
+                  {language === 'am' ? 'ማስጠንቀቂያ፡ ሙሉ ካታሎጉን ማጥፋት' : 'Danger: Clear Entire Catalog'}
+                </h3>
+                <p className="text-xs text-text-muted">
+                  {language === 'am' ? `በአጠቃላይ ${products.length} እቃዎች ይነካሉ` : `Affects all ${products.length} items`}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs space-y-2">
+              <p className="font-bold">
+                {language === 'am'
+                  ? 'ይህ ተግባር በካታሎጉ ውስጥ ያሉትን ሁሉንም እቃዎች ያጠፋል!'
+                  : 'This action will clear all products from the catalog!'}
+              </p>
+              <p>
+                {language === 'am'
+                  ? 'ሽያጭ የሌላቸው እቃዎች፣ ባርኮዶች እና የስቶክ መረጃዎች በቋሚነት ይሰረዛሉ። ሽያጭ የተመዘገበባቸው እቃዎች ግን የፋይናንስ ህጉን ለመጠበቅ በራስ-ሰር ተደብቀው (Archive ሆነው) ይቀራሉ።'
+                  : 'Products with no recorded sales will be permanently purged. Any products that were ever sold will be deactivated and hidden to protect tax and audit records.'}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-main block">
+                {language === 'am'
+                  ? 'እባክዎ ለማረጋገጥ "DELETE ALL" ብለው በትክክል ይጻፉ፡'
+                  : 'Type "DELETE ALL" to confirm:'}
+              </label>
+              <input
+                type="text"
+                autoFocus
+                value={deleteAllConfirmInput}
+                onChange={(e) => setDeleteAllConfirmInput(e.target.value)}
+                placeholder="DELETE ALL"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-input border-2 border-rose-300 dark:border-rose-700 font-mono font-bold text-sm text-text-main focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={actionInProgress}
+                onClick={() => {
+                  setIsDeleteAllModalOpen(false);
+                  setDeleteAllConfirmInput('');
+                }}
+                className="px-4 py-2 rounded-xl bg-surface-2 dark:bg-surface hover:bg-surface-2 text-xs font-bold text-text-main transition cursor-pointer"
+              >
+                {language === 'am' ? 'ይቅር' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={actionInProgress || deleteAllConfirmInput.trim().toUpperCase() !== 'DELETE ALL'}
+                onClick={handleConfirmDeleteAll}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black transition flex items-center gap-1.5 shadow-md cursor-pointer"
+              >
+                {actionInProgress && <RefreshCw size={13} className="animate-spin" />}
+                {language === 'am' ? 'ሙሉ ካታሎጉን አጥፋ' : 'Delete All Catalog Items'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action Result Notice Toast */}
+      {deleteNotice && (
+        <div className="fixed bottom-6 left-6 z-50 p-4 rounded-2xl bg-surface-2 text-white shadow-2xl flex items-center gap-3 border border-border-subtle animate-in slide-in-from-bottom-3 duration-200 max-w-md">
+          {deleteNotice.type === 'success' ? (
+            <Check size={18} className="text-emerald-400 shrink-0" />
+          ) : (
+            <AlertTriangle size={18} className="text-amber-400 shrink-0" />
+          )}
+          <div className="text-xs font-medium flex-1">
+            {deleteNotice.message}
+          </div>
+          <button
+            onClick={() => setDeleteNotice(null)}
             className="text-text-muted hover:text-white p-1 cursor-pointer"
           >
             <X size={14} />

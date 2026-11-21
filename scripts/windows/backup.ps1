@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GebeyaOS – Daily Backup Script (Windows)
     Backs up the PostgreSQL database and uploaded photos.
@@ -63,7 +63,7 @@ Log "Starting backup: $backupName"
 
 try {
     Log "Dumping database '$DbName'..."
-    & pg_dump -h $DbHost -U $DbUser -F c -f $backupFile $DbName
+    & pg_dump -h $DbHost -U $DbUser --enable-row-security -F c -f $backupFile $DbName
     if ($LASTEXITCODE -ne 0) { throw "pg_dump exited with code $LASTEXITCODE" }
     $sizeMB = [math]::Round((Get-Item $backupFile).Length / 1MB, 2)
     Log "Database dump complete: ${sizeMB} MB"

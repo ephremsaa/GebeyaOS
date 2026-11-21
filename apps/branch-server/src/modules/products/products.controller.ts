@@ -24,6 +24,8 @@ import {
   UpdateCategoryDto,
   BulkCategoryDto,
   BulkArchiveDto,
+  BulkDeleteDto,
+  DeleteAllDto,
 } from './dto/products.dto';
 
 @Controller(['products', 'api/products'])
@@ -102,6 +104,15 @@ export class ProductsController {
     return this.productsService.archiveProduct(productId, branchId);
   }
 
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async deleteProduct(
+    @Param('id') productId: string,
+    @Query('force') force?: string,
+  ) {
+    return this.productsService.deleteProduct(productId, force === 'true');
+  }
+
   @Post('bulk-category')
   @HttpCode(HttpStatus.OK)
   async bulkUpdateCategory(@Body() dto: BulkCategoryDto) {
@@ -112,6 +123,18 @@ export class ProductsController {
   @HttpCode(HttpStatus.OK)
   async bulkArchive(@Body() dto: BulkArchiveDto) {
     return this.productsService.bulkArchive(dto.product_ids, dto.archive);
+  }
+
+  @Post('bulk-delete')
+  @HttpCode(HttpStatus.OK)
+  async bulkDelete(@Body() dto: BulkDeleteDto) {
+    return this.productsService.bulkDelete(dto.product_ids, dto.force);
+  }
+
+  @Post('delete-all')
+  @HttpCode(HttpStatus.OK)
+  async deleteAll(@Body() dto: DeleteAllDto) {
+    return this.productsService.deleteAll(dto.confirm);
   }
 
   @Post(':id/barcodes')

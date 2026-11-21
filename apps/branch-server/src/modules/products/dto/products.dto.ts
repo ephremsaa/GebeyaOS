@@ -357,4 +357,24 @@ export class BulkArchiveDto {
   archive!: boolean;
 }
 
+export class BulkDeleteDto {
+  @IsArray()
+  @IsNotEmpty()
+  product_ids!: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  force?: boolean;
+}
+
+export class DeleteAllDto {
+  @IsString()
+  @IsNotEmpty()
+  confirm!: string;
+
+  @IsBoolean()
+  @IsOptional()
+  force?: boolean;
+}
+
 

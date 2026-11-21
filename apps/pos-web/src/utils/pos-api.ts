@@ -983,6 +983,65 @@ export const posApi = {
   },
 
   /**
+   * Deletes a single product (permanently if no sales, soft-delete archive if sales exist).
+   */
+  async deleteProduct(id: string, force = true): Promise<{ success: boolean; mode: 'hard' | 'soft'; message: string }> {
+    const headers: Record<string, string> = {};
+    const token = localStorage.getItem('gebeyaos_access_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/products/${encodeURIComponent(id)}?force=${force}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to delete product' }));
+      throw new Error(err.message || 'Failed to delete product');
+    }
+    return await res.json();
+  },
+
+  /**
+   * Bulk deletes multiple products.
+   */
+  async bulkDeleteProducts(productIds: string[], force = true): Promise<{ hardDeleted: number; softDeleted: number; total: number }> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem('gebeyaos_access_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/products/bulk-delete`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ product_ids: productIds, force }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Bulk delete failed' }));
+      throw new Error(err.message || 'Bulk delete failed');
+    }
+    return await res.json();
+  },
+
+  /**
+   * Deletes all products in the catalog.
+   */
+  async deleteAllProducts(confirm: string): Promise<{ success: boolean; hardDeleted: number; softDeleted: number; total: number; message: string }> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem('gebeyaos_access_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/products/delete-all`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ confirm }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to delete all products' }));
+      throw new Error(err.message || 'Failed to delete all products');
+    }
+    return await res.json();
+  },
+
+  /**
    * Bulk updates category for multiple products.
    */
   async bulkUpdateCategory(productIds: string[], categoryId: string): Promise<{ updatedCount: number }> {

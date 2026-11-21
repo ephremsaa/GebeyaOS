@@ -19,6 +19,7 @@ import {
   Lock,
   History,
   Palette,
+  Trash2,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
@@ -62,6 +63,7 @@ interface ProductDrawerProps {
   categories: Array<{ id: string; code: string; name_en: string; name_am?: string | null }>;
   uoms: Array<{ code: string; name_en: string }>;
   onSaved: (savedProduct: any) => void;
+  onDeleted?: (deletedId: string) => void;
   onOpenCategoryManager?: () => void;
 }
 
@@ -92,11 +94,13 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
   categories: initialCategories,
   uoms: initialUoms,
   onSaved,
+  onDeleted,
 }) => {
   const { language, t, formatCurrency } = useI18n();
   const isAm = language === 'am';
   const { hasPermission, currentUser } = useAuth();
   const isEdit = Boolean(product?.id);
+  const [deleting, setDeleting] = useState(false);
 
   // Categories list
   const [categoriesList, setCategoriesList] = useState(initialCategories);
@@ -512,6 +516,26 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
       setFormError(err.message || 'Failed to save product');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!product?.id) return;
+    const confirmMsg = isAm
+      ? `እርግጠኛ ነዎት "${nameEn || product.name_en}" የተባለውን እቃ መሰረዝ ይፈልጋሉ?`
+      : `Are you sure you want to delete "${nameEn || product.name_en}"?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setDeleting(true);
+    try {
+      const res = await posApi.deleteProduct(product.id, true);
+      alert(res.message || (isAm ? 'እቃው በተሳካ ሁኔታ ተሰርዟል!' : 'Product deleted successfully!'));
+      onDeleted?.(product.id);
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete product');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1059,13 +1083,28 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
 
           {/* Footer Action Bar: Save & Save and Add Another */}
           <div className="px-6 py-4 border-t border-border-subtle bg-surface-2 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-xs font-bold text-text-main transition-colors"
-            >
-              {isAm ? 'ሰርዝ' : 'Cancel'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-xs font-bold text-text-main transition-colors"
+              >
+                {isAm ? 'ተመለስ' : 'Cancel'}
+              </button>
+
+              {isEdit && product?.id && hasPermission('MANAGE_PRODUCTS') && (
+                <button
+                  type="button"
+                  disabled={deleting || saving}
+                  onClick={handleDeleteProduct}
+                  className="px-3.5 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                  title={isAm ? 'እቃውን ሰርዝ' : 'Delete Product'}
+                >
+                  {deleting ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  <span>{deleting ? (isAm ? 'በመሰረዝ ላይ...' : 'Deleting...') : (isAm ? 'እቃውን ሰርዝ' : 'Delete Product')}</span>
+                </button>
+              )}
+            </div>
 
             <div className="flex items-center gap-2">
               {!isEdit && (

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GebeyaOS Branch Server – Windows Installer
     Installs and configures the GebeyaOS Point-of-Sale system on a Windows shop PC.
@@ -250,8 +250,8 @@ if ($dbExists -ne '1') {
     Write-Step "Creating database '$DbName'..."
     & psql -U postgres -c "CREATE DATABASE $DbName OWNER $DbUser;" | Out-Null
     & psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE $DbName TO $DbUser;" | Out-Null
-    & psql -U postgres -c "ALTER USER $DbUser BYPASSRLS CREATEDB;" | Out-Null
-    Write-OK "Database '$DbName' created (with BYPASSRLS for backups)"
+    & psql -U postgres -c "ALTER USER $DbUser NOBYPASSRLS CREATEDB;" | Out-Null
+    Write-OK "Database '$DbName' created (with NOBYPASSRLS for tenant isolation security)"
 } else {
     Write-OK "Database '$DbName' already exists"
 }

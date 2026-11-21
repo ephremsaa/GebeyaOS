@@ -755,5 +755,93 @@ export class ProductsService {
     );
     return { updatedCount: res.rowCount || 0 };
   }
+
+  /**
+   * Deletes a single product.
+   * If the product has recorded sales, hard delete is blocked by fiscal constraints,
+   * so it automatically soft-deletes (archives) it.
+   * If the product has NO sales, all associated barcodes, overrides, batches, and ledger entries are cleaned up
+   * and the product is deleted permanently.
+   */
+  async deleteProduct(id: string, force = false): Promise<{ success: boolean; mode: 'hard' | 'soft'; message: string }> {
+    const prodRes = await this.db.query(`SELECT id, name_en FROM products WHERE id = $1`, [id]);
+    if (prodRes.rows.length === 0) {
+      throw new NotFoundException(`Product ${id} not found`);
+    }
+
+    const salesRes = await this.db.query(
+      `SELECT COUNT(*)::int as count FROM sale_items WHERE product_id = $1`,
+      [id],
+    );
+    const saleCount = salesRes.rows[0]?.count || 0;
+
+    if (saleCount > 0) {
+      await this.db.query(
+        `UPDATE products SET is_active = FALSE, updated_at = clock_timestamp() WHERE id = $1`,
+        [id],
+      );
+      return {
+        success: true,
+        mode: 'soft',
+        message: `Product '${prodRes.rows[0].name_en}' has ${saleCount} sales record(s). It has been archived and removed from catalog and POS.`,
+      };
+    }
+
+    // Clean up dependent child records
+    await this.db.query(`DELETE FROM product_barcodes WHERE product_id = $1`, [id]);
+    await this.db.query(`DELETE FROM branch_product_overrides WHERE product_id = $1`, [id]);
+    await this.db.query(`DELETE FROM price_history WHERE product_id = $1`, [id]);
+    await this.db.query(`DELETE FROM stock_ledger WHERE product_id = $1`, [id]);
+    await this.db.query(`DELETE FROM batches WHERE product_id = $1`, [id]);
+    await this.db.query(`DELETE FROM products WHERE id = $1`, [id]);
+
+    return {
+      success: true,
+      mode: 'hard',
+      message: `Product '${prodRes.rows[0].name_en}' deleted permanently.`,
+    };
+  }
+
+  /**
+   * Bulk deletes multiple products.
+   */
+  async bulkDelete(productIds: string[], force = false): Promise<{ hardDeleted: number; softDeleted: number; total: number }> {
+    let hard = 0;
+    let soft = 0;
+
+    for (const id of productIds) {
+      try {
+        const res = await this.deleteProduct(id, force);
+        if (res.mode === 'hard') hard++;
+        else soft++;
+      } catch {
+        // continue with other items
+      }
+    }
+
+    return { hardDeleted: hard, softDeleted: soft, total: hard + soft };
+  }
+
+  /**
+   * Deletes all products in the catalog.
+   * Requires confirm: 'DELETE ALL'.
+   */
+  async deleteAll(confirm: string): Promise<{ success: boolean; hardDeleted: number; softDeleted: number; total: number; message: string }> {
+    if (confirm !== 'DELETE ALL') {
+      throw new BadRequestException("Must provide confirmation string 'DELETE ALL'");
+    }
+
+    const all = await this.db.query<{ id: string }>(`SELECT id FROM products`);
+    const ids = all.rows.map((r: any) => r.id);
+    const result = await this.bulkDelete(ids, true);
+
+    return {
+      success: true,
+      hardDeleted: result.hardDeleted,
+      softDeleted: result.softDeleted,
+      total: result.total,
+      message: `Cleared ${result.total} product(s) (${result.hardDeleted} removed permanently, ${result.softDeleted} archived with transaction history).`,
+    };
+  }
 }
 
