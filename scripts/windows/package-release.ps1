@@ -25,7 +25,7 @@ Set-Location $RepoRoot
 
 if (-not $Version) {
     $pkgJson = Get-Content "package.json" | ConvertFrom-Json
-    $Version = $pkgJson.version ?? "1.0.0"
+    if ($pkgJson.version) { $Version = $pkgJson.version } else { $Version = "1.0.0" }
 }
 
 $DistDir = "$RepoRoot\dist-release"

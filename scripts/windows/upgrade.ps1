@@ -1,5 +1,4 @@
-#Requires -RunAsAdministrator
-<#
+﻿<#
 .SYNOPSIS
     GebeyaOS – Upgrade Script (Windows)
     Stop → Backup → Migrate → Swap release → Health check → Auto-rollback on failure.

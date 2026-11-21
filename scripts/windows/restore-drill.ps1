@@ -1,23 +1,13 @@
-﻿#Requires -RunAsAdministrator
-<#
+﻿<#
 .SYNOPSIS
     GebeyaOS – Monthly Automated Backup Restore Drill (Windows)
-
-.DESCRIPTION
-    Non-destructive disaster recovery verification drill.
-    Tests restoring the latest backup into a temporary test database (gebeyaos_restore_test),
-    verifies record counts and schema consistency, and cleanly destroys the test database.
-    Does NOT affect the live production database.
-
-.OUTPUTS
-    Logs to C:\GebeyaOS\backups\restore-drill.log
 #>
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $InstallDir  = "C:\GebeyaOS"
-$BackupDir   = "C:\GebeyaOS\backups"
+$BackupDir   = "$InstallDir\backups"
 $EnvFile     = "$InstallDir\.env"
 $LogFile     = "$BackupDir\restore-drill.log"
 $TestDbName  = "gebeyaos_restore_test"
@@ -46,8 +36,14 @@ $DbPassword = Get-EnvValue "DB_PASSWORD"
 $DbHost     = Get-EnvValue "DB_HOST"
 
 $pgBin = $null
-foreach ($p in @("C:\Program Files\PostgreSQL\16\bin", "C:\Program Files\PostgreSQL\15\bin")) {
-    if (Test-Path "$p\pg_restore.exe") { $pgBin = $p; break }
+if (Test-Path "C:\Program Files\PostgreSQL") {
+    $pgDirs = Get-ChildItem "C:\Program Files\PostgreSQL" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+    foreach ($d in $pgDirs) {
+        if (Test-Path "$($d.FullName)\bin\pg_restore.exe") {
+            $pgBin = "$($d.FullName)\bin"
+            break
+        }
+    }
 }
 if (-not $pgBin) {
     Log "PostgreSQL tools not found in Program Files." "ERROR"
@@ -64,14 +60,21 @@ if (-not $latestBackup) {
 Log "Testing backup: $($latestBackup.FullName) ($([math]::Round($latestBackup.Length / 1MB, 2)) MB)"
 
 $env:PGPASSWORD = $DbPassword
+$env:PGOPTIONS  = "--client-min-messages=warning"
 
 try {
     Log "Creating isolated temporary database '$TestDbName'..."
-    & psql -h $DbHost -U postgres -c "DROP DATABASE IF EXISTS $TestDbName;" 2>$null | Out-Null
-    & psql -h $DbHost -U postgres -c "CREATE DATABASE $TestDbName OWNER $DbUser;" 2>$null | Out-Null
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    & psql -h $DbHost -U $DbUser -d postgres -c "DROP DATABASE IF EXISTS $TestDbName;" 2>&1 | Out-Null
+    & psql -h $DbHost -U $DbUser -d postgres -c "CREATE DATABASE $TestDbName OWNER $DbUser;" 2>&1 | Out-Null
+    $ErrorActionPreference = $prevEAP
 
     Log "Restoring backup into '$TestDbName'..."
-    & pg_restore -h $DbHost -U $DbUser -d $TestDbName --no-owner --no-privileges $latestBackup.FullName 2>$null
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    & pg_restore -h $DbHost -U $DbUser -d $TestDbName --no-owner --no-privileges $latestBackup.FullName 2>&1 | Out-Null
+    $ErrorActionPreference = $prevEAP
     
     Log "Validating core data integrity in restored test database..."
     $tableCounts = & psql -h $DbHost -U $DbUser -d $TestDbName -t -c "
@@ -94,8 +97,12 @@ try {
     exit 1
 } finally {
     Log "Tearing down temporary database '$TestDbName'..."
-    & psql -h $DbHost -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$TestDbName';" 2>$null | Out-Null
-    & psql -h $DbHost -U postgres -c "DROP DATABASE IF EXISTS $TestDbName;" 2>$null | Out-Null
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    & psql -h $DbHost -U $DbUser -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$TestDbName';" 2>&1 | Out-Null
+    & psql -h $DbHost -U $DbUser -d postgres -c "DROP DATABASE IF EXISTS $TestDbName;" 2>&1 | Out-Null
+    $ErrorActionPreference = $prevEAP
     Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
     Log "Restore drill complete and clean."
 }

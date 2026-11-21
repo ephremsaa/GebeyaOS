@@ -15,8 +15,26 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import * as fs from 'fs';
 import { AppModule } from './app.module';
 import { validateEnv } from './config/env.validation';
+
+// Load .env from common root or app directories before validation
+const candidateEnvPaths = [
+  process.env.ENV_FILE,
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), '../../.env'),
+  'C:\\GebeyaOS\\.env',
+].filter(Boolean) as string[];
+
+for (const envPath of candidateEnvPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    break;
+  }
+}
 
 async function bootstrap() {
   // ── 1. Validate environment before anything else ───────────────────────

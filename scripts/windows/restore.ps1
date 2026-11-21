@@ -1,5 +1,4 @@
-#Requires -RunAsAdministrator
-<#
+﻿<#
 .SYNOPSIS
     GebeyaOS – Database Restore Script (Windows)
 
@@ -93,15 +92,22 @@ Stop-Service GebeyaOS-API -Force -ErrorAction SilentlyContinue
 Start-Sleep 2
 
 $env:PGPASSWORD = $DbPassword
+$env:PGOPTIONS  = "--client-min-messages=warning"
 
 try {
     Write-Host "Dropping and recreating database '$DbName'..." -ForegroundColor Yellow
-    & psql -h $DbHost -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DbName';" | Out-Null
-    & psql -h $DbHost -U postgres -c "DROP DATABASE IF EXISTS $DbName;" | Out-Null
-    & psql -h $DbHost -U postgres -c "CREATE DATABASE $DbName OWNER $DbUser;" | Out-Null
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    & psql -h $DbHost -U $DbUser -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DbName';" 2>&1 | Out-Null
+    & psql -h $DbHost -U $DbUser -d postgres -c "DROP DATABASE IF EXISTS $DbName;" 2>&1 | Out-Null
+    & psql -h $DbHost -U $DbUser -d postgres -c "CREATE DATABASE $DbName OWNER $DbUser;" 2>&1 | Out-Null
+    $ErrorActionPreference = $prevEAP
 
     Write-Host "Restoring from $BackupFile..." -ForegroundColor Yellow
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
     & pg_restore -h $DbHost -U $DbUser -d $DbName -v $BackupFile 2>&1 | Select-Object -Last 10
+    $ErrorActionPreference = $prevEAP
     if ($LASTEXITCODE -ne 0) { throw "pg_restore failed with exit code $LASTEXITCODE" }
 
     Write-Host ""
@@ -111,11 +117,13 @@ try {
     Write-Host "  The database may be in an inconsistent state." -ForegroundColor Red
     Write-Host "  Try restoring from a different backup." -ForegroundColor Gray
     Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
     Start-Service GebeyaOS-API -ErrorAction SilentlyContinue
     exit 1
 }
 
 Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+Remove-Item Env:PGOPTIONS -ErrorAction SilentlyContinue
 
 # Check for photos backup
 $photoZip = $BackupFile -replace '\.dump$', '_photos.zip'
