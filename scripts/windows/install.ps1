@@ -150,19 +150,17 @@ foreach ($dir in @($InstallDir, $DataDir, $BackupDir, $LogDir, "$InstallDir\uplo
 }
 Write-OK "Target directories ready at $InstallDir"
 
-# Copy source from repo root if not already present in $InstallDir
+# Copy source from repo root to $InstallDir (always deploy latest binaries)
 $SourceRoot = Resolve-Path "$PSScriptRoot\..\.."
-if (-not (Test-Path "$InstallDir\apps\branch-server\dist\main.js")) {
-    Write-Step "Copying application binaries to $InstallDir..."
-    Copy-Item "$SourceRoot\apps" "$InstallDir\apps" -Recurse -Force
-    Copy-Item "$SourceRoot\packages" "$InstallDir\packages" -Recurse -Force
-    Copy-Item "$SourceRoot\database" "$InstallDir\database" -Recurse -Force
-    Copy-Item "$SourceRoot\scripts" "$InstallDir\scripts" -Recurse -Force
+Write-Step "Deploying application binaries to $InstallDir..."
+Copy-Item "$SourceRoot\apps" "$InstallDir\apps" -Recurse -Force
+Copy-Item "$SourceRoot\packages" "$InstallDir\packages" -Recurse -Force
+Copy-Item "$SourceRoot\database" "$InstallDir\database" -Recurse -Force
+Copy-Item "$SourceRoot\scripts" "$InstallDir\scripts" -Recurse -Force
+if (-not (Test-Path "$InstallDir\node_modules")) {
     Copy-Item "$SourceRoot\node_modules" "$InstallDir\node_modules" -Recurse -Force -ErrorAction SilentlyContinue
-    Write-OK "Application files deployed to $InstallDir"
-} else {
-    Write-OK "Application binaries already present in $InstallDir"
 }
+Write-OK "Application files deployed to $InstallDir"
 
 # ── STEP 6: Secrets ───────────────────────────────────────────────────────────
 Write-Header "Step 6: Generating Secrets"
@@ -280,14 +278,15 @@ Write-Header "Step 9: Registering Background Service"
 $svcName = "GebeyaOS-API"
 $launcherBatch = "$InstallDir\start-api.cmd"
 
-# Create a dedicated launcher script
-@"
+# Create a dedicated launcher script with logging
+$launcherContent = @"
 @echo off
 cd /d "$InstallDir\apps\branch-server"
 set NODE_ENV=production
 set PORT=$ApiPort
-node dist\main.js
-"@ | Set-Content $launcherBatch -Encoding ASCII
+node dist\main.js >> "$LogDir\api.log" 2>&1
+"@
+Set-Content -Path $launcherBatch -Value $launcherContent -Encoding ASCII
 
 # Register via Windows Task Scheduler (Runs at boot as SYSTEM with highest privileges)
 $taskName = "GebeyaOS-BranchServer"
@@ -302,6 +301,16 @@ try {
 } catch {
     Write-Fail "Could not register scheduled task: $_"
 }
+
+# Stop any previous stale process on $ApiPort to avoid EADDRINUSE
+try {
+    $staleConns = Get-NetTCPConnection -LocalPort $ApiPort -State Listen -ErrorAction SilentlyContinue
+    foreach ($conn in $staleConns) {
+        Write-Step "Stopping prior process listening on port $ApiPort (PID $($conn.OwningProcess))..."
+        Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+        Start-Sleep 1
+    }
+} catch {}
 
 # Start the service right now
 Write-Step "Starting GebeyaOS Branch Server process..."
@@ -336,7 +345,7 @@ Write-OK "Timezone set to E. Africa Standard Time (Africa/Addis_Ababa)"
 # ── STEP 12: Health check ─────────────────────────────────────────────────────
 Write-Header "Step 12: Health Check"
 $healthy = $false
-for ($i = 0; $i -lt 8; $i++) {
+for ($i = 0; $i -lt 15; $i++) {
     Start-Sleep 2
     try {
         $response = Invoke-RestMethod -Uri "http://localhost:$ApiPort/ready" -TimeoutSec 5
@@ -349,7 +358,11 @@ for ($i = 0; $i -lt 8; $i++) {
 }
 
 if (-not $healthy) {
-    Write-Fail "API is still starting up or encountered an issue. Check logs."
+    Write-Fail "API is still starting up or encountered an issue."
+    if (Test-Path "$LogDir\api.log") {
+        Write-Host "  Recent logs from $LogDir\api.log:" -ForegroundColor Yellow
+        Get-Content "$LogDir\api.log" -Tail 15 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    }
 }
 
 # ── DONE ──────────────────────────────────────────────────────────────────────

@@ -13,6 +13,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { json, urlencoded } from 'express';
+import * as express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as dotenv from 'dotenv';
@@ -66,13 +67,16 @@ async function bootstrap() {
     }),
   );
 
-  // ── 3. CORS – restricted to configured origins ──────────────────────────
+  // ── 3. CORS – restricted to configured origins + LAN terminals ──────────
   const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no Origin header (server-to-server, curl health checks)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
+      // Allow local LAN cashier terminal origins (e.g. 192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+      const isLanOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin);
+      if (isLanOrigin) return callback(null, true);
       logger.warn(`CORS blocked request from origin: ${origin}`);
       callback(new Error(`Origin ${origin} not allowed by CORS policy`));
     },
@@ -120,7 +124,44 @@ async function bootstrap() {
     }),
   );
 
-  // ── 7. Listen ───────────────────────────────────────────────────────────
+  // ── 7. Single-Port POS Web Serving ─────────────────────────────────────
+  const expressApp = app.getHttpAdapter().getInstance();
+  const webDistCandidates = [
+    path.resolve(process.cwd(), 'apps/pos-web/dist'),
+    path.resolve(process.cwd(), '../pos-web/dist'),
+    path.resolve(__dirname, '../../pos-web/dist'),
+    path.resolve(__dirname, '../../../apps/pos-web/dist'),
+    'C:\\GebeyaOS\\apps\\pos-web\\dist',
+  ];
+  const webDistPath = webDistCandidates.find((p) => fs.existsSync(p));
+  if (webDistPath) {
+    logger.log(`Serving Web POS from ${webDistPath}`);
+    expressApp.use(express.static(webDistPath));
+    expressApp.get('*', (req: any, res: any, next: any) => {
+      // Pass API routes and operational checks to NestJS controllers
+      if (
+        req.path.startsWith('/api') ||
+        req.path.startsWith('/auth') ||
+        req.path.startsWith('/health') ||
+        req.path.startsWith('/ready') ||
+        req.path.startsWith('/media') ||
+        req.path.startsWith('/products') ||
+        req.path.startsWith('/inventory') ||
+        req.path.startsWith('/pos') ||
+        req.path.startsWith('/reports') ||
+        req.path.startsWith('/users') ||
+        req.path.startsWith('/branches') ||
+        req.path.startsWith('/onboarding') ||
+        req.path.startsWith('/platform') ||
+        req.path.startsWith('/system')
+      ) {
+        return next();
+      }
+      res.sendFile(path.join(webDistPath, 'index.html'));
+    });
+  }
+
+  // ── 8. Listen ───────────────────────────────────────────────────────────
   await app.listen(env.PORT);
 
   // Log startup info – deliberately EXCLUDES secrets

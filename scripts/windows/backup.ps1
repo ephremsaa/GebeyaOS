@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     GebeyaOS – Daily Backup Script (Windows)
     Backs up the PostgreSQL database and uploaded photos.
