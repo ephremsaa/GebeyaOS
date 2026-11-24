@@ -386,8 +386,8 @@ export const ReportsView: React.FC = () => {
                         ? 'ሁሉም ቅርንጫፎች (የዋና መስሪያ ቤት)'
                         : 'All Branches (Consolidated HQ)'
                       : isAm && b.nameAm
-                      ? b.nameAm
-                      : `${b.name} (${b.code})`}
+                        ? b.nameAm
+                        : `${b.name} (${b.code})`}
                   </option>
                 ))}
               </select>
@@ -419,11 +419,10 @@ export const ReportsView: React.FC = () => {
                 <button
                   key={r.id}
                   onClick={() => setTimeRange(r.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-white dark:bg-surface text-text-main shadow-xs'
-                      : 'text-text-muted hover:text-text-main'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${isActive
+                    ? 'bg-white dark:bg-surface text-text-main shadow-xs'
+                    : 'text-text-muted hover:text-text-main'
+                    }`}
                 >
                   {isAm ? r.am : r.en}
                 </button>
@@ -561,18 +560,16 @@ export const ReportsView: React.FC = () => {
 
               <div className="text-right">
                 <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                    b.status === 'LIVE'
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                      : b.status === 'DELAYED'
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${b.status === 'LIVE'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                    : b.status === 'DELAYED'
                       ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
                       : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                  }`}
+                    }`}
                 >
                   <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      b.status === 'LIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-current'
-                    }`}
+                    className={`w-1.5 h-1.5 rounded-full ${b.status === 'LIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-current'
+                      }`}
                   />
                   {b.status} {b.minutesSinceSync !== null ? `(${b.minutesSinceSync}m)` : ''}
                 </span>
@@ -702,8 +699,8 @@ export const ReportsView: React.FC = () => {
               {profitability?.overallMarginPercentage
                 ? `${profitability.overallMarginPercentage.toFixed(1)}% ${isAm ? 'የትርፍ ህዳግ' : 'Gross Margin'}`
                 : isAm
-                ? '0.0% የትርፍ ህዳግ'
-                : '0.0% Gross Margin'}
+                  ? '0.0% የትርፍ ህዳግ'
+                  : '0.0% Gross Margin'}
             </span>
             <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
               <ArrowUpRight size={13} /> {deltas.profit}
@@ -750,21 +747,19 @@ export const ReportsView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                isActive
-                  ? 'bg-primary text-white shadow-soft font-black'
-                  : 'text-text-muted hover:text-text-main hover:bg-surface/60'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isActive
+                ? 'bg-primary text-white shadow-soft font-black'
+                : 'text-text-muted hover:text-text-main hover:bg-surface/60'
+                }`}
             >
               <Icon size={15} className={isActive ? 'text-white' : 'text-text-muted'} />
               <span>{tab.label}</span>
               {typeof tab.count === 'number' && tab.count > 0 && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-                    isActive
-                      ? 'bg-white/20 text-white'
-                      : 'bg-surface text-text-main border border-border-subtle'
-                  }`}
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-surface text-text-main border border-border-subtle'
+                    }`}
                 >
                   {tab.count}
                 </span>
@@ -945,13 +940,12 @@ export const ReportsView: React.FC = () => {
                             {isAm ? 'የገንዘብ ልዩነት:' : 'Drawer Variance:'}
                           </span>
                           <span
-                            className={`font-black ${
-                              audit.netVariance === 0
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : audit.netVariance < 0
+                            className={`font-black ${audit.netVariance === 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : audit.netVariance < 0
                                 ? 'text-rose-600 dark:text-rose-400'
                                 : 'text-amber-600 dark:text-amber-400'
-                            }`}
+                              }`}
                           >
                             ETB {fmt(audit.netVariance)}{' '}
                             {audit.netVariance === 0
@@ -959,12 +953,12 @@ export const ReportsView: React.FC = () => {
                                 ? '(ትክክል)'
                                 : '(Balanced)'
                               : audit.netVariance < 0
-                              ? isAm
-                                ? '(ጉድለት)'
-                                : '(Short)'
-                              : isAm
-                              ? '(ትርፍ)'
-                              : '(Over)'}
+                                ? isAm
+                                  ? '(ጉድለት)'
+                                  : '(Short)'
+                                : isAm
+                                  ? '(ትርፍ)'
+                                  : '(Over)'}
                           </span>
                         </div>
                       </div>
@@ -1034,10 +1028,10 @@ export const ReportsView: React.FC = () => {
                 {(dailySales?.hourlyBreakdown && dailySales.hourlyBreakdown.length > 0
                   ? dailySales.hourlyBreakdown
                   : Array.from({ length: 12 }, (_, i) => ({
-                      hour: i + 8,
-                      grossAmount: 0,
-                      transactionCount: 0,
-                    }))
+                    hour: i + 8,
+                    grossAmount: 0,
+                    transactionCount: 0,
+                  }))
                 ).map((h) => {
                   const maxAmount = Math.max(
                     ...(dailySales?.hourlyBreakdown?.map((x) => x.grossAmount) || [1]),
@@ -1056,13 +1050,12 @@ export const ReportsView: React.FC = () => {
 
                       <div className="my-2 h-20 flex items-end justify-center bg-surface rounded-lg p-1">
                         <div
-                          className={`w-full rounded-t-md transition-all duration-300 ${
-                            isPeak
-                              ? 'bg-primary shadow-xs'
-                              : pct > 0
+                          className={`w-full rounded-t-md transition-all duration-300 ${isPeak
+                            ? 'bg-primary shadow-xs'
+                            : pct > 0
                               ? 'bg-primary/50'
                               : 'bg-surface-2'
-                          }`}
+                            }`}
                           style={{ height: `${Math.max(8, pct)}%` }}
                         />
                       </div>
@@ -1255,15 +1248,14 @@ export const ReportsView: React.FC = () => {
                       </td>
                       <td className="p-3 text-right">
                         <span
-                          className={`inline-block px-2 py-0.5 rounded-md font-bold font-mono text-[11px] ${
-                            p.marginPercentage >= 30
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : p.marginPercentage >= 15
+                          className={`inline-block px-2 py-0.5 rounded-md font-bold font-mono text-[11px] ${p.marginPercentage >= 30
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            : p.marginPercentage >= 15
                               ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
                               : p.marginPercentage >= 5
-                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                              : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                          }`}
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                            }`}
                         >
                           {p.marginPercentage}%
                         </span>
@@ -1279,8 +1271,8 @@ export const ReportsView: React.FC = () => {
                           ? `ከ "${productSearch}" ጋር የሚዛመድ ምርት አልተገኘም`
                           : `No products matching "${productSearch}"`
                         : isAm
-                        ? 'በዚህ የጊዜ ገደብ የተመዘገበ የሽያጭ መረጃ የለም'
-                        : 'No product sales recorded in this period'}
+                          ? 'በዚህ የጊዜ ገደብ የተመዘገበ የሽያጭ መረጃ የለም'
+                          : 'No product sales recorded in this period'}
                     </td>
                   </tr>
                 )}
@@ -1531,8 +1523,8 @@ export const ReportsView: React.FC = () => {
                               b.daysUntilExpiry <= 0
                                 ? 'text-rose-600 dark:text-rose-400 font-black'
                                 : b.daysUntilExpiry <= 7
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : 'text-emerald-600 dark:text-emerald-400'
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-emerald-600 dark:text-emerald-400'
                             }
                           >
                             {b.daysUntilExpiry <= 0
@@ -1551,25 +1543,24 @@ export const ReportsView: React.FC = () => {
                         </td>
                         <td className="p-3 text-center">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              b.daysUntilExpiry <= 0
-                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                : b.daysUntilExpiry <= 7
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${b.daysUntilExpiry <= 0
+                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                              : b.daysUntilExpiry <= 7
                                 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                                 : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                            }`}
+                              }`}
                           >
                             {b.daysUntilExpiry <= 0
                               ? isAm
                                 ? 'ያለፈበት'
                                 : 'EXPIRED'
                               : b.daysUntilExpiry <= 7
-                              ? isAm
-                                ? 'አጣዳፊ'
-                                : 'CRITICAL'
-                              : isAm
-                              ? 'ጥሩ'
-                              : 'GOOD'}
+                                ? isAm
+                                  ? 'አጣዳፊ'
+                                  : 'CRITICAL'
+                                : isAm
+                                  ? 'ጥሩ'
+                                  : 'GOOD'}
                           </span>
                         </td>
                       </tr>
@@ -1645,26 +1636,24 @@ export const ReportsView: React.FC = () => {
                       </td>
                       <td className="p-3 text-center font-mono">
                         <span
-                          className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
-                            c.totalVariance === 0
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : c.totalVariance < 0
+                          className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${c.totalVariance === 0
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            : c.totalVariance < 0
                               ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                               : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                          }`}
+                            }`}
                         >
                           {c.totalVariance === 0 ? '0.00' : fmt(c.totalVariance)}
                         </span>
                       </td>
                       <td className="p-3 text-center">
                         <span
-                          className={`font-black font-mono text-xs ${
-                            c.accuracyRate === 100
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : c.accuracyRate >= 80
+                          className={`font-black font-mono text-xs ${c.accuracyRate === 100
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : c.accuracyRate >= 80
                               ? 'text-amber-600 dark:text-amber-400'
                               : 'text-rose-600 dark:text-rose-400'
-                          }`}
+                            }`}
                         >
                           {c.accuracyRate}%
                         </span>

@@ -585,8 +585,9 @@ export const ProductCatalogView: React.FC = () => {
   };
 
   const handleConfirmDeleteAll = async () => {
-    if (deleteAllConfirmInput.trim().toUpperCase() !== 'DELETE ALL') {
-      alert(language === 'am' ? 'እባክዎ በትክክል "DELETE ALL" ብለው ይጻፉ' : 'Please type "DELETE ALL" exactly to confirm.');
+    const val = deleteAllConfirmInput.trim().toUpperCase();
+    if (val !== 'DELETE ALL' && val !== 'ሰርዝ' && val !== 'አጥፋ') {
+      alert(language === 'am' ? 'እባክዎ በትክክል "DELETE ALL" ወይም "ሰርዝ" ብለው ይጻፉ' : 'Please type "DELETE ALL" exactly to confirm.');
       return;
     }
     setActionInProgress(true);
@@ -597,7 +598,7 @@ export const ProductCatalogView: React.FC = () => {
       setSelectedIds([]);
       setDeleteNotice({
         message: language === 'am'
-          ? `ካታሎግ ፀድቷል፡ ${res.hardDeleted} እቃዎች ተሰርዘዋል፣ ${res.softDeleted} እቃዎች ተደብቀዋል (ሽያጭ ስላላቸው)።`
+          ? `ካታሎግ ፀድቷል፡ ${res.hardDeleted} እቃዎች በቋሚነት ተሰርዘዋል፣ ${res.softDeleted} እቃዎች ተደብቀዋል (ሽያጭ ስላላቸው)።`
           : `Catalog cleared: ${res.hardDeleted} deleted permanently, ${res.softDeleted} archived (had sales).`,
         type: 'success',
       });
@@ -2217,11 +2218,20 @@ export const ProductCatalogView: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-main block">
-                {language === 'am'
-                  ? 'እባክዎ ለማረጋገጥ "DELETE ALL" ብለው በትክክል ይጻፉ፡'
-                  : 'Type "DELETE ALL" to confirm:'}
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-text-main block">
+                  {language === 'am'
+                    ? 'እባክዎ ለማረጋገጥ "DELETE ALL" ብለው በትክክል ይጻፉ፡'
+                    : 'Type "DELETE ALL" to confirm:'}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setDeleteAllConfirmInput('DELETE ALL')}
+                  className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                >
+                  {language === 'am' ? '👉 እዚህ ይጫኑ (DELETE ALL)' : '👉 Auto-fill "DELETE ALL"'}
+                </button>
+              </div>
               <input
                 type="text"
                 autoFocus
@@ -2246,7 +2256,10 @@ export const ProductCatalogView: React.FC = () => {
               </button>
               <button
                 type="button"
-                disabled={actionInProgress || deleteAllConfirmInput.trim().toUpperCase() !== 'DELETE ALL'}
+                disabled={
+                  actionInProgress ||
+                  !['DELETE ALL', 'ሰርዝ', 'አጥፋ'].includes(deleteAllConfirmInput.trim().toUpperCase())
+                }
                 onClick={handleConfirmDeleteAll}
                 className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black transition flex items-center gap-1.5 shadow-md cursor-pointer"
               >

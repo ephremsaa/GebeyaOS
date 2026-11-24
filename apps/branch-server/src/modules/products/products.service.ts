@@ -758,10 +758,10 @@ export class ProductsService {
 
   /**
    * Deletes a single product.
-   * If the product has recorded sales, hard delete is blocked by fiscal constraints,
-   * so it automatically soft-deletes (archives) it.
-   * If the product has NO sales, all associated barcodes, overrides, batches, and ledger entries are cleaned up
-   * and the product is deleted permanently.
+   * If the product has recorded sales or transaction audit history, hard delete is blocked
+   * by fiscal constraints, so it automatically soft-deletes (archives) it.
+   * If the product has NO sales/transactions, all associated barcodes, overrides, batches,
+   * price logs, and ledger entries are cleaned up and the product is deleted permanently.
    */
   async deleteProduct(id: string, force = false): Promise<{ success: boolean; mode: 'hard' | 'soft'; message: string }> {
     const prodRes = await this.db.query(`SELECT id, name_en FROM products WHERE id = $1`, [id]);
@@ -769,13 +769,21 @@ export class ProductsService {
       throw new NotFoundException(`Product ${id} not found`);
     }
 
-    const salesRes = await this.db.query(
-      `SELECT COUNT(*)::int as count FROM sale_items WHERE product_id = $1`,
+    const name = prodRes.rows[0].name_en;
+    const auditRes = await this.db.query<{ count: string }>(
+      `SELECT (
+        (SELECT COUNT(*) FROM sale_items WHERE product_id = $1) +
+        (SELECT COUNT(*) FROM sale_refund_items WHERE product_id = $1) +
+        (SELECT COUNT(*) FROM grn_items WHERE product_id = $1) +
+        (SELECT COUNT(*) FROM purchase_order_items WHERE product_id = $1) +
+        (SELECT COUNT(*) FROM supplier_return_items WHERE product_id = $1) +
+        (SELECT COUNT(*) FROM transfer_items WHERE product_id = $1)
+      )::int as count`,
       [id],
     );
-    const saleCount = salesRes.rows[0]?.count || 0;
+    const hasAuditRecords = Number(auditRes.rows[0]?.count || 0) > 0;
 
-    if (saleCount > 0) {
+    if (hasAuditRecords) {
       await this.db.query(
         `UPDATE products SET is_active = FALSE, updated_at = clock_timestamp() WHERE id = $1`,
         [id],
@@ -783,55 +791,150 @@ export class ProductsService {
       return {
         success: true,
         mode: 'soft',
-        message: `Product '${prodRes.rows[0].name_en}' has ${saleCount} sales record(s). It has been archived and removed from catalog and POS.`,
+        message: `Product '${name}' has recorded transaction history. It has been archived and hidden from the active catalog and POS.`,
       };
     }
 
-    // Clean up dependent child records
-    await this.db.query(`DELETE FROM product_barcodes WHERE product_id = $1`, [id]);
-    await this.db.query(`DELETE FROM branch_product_overrides WHERE product_id = $1`, [id]);
-    await this.db.query(`DELETE FROM price_history WHERE product_id = $1`, [id]);
-    await this.db.query(`DELETE FROM stock_ledger WHERE product_id = $1`, [id]);
-    await this.db.query(`DELETE FROM batches WHERE product_id = $1`, [id]);
-    await this.db.query(`DELETE FROM products WHERE id = $1`, [id]);
+    try {
+      await this.db.query(
+        `DELETE FROM notifications WHERE product_id = $1 OR batch_id IN (SELECT id FROM batches WHERE product_id = $1)`,
+        [id],
+      );
+      await this.db.query(
+        `DELETE FROM import_batch_rows WHERE product_id = $1 OR batch_id_ref IN (SELECT id FROM batches WHERE product_id = $1)`,
+        [id],
+      );
+      await this.db.query(
+        `DELETE FROM stock_adjustment_items WHERE product_id = $1 OR batch_id IN (SELECT id FROM batches WHERE product_id = $1)`,
+        [id],
+      );
+      await this.db.query(
+        `DELETE FROM stock_take_items WHERE product_id = $1 OR batch_id IN (SELECT id FROM batches WHERE product_id = $1)`,
+        [id],
+      );
+      await this.db.query(`DELETE FROM stock_ledger WHERE product_id = $1`, [id]);
+      await this.db.query(`DELETE FROM batches WHERE product_id = $1`, [id]);
+      await this.db.query(`DELETE FROM product_barcodes WHERE product_id = $1`, [id]);
+      await this.db.query(`DELETE FROM branch_product_overrides WHERE product_id = $1`, [id]);
+      await this.db.query(`DELETE FROM price_change_logs WHERE product_id = $1`, [id]);
+      await this.db.query(`DELETE FROM products WHERE id = $1`, [id]);
+
+      return {
+        success: true,
+        mode: 'hard',
+        message: `Product '${name}' deleted permanently.`,
+      };
+    } catch (err: any) {
+      this.logger.warn(`Hard delete failed for product ${id}, falling back to archive: ${err.message}`);
+      await this.db.query(
+        `UPDATE products SET is_active = FALSE, updated_at = clock_timestamp() WHERE id = $1`,
+        [id],
+      );
+      return {
+        success: true,
+        mode: 'soft',
+        message: `Product '${name}' was archived and hidden from the catalog.`,
+      };
+    }
+  }
+
+  /**
+   * Bulk deletes multiple products using fast set-based queries with safe fallback.
+   */
+  async bulkDelete(productIds: string[], force = false): Promise<{ hardDeleted: number; softDeleted: number; total: number }> {
+    if (!productIds || productIds.length === 0) {
+      return { hardDeleted: 0, softDeleted: 0, total: 0 };
+    }
+
+    // Identify products with immutable audit/sales history
+    const auditRes = await this.db.query<{ product_id: string }>(
+      `SELECT DISTINCT product_id FROM (
+        SELECT product_id FROM sale_items WHERE product_id = ANY($1)
+        UNION
+        SELECT product_id FROM sale_refund_items WHERE product_id = ANY($1)
+        UNION
+        SELECT product_id FROM grn_items WHERE product_id = ANY($1)
+        UNION
+        SELECT product_id FROM purchase_order_items WHERE product_id = ANY($1)
+        UNION
+        SELECT product_id FROM supplier_return_items WHERE product_id = ANY($1)
+        UNION
+        SELECT product_id FROM transfer_items WHERE product_id = ANY($1)
+      ) sub`,
+      [productIds],
+    );
+
+    const auditProductIds = new Set(auditRes.rows.map((r) => r.product_id));
+    const toSoftDelete = productIds.filter((id) => auditProductIds.has(id));
+    const toHardDelete = productIds.filter((id) => !auditProductIds.has(id));
+
+    let softCount = 0;
+    let hardCount = 0;
+
+    // 1. Soft delete all products with fiscal/audit history
+    if (toSoftDelete.length > 0) {
+      const res = await this.db.query(
+        `UPDATE products SET is_active = FALSE, updated_at = clock_timestamp() WHERE id = ANY($1)`,
+        [toSoftDelete],
+      );
+      softCount = res.rowCount || toSoftDelete.length;
+    }
+
+    // 2. Hard delete candidates with no fiscal history
+    if (toHardDelete.length > 0) {
+      try {
+        await this.db.query(
+          `DELETE FROM notifications WHERE product_id = ANY($1) OR batch_id IN (SELECT id FROM batches WHERE product_id = ANY($1))`,
+          [toHardDelete],
+        );
+        await this.db.query(
+          `DELETE FROM import_batch_rows WHERE product_id = ANY($1) OR batch_id_ref IN (SELECT id FROM batches WHERE product_id = ANY($1))`,
+          [toHardDelete],
+        );
+        await this.db.query(
+          `DELETE FROM stock_adjustment_items WHERE product_id = ANY($1) OR batch_id IN (SELECT id FROM batches WHERE product_id = ANY($1))`,
+          [toHardDelete],
+        );
+        await this.db.query(
+          `DELETE FROM stock_take_items WHERE product_id = ANY($1) OR batch_id IN (SELECT id FROM batches WHERE product_id = ANY($1))`,
+          [toHardDelete],
+        );
+        await this.db.query(`DELETE FROM stock_ledger WHERE product_id = ANY($1)`, [toHardDelete]);
+        await this.db.query(`DELETE FROM batches WHERE product_id = ANY($1)`, [toHardDelete]);
+        await this.db.query(`DELETE FROM product_barcodes WHERE product_id = ANY($1)`, [toHardDelete]);
+        await this.db.query(`DELETE FROM branch_product_overrides WHERE product_id = ANY($1)`, [toHardDelete]);
+        await this.db.query(`DELETE FROM price_change_logs WHERE product_id = ANY($1)`, [toHardDelete]);
+
+        const deleteRes = await this.db.query(`DELETE FROM products WHERE id = ANY($1)`, [toHardDelete]);
+        hardCount = deleteRes.rowCount || 0;
+      } catch (err: any) {
+        this.logger.warn(`Bulk hard delete failed on residual constraint, falling back to archiving: ${err.message}`);
+        const fallbackRes = await this.db.query(
+          `UPDATE products SET is_active = FALSE, updated_at = clock_timestamp() WHERE id = ANY($1)`,
+          [toHardDelete],
+        );
+        softCount += fallbackRes.rowCount || toHardDelete.length;
+      }
+    }
 
     return {
-      success: true,
-      mode: 'hard',
-      message: `Product '${prodRes.rows[0].name_en}' deleted permanently.`,
+      hardDeleted: hardCount,
+      softDeleted: softCount,
+      total: hardCount + softCount,
     };
   }
 
   /**
-   * Bulk deletes multiple products.
-   */
-  async bulkDelete(productIds: string[], force = false): Promise<{ hardDeleted: number; softDeleted: number; total: number }> {
-    let hard = 0;
-    let soft = 0;
-
-    for (const id of productIds) {
-      try {
-        const res = await this.deleteProduct(id, force);
-        if (res.mode === 'hard') hard++;
-        else soft++;
-      } catch {
-        // continue with other items
-      }
-    }
-
-    return { hardDeleted: hard, softDeleted: soft, total: hard + soft };
-  }
-
-  /**
    * Deletes all products in the catalog.
-   * Requires confirm: 'DELETE ALL'.
+   * Accepts confirm string 'DELETE ALL' (or 'ሰርዝ' in Amharic).
    */
   async deleteAll(confirm: string): Promise<{ success: boolean; hardDeleted: number; softDeleted: number; total: number; message: string }> {
-    if (confirm !== 'DELETE ALL') {
+    const normalized = (confirm || '').trim().toUpperCase();
+    if (normalized !== 'DELETE ALL' && normalized !== 'ሰርዝ' && normalized !== 'አጥፋ') {
       throw new BadRequestException("Must provide confirmation string 'DELETE ALL'");
     }
 
-    const all = await this.db.query<{ id: string }>(`SELECT id FROM products`);
+    const all = await this.db.query<{ id: string }>(`SELECT id FROM products WHERE is_active = TRUE`);
     const ids = all.rows.map((r: any) => r.id);
     const result = await this.bulkDelete(ids, true);
 
