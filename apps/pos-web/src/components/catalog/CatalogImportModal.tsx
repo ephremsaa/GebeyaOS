@@ -45,6 +45,7 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
 }) => {
   const { language, t } = useI18n();
   const { currentUser } = useAuth();
+  const isAm = language === 'am';
 
   const [activeTab, setActiveTab] = useState<'excel' | 'zip'>('excel');
 
@@ -244,10 +245,10 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
   const totalErrors = rows.filter((r) => r.status === 'ERROR').length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in select-none">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-5xl h-[92vh] max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <div className="shrink-0 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center">
               <UploadCloud size={20} />
@@ -270,12 +271,12 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
                 className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
               >
                 <Download size={14} />
-                Download Template
+                {isAm ? 'ቅጽ አውርድ (Template)' : 'Download Template'}
               </button>
             )}
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
+              className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
             >
               <X size={18} />
             </button>
@@ -283,11 +284,11 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+        <div className="shrink-0 px-6 py-2.5 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('excel')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'excel'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200 dark:border-slate-700'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -300,7 +301,7 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('zip')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'zip'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-slate-200 dark:border-slate-700'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -312,7 +313,7 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
           {activeTab === 'zip' ? (
             /* ZIP Photos Import Flow */
             <div className="space-y-6">
@@ -431,7 +432,7 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
           {!file ? (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-3xl p-10 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 transition group"
+              className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-400 rounded-3xl p-10 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 transition group"
             >
               <input
                 ref={fileInputRef}
@@ -440,20 +441,22 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
                 className="hidden"
                 onChange={handleFileChange}
               />
-              <div className="w-16 h-16 rounded-3xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition">
+              <div className="w-16 h-16 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition shadow-sm">
                 <FileSpreadsheet size={32} />
               </div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
-                Choose CSV or Excel spreadsheet
+                {isAm ? 'የኤክሴል ወይም ሲኤስቪ ፋይል ይምረጡ' : 'Choose CSV or Excel spreadsheet'}
               </h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Drag and drop your product catalog file here, or click to browse. Max 5,000 rows per batch.
+                {isAm
+                  ? 'የካታሎግ ፋይሉን እዚህ ይጎትቱ ወይም ለመምረጥ ይጫኑ። እስከ 5,000 እቃዎች በአንድ ጊዜ።'
+                  : 'Drag and drop your product catalog file here, or click to browse. Max 5,000 rows per batch.'}
               </p>
             </div>
           ) : (
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
                   <FileText size={20} />
                 </div>
                 <div>
@@ -469,76 +472,116 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setFile(null);
                   setRows([]);
                   setFileHash('');
                   setIsDuplicateFile(false);
                 }}
-                className="text-xs text-slate-500 hover:text-rose-500 font-bold transition"
+                className="text-xs text-rose-500 hover:text-rose-600 font-bold transition px-3 py-1.5 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
               >
-                Change File
+                {isAm ? 'ፋይል ቀይር' : 'Change File'}
               </button>
+            </div>
+          )}
+
+          {/* Parsing Spinner */}
+          {parsing && (
+            <div className="p-6 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center gap-3 text-indigo-700 dark:text-indigo-300 font-bold text-xs animate-pulse">
+              <RefreshCw size={18} className="animate-spin text-indigo-600" />
+              <span>{isAm ? 'የኤክሴል ፋይሉን በማረጋገጥ ላይ... እባክዎ ይጠብቁ' : 'Validating spreadsheet data on server... Please wait'}</span>
             </div>
           )}
 
           {/* Idempotent Check Warning */}
           {isDuplicateFile && (
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs space-y-2">
-              <div className="flex items-center gap-2 font-bold">
-                <AlertTriangle size={16} className="text-amber-600" />
-                Duplicate File Detected (Idempotency Safeguard)
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold">
+                  <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                  <span>{isAm ? 'ተመሳሳይ ፋይል ቀደም ሲል ገብቷል' : 'Duplicate File Detected (Idempotency Safeguard)'}</span>
+                </div>
+                {!confirmDuplicate && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDuplicate(true)}
+                    className="px-3 py-1 rounded-lg bg-amber-600 text-white font-bold text-[11px] hover:bg-amber-700 transition cursor-pointer"
+                  >
+                    {isAm ? 'እንደገና እንዲገባ ፍቀድ' : 'Allow Re-import'}
+                  </button>
+                )}
               </div>
               <p className="text-slate-600 dark:text-slate-300 text-[11px]">
-                A file with identical content was previously processed. Re-importing may duplicate stock movements or overwrite records.
+                {isAm
+                  ? 'ይህ ፋይል ቀደም ሲል ወደ ሲስተሙ ገብቷል። እንደገና ማስገባት የምርት መረጃዎችን ወይም ስቶክን ሊደግም ይችላል።'
+                  : 'A file with identical content was previously processed. Re-importing may duplicate stock movements or overwrite records.'}
               </p>
-              <label className="flex items-center gap-2 cursor-pointer pt-1 font-semibold text-xs">
+              <label className="flex items-center gap-2 cursor-pointer pt-1 font-semibold text-xs text-amber-900 dark:text-amber-200">
                 <input
                   type="checkbox"
                   checked={confirmDuplicate}
                   onChange={(e) => setConfirmDuplicate(e.target.checked)}
-                  className="rounded text-amber-600 focus:ring-amber-500"
+                  className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
                 />
-                Confirm re-import of this identical file
+                <span>{isAm ? 'ይህን ተመሳሳይ ፋይል ዳግም ለማስገባት አረጋግጫለሁ' : 'Confirm re-import of this identical file'}</span>
               </label>
             </div>
           )}
 
           {error && (
-            <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 text-xs flex items-center gap-2">
-              <AlertCircle size={16} />
-              {error}
+            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 text-xs flex items-center gap-2">
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 text-xs flex items-center gap-2">
-              <CheckCircle size={16} />
-              {success}
+            <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 text-xs flex items-center gap-2">
+              <CheckCircle size={16} className="shrink-0" />
+              <span>{success}</span>
             </div>
           )}
 
           {/* Validation Summary and Preview Table */}
           {rows.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">
-                    Total: {rows.length} rows
+                  <span className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700">
+                    {isAm ? `ጠቅላላ፡ ${rows.length} መስመሮች` : `Total: ${rows.length} rows`}
                   </span>
                   <span className="px-2.5 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 text-xs font-bold">
-                    Valid: {totalValid}
+                    {isAm ? `ትክክለኛ፡ ${totalValid}` : `Valid: ${totalValid}`}
                   </span>
                   {totalErrors > 0 && (
                     <span className="px-2.5 py-1 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-600 text-xs font-bold">
-                      Errors: {totalErrors}
+                      {isAm ? `ስህተቶች፡ ${totalErrors}` : `Errors: ${totalErrors}`}
                     </span>
                   )}
                 </div>
+
+                {/* Top Quick Done Button */}
+                <button
+                  type="button"
+                  onClick={handleCommit}
+                  disabled={committing || rows.length === 0 || totalValid === 0 || (isDuplicateFile && !confirmDuplicate)}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black flex items-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
+                  title={isAm ? 'እቃዎችን አስገባ / ጨርስ' : 'Done: commit import'}
+                >
+                  {committing ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                  <span>
+                    {committing
+                      ? (isAm ? 'በማስገባት ላይ...' : 'Importing...')
+                      : isAm
+                      ? `✓ ${totalValid} እቃዎችን አስገባ (Done)`
+                      : `✓ Done / Import (${totalValid} Items)`}
+                  </span>
+                </button>
               </div>
 
               {/* Preview Table */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden max-h-64 overflow-y-auto">
+              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden max-h-72 overflow-y-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold sticky top-0">
                     <tr>
@@ -611,39 +654,53 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between">
+        <div className="shrink-0 sticky bottom-0 z-20 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between gap-3 shadow-lg">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+            className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-xs font-bold text-slate-700 dark:text-slate-200 transition cursor-pointer"
           >
             {language === 'am' ? 'ዝጋ' : 'Close'}
           </button>
 
           {activeTab === 'zip' ? (
             <button
+              type="button"
               onClick={zipResult ? onClose : handleUploadZip}
               disabled={zipUploading || !zipFile}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black flex items-center gap-2 shadow-xs transition disabled:opacity-50 cursor-pointer"
             >
               {zipUploading ? (
                 <RefreshCw size={14} className="animate-spin" />
               ) : (
                 <CheckCircle size={14} />
               )}
-              {zipUploading
-                ? 'Processing ZIP...'
-                : zipResult
-                ? (language === 'am' ? 'ተጠናቋል' : 'Done')
-                : t('catalog.importZipBtn')}
+              <span>
+                {zipUploading
+                  ? 'Processing ZIP...'
+                  : zipResult
+                  ? (language === 'am' ? 'ተጠናቋል (Done)' : 'Done')
+                  : t('catalog.importZipBtn')}
+              </span>
             </button>
           ) : (
             <button
+              type="button"
               onClick={handleCommit}
               disabled={committing || rows.length === 0 || totalValid === 0 || (isDuplicateFile && !confirmDuplicate)}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition disabled:opacity-50"
+              className="px-7 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-black flex items-center gap-2.5 shadow-md shadow-emerald-700/20 transition active:scale-95 cursor-pointer"
+              title={isAm ? 'እቃዎችን ወደ ካታሎግ አስገባ' : 'Commit items to catalog'}
             >
-              {committing ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-              {committing ? 'Importing...' : `Commit Import (${totalValid} Products)`}
+              {committing ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+              <span>
+                {committing
+                  ? (isAm ? 'እቃዎችን በማስገባት ላይ...' : 'Importing Products...')
+                  : rows.length === 0
+                  ? (isAm ? 'እቃዎችን አስገባ (Done)' : 'Done / Import')
+                  : isAm
+                  ? `✓ ${totalValid} እቃዎችን አስገባ (Done)`
+                  : `✓ Done / Import ${totalValid} Products`}
+              </span>
             </button>
           )}
         </div>

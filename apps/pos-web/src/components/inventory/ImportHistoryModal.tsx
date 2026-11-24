@@ -66,10 +66,10 @@ export const ImportHistoryModal: React.FC<ImportHistoryModalProps> = ({
 
   return (
     <div
-      className="modal-overlay select-none animate-in fade-in duration-100"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 select-none animate-in fade-in duration-100"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal-content max-w-4xl max-h-[90vh] flex flex-col p-6">
+      <div className="bg-surface rounded-3xl shadow-2xl border border-border-subtle w-full max-w-4xl max-h-[90vh] flex flex-col p-6 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
           <div className="flex items-center gap-3">

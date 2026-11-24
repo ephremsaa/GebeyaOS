@@ -210,12 +210,12 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
 
   return (
     <div
-      className="modal-overlay select-none animate-in fade-in duration-100"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 select-none animate-in fade-in duration-100"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal-content max-w-5xl max-h-[94vh] flex flex-col p-6">
+      <div className="bg-surface rounded-3xl shadow-2xl border border-border-subtle w-full max-w-5xl h-[92vh] max-h-[92vh] flex flex-col overflow-hidden p-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+        <div className="shrink-0 flex items-center justify-between pb-3 border-b border-border-subtle">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-primary text-white shadow-soft flex items-center justify-center shadow-md shadow-emerald-600/30">
               <FileSpreadsheet size={20} />
@@ -304,9 +304,9 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
 
         {/* ─── STEP 2: Validation Preview Table with Inline Cell Editing ─── */}
         {step === 2 && (
-          <div className="flex flex-col gap-4 py-2 flex-1 overflow-hidden animate-in fade-in duration-150">
+          <div className="flex flex-col gap-4 py-2 flex-1 min-h-0 overflow-hidden animate-in fade-in duration-150">
             {/* Summary Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-surface-2/80 border border-border-subtle text-xs">
+            <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-surface-2/80 border border-border-subtle text-xs">
               <div className="flex items-center gap-3">
                 <span className="font-bold text-text-main text-text-main">
                   File: <strong className="font-mono text-primary">{fileName}</strong> ({editableRows.length} rows)
@@ -345,7 +345,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             </div>
 
             {/* In-Browser Inline Editor Table */}
-            <div className="flex-1 overflow-y-auto glass-panel border border-border-subtle rounded-2xl min-h-[300px]">
+            <div className="flex-1 min-h-0 overflow-y-auto glass-panel border border-border-subtle rounded-2xl">
               <table className="data-table text-xs">
                 <thead>
                   <tr>
@@ -484,29 +484,29 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             )}
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
+            <div className="shrink-0 flex items-center justify-between pt-3 mt-auto border-t border-border-subtle">
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="btn-secondary text-xs flex items-center gap-1.5"
+                className="btn-secondary text-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <ArrowLeft size={14} /> Back to Upload
               </button>
 
               <div className="flex items-center gap-2">
-                <button type="button" onClick={onClose} className="btn-secondary text-xs">
+                <button type="button" onClick={onClose} className="btn-secondary text-xs cursor-pointer">
                   Cancel
                 </button>
                 <button
                   type="button"
                   disabled={isProcessing || okRowsCount === 0}
                   onClick={handleCommit}
-                  className="btn-primary text-xs"
+                  className="btn-primary text-xs cursor-pointer"
                 >
                   <CheckCircle2 size={14} />
                   {isProcessing
                     ? 'Writing to DB in 1 Transaction...'
-                    : `Commit ${okRowsCount + warningRowsCount} Valid Rows`}
+                    : `✓ Done & Import (${okRowsCount + warningRowsCount} Valid Rows)`}
                 </button>
               </div>
             </div>

@@ -322,6 +322,37 @@
     color: var(--text-main);
   }
 
+  /* Modal System */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    padding: 1rem;
+    overflow-y: auto;
+  }
+
+  .modal-content {
+    background-color: var(--bg-surface);
+    color: var(--text-main);
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-subtle);
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .modal-title {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--text-main);
+  }
+
   /* Button system */
   .btn,
   .btn-primary,
