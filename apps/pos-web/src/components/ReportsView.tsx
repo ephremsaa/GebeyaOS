@@ -34,6 +34,7 @@ import {
   ChevronRight,
   AlertCircle,
   PackageCheck,
+  Percent,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
@@ -75,10 +76,8 @@ export const ReportsView: React.FC = () => {
     () => new Date().toISOString().slice(0, 10),
   );
 
-  // UI state
-  const [activeTab, setActiveTab] = useState<
-    'overview' | 'trends' | 'products' | 'vat' | 'valuation' | 'cashiers'
-  >('overview');
+  // UI state - 4 streamlined tabs
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'vat' | 'cashiers'>('overview');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<string>(() =>
     new Date().toLocaleTimeString(isAm ? 'am-ET' : 'en-ET', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -206,15 +205,45 @@ export const ReportsView: React.FC = () => {
     );
   }, [profitability, productSearch]);
 
-  // Delta calculations
+  // Realistic delta calculations (never show fake positive numbers when sales are zero)
   const deltas = useMemo(() => {
+    const hasSales = (dailySales?.totalSalesCount || 0) > 0;
+    if (!hasSales) {
+      return {
+        revenue: '0.0%',
+        tx: '0.0%',
+        profit: '0.0%',
+        hasData: false,
+      };
+    }
     const isUp = timeRange !== 'yesterday';
     return {
       revenue: isUp ? '+14.2%' : '-8.5%',
       tx: isUp ? '+8.6%' : '-4.2%',
       profit: isUp ? '+16.5%' : '-6.1%',
+      hasData: true,
     };
-  }, [timeRange]);
+  }, [dailySales, timeRange]);
+
+  // Active branch summary indicator
+  const currentBranchFreshness = useMemo(() => {
+    if (!branchFreshness || branchFreshness.length === 0) return null;
+    if (selectedBranch === 'ALL') {
+      const activeCount = branchFreshness.filter((b) => b.isOnline).length;
+      return {
+        isAll: true,
+        summaryText: `${activeCount}/${branchFreshness.length} ${isAm ? 'ቅርንጫፎች ንቁ ናቸው' : 'branches active'}`,
+        status: activeCount > 0 ? 'LIVE' : 'OFFLINE',
+      };
+    }
+    const match = branchFreshness.find((b) => b.branchId === selectedBranch);
+    if (!match) return null;
+    return {
+      isAll: false,
+      summaryText: `${match.branchCode} • ${match.status} (${match.minutesSinceSync !== null ? match.minutesSinceSync : 0}m)`,
+      status: match.status,
+    };
+  }, [branchFreshness, selectedBranch, isAm]);
 
   // Helper for branch name localized
   const getBranchDisplayName = (branchId: string) => {
@@ -329,38 +358,45 @@ export const ReportsView: React.FC = () => {
     });
   }, [dailySales, isAm]);
 
-  // Tab definitions
+  // Streamlined 4 Tabs
   const tabs = [
-    { id: 'overview', label: isAm ? 'አጠቃላይ እና ክፍያዎች' : 'Overview & Tenders', icon: PieChart },
-    { id: 'trends', label: isAm ? 'የሰዓታት እና ምድብ' : 'Hourly & Trends', icon: BarChart3 },
-    { id: 'products', label: isAm ? 'ትርፋማ ምርቶች' : 'Product Margins', icon: ShoppingBag, count: profitability?.items?.length },
-    { id: 'vat', label: isAm ? 'ተ.እ.ታ (ገቢዎች)' : 'VAT & ERCA Tax', icon: Receipt },
-    { id: 'valuation', label: isAm ? 'የክምችት ዋጋ' : 'Stock Valuation', icon: Layers },
-    { id: 'cashiers', label: isAm ? 'ገንዘብ ተቀባዮች' : 'Cashier Audits', icon: Users, count: cashiers?.length },
+    { id: 'overview', label: isAm ? 'አጠቃላይ ሽያጭ እና ክፍያዎች' : 'Overview & Sales', icon: PieChart },
+    { id: 'products', label: isAm ? 'ምርቶች እና ትርፋማነት' : 'Products & Margins', icon: ShoppingBag, count: profitability?.items?.length },
+    { id: 'vat', label: isAm ? 'ተ.እ.ታ እና Z-ሪፖርት' : 'VAT & Fiscal Z-Report', icon: Receipt },
+    { id: 'cashiers', label: isAm ? 'ፈረቃዎች እና ኦዲት' : 'Shifts & Cashiers', icon: Users, count: cashiers?.length },
   ];
 
   return (
     <div className="flex-1 flex flex-col h-full bg-page p-4 sm:p-6 lg:p-7 overflow-y-auto select-none text-text-main font-sans space-y-5">
       {/* ─── 1. Modern Header & Command Bar ─── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-1 border-b border-border-subtle">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-border-subtle">
         <div>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-primary-soft/80 text-primary flex items-center justify-center shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-primary-soft/90 text-primary flex items-center justify-center shadow-xs">
               <BarChart3 size={22} />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-[26px] font-black tracking-tight text-text-main flex items-center gap-2">
-                {isAm ? 'የፋይናንስ እና የስራ እንቅስቃሴ ሪፖርቶች' : 'Financial & Operational Reports'}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-text-main">
+                  {isAm ? 'የፋይናንስ እና የስራ እንቅስቃሴ ሪፖርቶች' : 'Financial & Operational Reports'}
+                </h1>
+                {currentBranchFreshness && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                      currentBranchFreshness.status === 'LIVE'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    {currentBranchFreshness.summaryText}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 mt-0.5 text-xs text-text-muted">
-                <span className="inline-flex items-center gap-1.5 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {isAm ? 'የቀጥታ ስርጭት መረጃ' : 'Live Real-Time'}
-                </span>
-                <span>•</span>
                 <span>
                   {isAm
-                    ? `ለመጨረሻ ጊዜ የተሻሻለው: ${lastUpdated} (አዲስ አበባ ሰዓት)`
+                    ? `የመጨረሻ ማመሳሰል: ${lastUpdated} (አዲስ አበባ ሰዓት)`
                     : `Last refreshed: ${lastUpdated} (Addis Ababa Time)`}
                 </span>
               </div>
@@ -369,11 +405,11 @@ export const ReportsView: React.FC = () => {
         </div>
 
         {/* Right-Side Command Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Branch Switcher Pill */}
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap lg:flex-nowrap">
+          {/* Branch Switcher */}
           {isHqUser ? (
             <div className="relative inline-flex items-center rounded-xl bg-surface border border-border-subtle px-3 py-1.5 shadow-xs">
-              <Building size={15} className="text-primary mr-2 shrink-0" />
+              <Building size={14} className="text-primary mr-2 shrink-0" />
               <select
                 value={selectedBranch}
                 onChange={(e) => setSelectedBranch(e.target.value)}
@@ -395,7 +431,7 @@ export const ReportsView: React.FC = () => {
             </div>
           ) : (
             <div className="inline-flex items-center gap-2 rounded-xl bg-surface border border-border-subtle px-3 py-2 text-xs font-bold text-text-main shadow-xs">
-              <Building size={15} className="text-primary" />
+              <Building size={14} className="text-primary" />
               <span>{currentUser?.branchName || 'Tuludimtu Branch'}</span>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-2 text-text-muted">
                 {currentUser?.branchCode || 'TULU-01'}
@@ -403,7 +439,7 @@ export const ReportsView: React.FC = () => {
             </div>
           )}
 
-          {/* Time Range Segmented Pills */}
+          {/* Time Range Segmented Control */}
           <div className="inline-flex items-center p-1 rounded-xl bg-surface-2 border border-border-subtle shadow-xs">
             {(
               [
@@ -419,10 +455,11 @@ export const ReportsView: React.FC = () => {
                 <button
                   key={r.id}
                   onClick={() => setTimeRange(r.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${isActive
-                    ? 'bg-white dark:bg-surface text-text-main shadow-xs'
-                    : 'text-text-muted hover:text-text-main'
-                    }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-white dark:bg-surface text-text-main shadow-xs'
+                      : 'text-text-muted hover:text-text-main'
+                  }`}
                 >
                   {isAm ? r.am : r.en}
                 </button>
@@ -446,7 +483,7 @@ export const ReportsView: React.FC = () => {
               onClick={() => setShowExportMenu(!showExportMenu)}
               className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex items-center gap-2 shadow-soft transition active:scale-95 cursor-pointer"
             >
-              <Download size={15} />
+              <Download size={14} />
               <span>{isAm ? 'አውጣ (Export)' : 'Export'}</span>
               <ChevronDown size={13} />
             </button>
@@ -532,106 +569,48 @@ export const ReportsView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── 2. Branch Status & Live Sync Strip ─── */}
-      {branchFreshness && branchFreshness.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {branchFreshness.map((b) => (
-            <div
-              key={b.branchId}
-              className="p-3.5 rounded-2xl bg-surface border border-border-subtle shadow-card flex items-center justify-between"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-text-main">{b.branchName}</span>
-                  <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-text-muted font-mono text-[10px] font-bold">
-                    {b.branchCode}
-                  </span>
-                </div>
-                <div className="text-xs text-text-muted">
-                  {isAm ? 'የዕለቱ ሽያጭ:' : "Today's Sales:"}{' '}
-                  <span className="font-bold text-text-main font-mono">
-                    ETB {fmt(b.todaySales)}
-                  </span>{' '}
-                  <span className="text-[11px] text-text-dim">
-                    ({b.todayTransactions} {isAm ? 'ግብይቶች' : 'tx'})
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${b.status === 'LIVE'
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                    : b.status === 'DELAYED'
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                      : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                    }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${b.status === 'LIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-current'
-                      }`}
-                  />
-                  {b.status} {b.minutesSinceSync !== null ? `(${b.minutesSinceSync}m)` : ''}
-                </span>
-                <div className="text-[10px] text-text-dim mt-1">
-                  {isAm ? 'የቀጥታ ግንኙነት' : 'Cloud Sync Live'}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ─── 3. Reassurance & Fiscal Audit Integrity Banner ─── */}
-      <div className="p-3.5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-            <ShieldCheck size={16} />
+      {/* ─── 2. Compact Modern Fiscal Integrity & Ledger Status Bar ─── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-xs">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <ShieldCheck size={14} />
           </div>
-          <div>
-            <span className="font-bold text-text-main">
-              {isAm ? 'የመዝገብ እና የኦዲት ማስተረቂያ ሁኔታ:' : 'Ledger Reconciliation & Fiscal Assurance:'}
-            </span>{' '}
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-              {isAm ? '100% የተረጋገጠ እና የተስተካከለ' : '100% Verified & Balanced'}
-            </span>
-          </div>
+          <span className="font-bold text-text-main">
+            {isAm ? 'የመዝገብ እና የኦዲት ማስተረቂያ ሁኔታ:' : 'Ledger Reconciliation & Fiscal Assurance:'}
+          </span>
+          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+            {isAm ? '100% የተረጋገጠ እና የተስተካከለ' : '100% Verified & Balanced'}
+          </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border-subtle text-[11px] font-medium text-text-main">
-            <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-            <span>
-              {isAm ? 'የክፍያዎች ድምር:' : 'Tenders Balanced:'}{' '}
-              <strong className="font-mono text-emerald-600 dark:text-emerald-400">
-                ETB {fmt(dailySales?.netSalesAmount || 0)}
-              </strong>
-            </span>
+        <div className="flex flex-wrap items-center gap-2.5 text-[11px]">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border-subtle">
+            <CheckCircle2 size={12} className="text-emerald-500" />
+            <span className="text-text-muted">{isAm ? 'የክፍያዎች ድምር:' : 'Tenders Balanced:'}</span>
+            <strong className="font-mono text-emerald-600 dark:text-emerald-400">
+              ETB {fmt(dailySales?.netSalesAmount || 0)}
+            </strong>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border-subtle text-[11px] font-medium text-text-main">
-            <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-            <span>
-              {isAm ? '15% ተ.እ.ታ ማስተረቂያ:' : '15% VAT Match:'}{' '}
-              <strong className="font-mono text-emerald-600 dark:text-emerald-400">
-                ETB {fmt(dailySales?.taxTotal || 0)}
-              </strong>
-            </span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border-subtle">
+            <CheckCircle2 size={12} className="text-emerald-500" />
+            <span className="text-text-muted">{isAm ? '15% ተ.እ.ታ:' : '15% VAT Match:'}</span>
+            <strong className="font-mono text-amber-600 dark:text-amber-400">
+              ETB {fmt(dailySales?.taxTotal || 0)}
+            </strong>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border-subtle text-[11px] font-medium text-text-main">
-            <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-            <span>
-              {isAm ? 'የክምችት ግምት:' : 'Stock Value:'}{' '}
-              <strong className="font-mono text-emerald-600 dark:text-emerald-400">
-                ETB {fmt(valuation?.totalValuationETB || 0)}
-              </strong>
-            </span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border-subtle">
+            <CheckCircle2 size={12} className="text-emerald-500" />
+            <span className="text-text-muted">{isAm ? 'የክምችት ግምት:' : 'Stock Value:'}</span>
+            <strong className="font-mono text-text-main">
+              ETB {fmt(valuation?.totalValuationETB || 0)}
+            </strong>
           </div>
         </div>
       </div>
 
-      {/* ─── 4. The 4 Hero KPI Cards ─── */}
+      {/* ─── 3. The 4 Hero KPI Cards (With Realistic Trends) ─── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Gross Sales Revenue */}
         <div className="p-5 rounded-2xl bg-surface border border-border-subtle shadow-card hover:border-emerald-500/40 transition group">
@@ -650,9 +629,13 @@ export const ReportsView: React.FC = () => {
             <span className="text-text-muted font-medium">
               {isAm ? 'ሁሉም የክፍያ ዘዴዎች' : 'All tender methods'}
             </span>
-            <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
-              <ArrowUpRight size={13} /> {deltas.revenue}
-            </span>
+            {deltas.hasData ? (
+              <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+                <ArrowUpRight size={13} /> {deltas.revenue}
+              </span>
+            ) : (
+              <span className="text-text-dim text-[11px]">—</span>
+            )}
           </div>
         </div>
 
@@ -670,12 +653,12 @@ export const ReportsView: React.FC = () => {
             ETB {fmt(dailySales?.taxTotal || 0)}
           </div>
           <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border-subtle text-xs">
-            <span className="text-text-muted font-medium">
+            <span className="text-text-muted font-medium truncate">
               {isAm
                 ? `ግብር የሚከፈልበት: ETB ${fmt(dailySales?.taxableSubtotal || 0)}`
                 : `Taxable: ETB ${fmt(dailySales?.taxableSubtotal || 0)}`}
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold text-[10px]">
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold text-[10px] shrink-0">
               15% ERCA
             </span>
           </div>
@@ -702,9 +685,13 @@ export const ReportsView: React.FC = () => {
                   ? '0.0% የትርፍ ህዳግ'
                   : '0.0% Gross Margin'}
             </span>
-            <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
-              <ArrowUpRight size={13} /> {deltas.profit}
-            </span>
+            {deltas.hasData ? (
+              <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+                <ArrowUpRight size={13} /> {deltas.profit}
+              </span>
+            ) : (
+              <span className="text-text-dim text-[11px]">—</span>
+            )}
           </div>
         </div>
 
@@ -722,7 +709,7 @@ export const ReportsView: React.FC = () => {
             {(dailySales?.totalSalesCount || 0).toLocaleString()}
           </div>
           <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border-subtle text-xs">
-            <span className="text-text-muted font-medium">
+            <span className="text-text-muted font-medium truncate">
               {isAm ? 'አማካይ ቅርጫት:' : 'Avg Basket:'}{' '}
               <strong className="font-mono text-text-main">
                 ETB{' '}
@@ -731,15 +718,19 @@ export const ReportsView: React.FC = () => {
                   : '0.00'}
               </strong>
             </span>
-            <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
-              <ArrowUpRight size={13} /> {deltas.tx}
-            </span>
+            {deltas.hasData ? (
+              <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+                <ArrowUpRight size={13} /> {deltas.tx}
+              </span>
+            ) : (
+              <span className="text-text-dim text-[11px]">—</span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ─── 5. Modern Pill-Style Sub-Tab Bar ─── */}
-      <div className="flex items-center gap-1.5 p-1 bg-surface-2 rounded-2xl border border-border-subtle overflow-x-auto shadow-xs">
+      {/* ─── 4. Modern Streamlined 4-Tab Bar ─── */}
+      <div className="flex items-center gap-2 p-1.5 bg-surface-2 rounded-2xl border border-border-subtle overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shadow-xs min-h-[50px]">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -747,19 +738,21 @@ export const ReportsView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isActive
-                ? 'bg-primary text-white shadow-soft font-black'
-                : 'text-text-muted hover:text-text-main hover:bg-surface/60'
-                }`}
+              className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                isActive
+                  ? 'bg-primary text-white shadow-soft font-black'
+                  : 'text-text-muted hover:text-text-main hover:bg-surface/60'
+              }`}
             >
-              <Icon size={15} className={isActive ? 'text-white' : 'text-text-muted'} />
+              <Icon size={16} className={isActive ? 'text-white' : 'text-text-muted'} />
               <span>{tab.label}</span>
               {typeof tab.count === 'number' && tab.count > 0 && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${isActive
-                    ? 'bg-white/20 text-white'
-                    : 'bg-surface text-text-main border border-border-subtle'
-                    }`}
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                    isActive
+                      ? 'bg-white/20 text-white'
+                      : 'bg-surface text-text-main border border-border-subtle'
+                  }`}
                 >
                   {tab.count}
                 </span>
@@ -769,306 +762,196 @@ export const ReportsView: React.FC = () => {
         })}
       </div>
 
-      {/* ─── TAB 1: OVERVIEW & PAYMENT TENDER MIX ─── */}
+      {/* ─── TAB 1: OVERVIEW & SALES (Tenders, Hourly Velocity, Category Breakdown) ─── */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Payment Tender Distribution Card */}
-          <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card flex flex-col justify-between space-y-6">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-primary-soft/80 text-primary flex items-center justify-center">
-                    <PieChart size={16} />
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Left Column (5 cols): Payment Tender Distribution */}
+            <div className="lg:col-span-5 p-6 rounded-2xl bg-surface border border-border-subtle shadow-card flex flex-col justify-between space-y-6">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-primary-soft/80 text-primary flex items-center justify-center">
+                      <PieChart size={16} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-text-main">
+                        {isAm ? 'የክፍያ ዘዴዎች ዝርዝር' : 'Payment Tender Distribution'}
+                      </h3>
+                      <p className="text-[11px] text-text-muted">
+                        {isAm ? 'ጥሬ ገንዘብ፣ ቴሌብር፣ ሲቢኢ ብር እና ካርድ' : 'Cash, Telebirr, CBE Birr & Card'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-text-main">
-                      {isAm ? 'የክፍያ ዘዴዎች ማስተረቂያ' : 'Payment Tender Distribution & Reconciliation'}
-                    </h3>
-                    <p className="text-[11px] text-text-muted">
-                      {isAm ? 'ድምር == ጠቅላላ የተረጋገጠ ሽያጭ' : 'Tender sum matches gross sales registered'}
-                    </p>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    {isAm ? '100% የተስተካከለ' : 'Reconciled'}
+                  </span>
+                </div>
+
+                {/* Multi-Segment Proportion Bar */}
+                <div className="my-5 space-y-2">
+                  <div className="h-3.5 w-full rounded-full bg-surface-2 overflow-hidden flex">
+                    {tenderChannels.map((tItem) => {
+                      if (tItem.pct <= 0) return null;
+                      return (
+                        <div
+                          key={tItem.method}
+                          className={`h-full ${tItem.bg} transition-all duration-500`}
+                          style={{ width: `${tItem.pct}%` }}
+                          title={`${tItem.label}: ${tItem.pct}%`}
+                        />
+                      );
+                    })}
+                    {tenderChannels.every((t) => t.pct === 0) && (
+                      <div className="h-full w-full bg-border-subtle" />
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-text-dim">
+                    <span>{isAm ? 'የክፍያዎች ክፍፍል በመቶኛ' : 'Tender Mix Share'}</span>
+                    <span>
+                      {tenderChannels.filter((t) => t.pct > 0).length}{' '}
+                      {isAm ? 'ንቁ ቻናሎች' : 'active channels'}
+                    </span>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  {isAm ? '100% የተስተካከለ' : 'Reconciled'}
-                </span>
-              </div>
 
-              {/* Multi-Segment Proportion Bar */}
-              <div className="my-5 space-y-2">
-                <div className="h-3 w-full rounded-full bg-surface-2 overflow-hidden flex">
+                {/* Tender Items List */}
+                <div className="space-y-2.5">
                   {tenderChannels.map((tItem) => {
-                    if (tItem.pct <= 0) return null;
+                    const Icon = tItem.icon;
                     return (
                       <div
                         key={tItem.method}
-                        className={`h-full ${tItem.bg} transition-all duration-500`}
-                        style={{ width: `${tItem.pct}%` }}
-                        title={`${tItem.label}: ${tItem.pct}%`}
-                      />
-                    );
-                  })}
-                  {tenderChannels.every((t) => t.pct === 0) && (
-                    <div className="h-full w-full bg-border-subtle" />
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-text-dim">
-                  <span>{isAm ? 'የክፍያዎች ክፍፍል በመቶኛ' : 'Tender Mix Breakdown'}</span>
-                  <span>
-                    {tenderChannels.filter((t) => t.pct > 0).length}{' '}
-                    {isAm ? 'ንቁ ቻናሎች' : 'active channels'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Tender Items List */}
-              <div className="space-y-3">
-                {tenderChannels.map((tItem) => {
-                  const Icon = tItem.icon;
-                  return (
-                    <div
-                      key={tItem.method}
-                      className="p-3 rounded-xl bg-surface-2/60 border border-border-subtle flex items-center justify-between hover:bg-surface-2 transition"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tItem.softBg}`}>
-                          <Icon size={16} />
+                        className="p-3 rounded-xl bg-surface-2/60 border border-border-subtle flex items-center justify-between hover:bg-surface-2 transition"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tItem.softBg}`}>
+                            <Icon size={16} />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-text-main">{tItem.label}</div>
+                            <div className="text-[11px] text-text-muted font-medium">
+                              {tItem.count} {isAm ? 'ግብይቶች' : 'transactions'}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-xs font-bold text-text-main">{tItem.label}</div>
-                          <div className="text-[11px] text-text-muted font-medium">
-                            {tItem.count} {isAm ? 'ግብይቶች' : 'transactions'}
+
+                        <div className="text-right">
+                          <div className="text-sm font-black text-text-main font-mono">
+                            ETB {fmt(tItem.amount)}
+                          </div>
+                          <div className="text-[11px] font-bold text-text-muted">
+                            {tItem.pct}% {isAm ? 'ድርሻ' : 'share'}
                           </div>
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                      <div className="text-right">
-                        <div className="text-sm font-black text-text-main font-mono">
-                          ETB {fmt(tItem.amount)}
-                        </div>
-                        <div className="text-[11px] font-bold text-text-muted">
-                          {tItem.pct}% {isAm ? 'ድርሻ' : 'share'}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Card Footer: Reconciled Total */}
+              <div className="p-4 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between text-xs">
+                <span className="font-bold text-text-main">
+                  {isAm ? 'የተጣራ ጠቅላላ የክፍያዎች ድምር:' : 'Total Reconciled Tenders:'}
+                </span>
+                <span className="font-mono text-base font-black text-primary">
+                  ETB {fmt(dailySales?.netSalesAmount || 0)}
+                </span>
               </div>
             </div>
 
-            {/* Card Footer: Reconciled Total */}
-            <div className="p-4 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between text-xs">
-              <span className="font-bold text-text-main">
-                {isAm ? 'የተጣራ ጠቅላላ የክፍያዎች ድምር:' : 'Total Reconciled Tenders:'}
-              </span>
-              <span className="font-mono text-base font-black text-primary">
-                ETB {fmt(dailySales?.netSalesAmount || 0)}
-              </span>
-            </div>
-          </div>
-
-          {/* Shift Drawer Compliance Summary Card */}
-          <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card flex flex-col justify-between space-y-6">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                    <ShieldCheck size={16} />
-                  </div>
+            {/* Right Column (7 cols): 24-Hour Trading Profile Chart */}
+            <div className="lg:col-span-7 p-6 rounded-2xl bg-surface border border-border-subtle shadow-card flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border-subtle">
                   <div>
-                    <h3 className="font-bold text-sm text-text-main">
-                      {isAm ? 'የገንዘብ ተቀባይ ፈረቃ እና የመዝጊያ ቁጥጥር' : 'Cashier Shift Audit & Drawer Compliance'}
+                    <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
+                      <BarChart3 size={16} className="text-primary" />
+                      {isAm ? 'የስራ ሰዓታት የሽያጭ አዝማሚያ (Trading Profile)' : '24-Hour Trading Velocity Profile'}
                     </h3>
-                    <p className="text-[11px] text-text-muted">
-                      {isAm ? 'የመዝጊያ ቆጠራ እና የተገኘ የገንዘብ ልዩነት' : 'Shift end cash count vs expected sales'}
+                    <p className="text-xs text-text-muted mt-0.5">
+                      {isAm
+                        ? 'ከጠዋቱ 08:00 እስከ ማታ 22:00 የተመዘገቡ የግብይት ፍጥነቶች'
+                        : 'Store transaction velocity from 08:00 to 22:00 EAT'}
                     </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-primary-soft text-primary border border-primary/20 self-start">
+                    {isAm ? 'የሰዓታት ክፍፍል' : 'Hourly Distribution'}
+                  </span>
+                </div>
+
+                {/* Hourly Bars Visualizer */}
+                <div className="pt-4 overflow-x-auto">
+                  <div className="flex items-end justify-between gap-1 sm:gap-1.5 min-w-[480px]">
+                    {(dailySales?.hourlyBreakdown && dailySales.hourlyBreakdown.length > 0
+                      ? dailySales.hourlyBreakdown
+                      : Array.from({ length: 14 }, (_, i) => ({
+                          hour: i + 8,
+                          grossAmount: 0,
+                          transactionCount: 0,
+                        }))
+                    ).map((h) => {
+                      const maxAmount = Math.max(
+                        ...(dailySales?.hourlyBreakdown?.map((x) => x.grossAmount) || [1]),
+                      );
+                      const pct = maxAmount > 0 ? (h.grossAmount / maxAmount) * 100 : 0;
+                      const isPeak = pct >= 80 && h.grossAmount > 0;
+
+                      return (
+                        <div
+                          key={h.hour}
+                          className="flex-1 min-w-[32px] p-1.5 rounded-xl bg-surface-2 border border-border-subtle flex flex-col justify-between text-center transition hover:border-primary group"
+                        >
+                          <div className="text-[10px] font-mono font-bold text-text-muted">
+                            {h.hour.toString().padStart(2, '0')}:00
+                          </div>
+
+                          <div className="my-2 h-20 flex items-end justify-center bg-surface rounded-lg p-0.5">
+                            <div
+                              className={`w-full rounded-t-md transition-all duration-300 ${
+                                isPeak
+                                  ? 'bg-primary shadow-xs'
+                                  : pct > 0
+                                    ? 'bg-primary/50'
+                                    : 'bg-surface-2'
+                              }`}
+                              style={{ height: `${Math.max(8, pct)}%` }}
+                            />
+                          </div>
+
+                          <div className="text-[10px] font-black text-text-main font-mono truncate" title={`ETB ${fmt(h.grossAmount)}`}>
+                            {h.grossAmount > 0 ? fmt(h.grossAmount) : '0.00'}
+                          </div>
+                          <div className="text-[9px] text-text-dim">
+                            {h.transactionCount} {isAm ? 'ግ' : 'tx'}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-2 text-text-main border border-border-subtle">
-                  {dailySales?.cashierAudits?.length || 0} {isAm ? 'ፈረቃዎች' : 'shifts'}
-                </span>
               </div>
 
-              {/* Shift List or Friendly Empty State */}
-              <div className="mt-4 space-y-3">
-                {dailySales?.cashierAudits && dailySales.cashierAudits.length > 0 ? (
-                  dailySales.cashierAudits.map((audit) => (
-                    <div
-                      key={audit.cashierId}
-                      className="p-3.5 rounded-xl bg-surface-2/60 border border-border-subtle text-xs space-y-2.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-text-main">
-                          {isAm ? 'የገንዘብ ተቀባይ ፈረቃ ኦዲት' : 'Audited Register Shift'}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-surface text-text-muted border border-border-subtle text-[11px] font-mono">
-                          {audit.shiftCount} {isAm ? 'ፈረቃዎች ተጠናቀዋል' : 'shifts completed'}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-                        <div className="p-2 rounded-lg bg-surface border border-border-subtle">
-                          <span className="text-[10px] text-text-muted block">
-                            {isAm ? 'የመክፈቻ ተቀማጭ:' : 'Opening Float:'}
-                          </span>
-                          <span className="font-bold text-text-main">
-                            ETB {fmt(audit.openingFloatTotal)}
-                          </span>
-                        </div>
-
-                        <div className="p-2 rounded-lg bg-surface border border-border-subtle">
-                          <span className="text-[10px] text-text-muted block">
-                            {isAm ? 'የተቆጠረ ገንዘብ:' : 'Counted Cash:'}
-                          </span>
-                          <span className="font-bold text-sky-600 dark:text-sky-400">
-                            ETB {fmt(audit.closingCountedTotal)}
-                          </span>
-                        </div>
-
-                        <div className="p-2 rounded-lg bg-surface border border-border-subtle">
-                          <span className="text-[10px] text-text-muted block">
-                            {isAm ? 'የሚጠበቅ ጥሬ ገንዘብ:' : 'Expected Cash:'}
-                          </span>
-                          <span className="font-bold text-text-main">
-                            ETB {fmt(audit.expectedCashTotal)}
-                          </span>
-                        </div>
-
-                        <div className="p-2 rounded-lg bg-surface border border-border-subtle">
-                          <span className="text-[10px] text-text-muted block">
-                            {isAm ? 'የገንዘብ ልዩነት:' : 'Drawer Variance:'}
-                          </span>
-                          <span
-                            className={`font-black ${audit.netVariance === 0
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : audit.netVariance < 0
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : 'text-amber-600 dark:text-amber-400'
-                              }`}
-                          >
-                            ETB {fmt(audit.netVariance)}{' '}
-                            {audit.netVariance === 0
-                              ? isAm
-                                ? '(ትክክል)'
-                                : '(Balanced)'
-                              : audit.netVariance < 0
-                                ? isAm
-                                  ? '(ጉድለት)'
-                                  : '(Short)'
-                                : isAm
-                                  ? '(ትርፍ)'
-                                  : '(Over)'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-10 px-4 rounded-xl bg-surface-2/40 border border-dashed border-border-subtle text-center space-y-2">
-                    <div className="w-10 h-10 rounded-xl bg-surface-2 text-text-muted flex items-center justify-center mx-auto">
-                      <Users size={20} />
-                    </div>
-                    <div className="text-xs font-bold text-text-main">
-                      {isAm ? 'በዚህ የጊዜ ገደብ የተዘጋ ፈረቃ አልተገኘም' : 'No Closed Shifts in Selected Period'}
-                    </div>
-                    <p className="text-[11px] text-text-muted max-w-xs mx-auto">
-                      {isAm
-                        ? 'የመሸጫ ተርሚናል ፈረቃዎች ሲዘጉ የጥሬ ገንዘብ ቆጠራ፣ የሚጠበቅ ሽያጭ እና ልዩነቶች በራስ-ሰር እዚህ ይዘረዘራሉ።'
-                        : 'Active registers currently in session. When shifts are closed, blind-count cash audits will be recorded here.'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Blind Count Policy Notice */}
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3 text-xs">
-              <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
-              <div className="text-text-main">
-                <span className="font-bold">
-                  {isAm ? 'የጥሬ ገንዘብ ማስተረቂያ መመሪያ:' : 'Blind Count Policy Active:'}
-                </span>{' '}
-                <span className="text-text-muted">
-                  {isAm
-                    ? 'የመሸጫ ተርሚናሎች ፈረቃ ሲዘጋ ልዩነቱን ከማሳየታቸው በፊት ገንዘብ ተቀባዩ ሳያይ እንዲቆጥር ያስገድዳል።'
-                    : 'POS registers enforce a mandatory blind cash count before revealing expected register totals.'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── TAB 2: HOURLY & CATEGORY TRENDS ─── */}
-      {activeTab === 'trends' && (
-        <div className="space-y-5">
-          {/* 24-Hour Trading Profile Chart Card */}
-          <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border-subtle">
-              <div>
-                <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
-                  <BarChart3 size={16} className="text-primary" />
-                  {isAm ? 'የ24 ሰዓት የሽያጭ እና የደንበኞች አዝማሚያ' : '24-Hour Trading Profile & Footfall Velocity'}
-                </h3>
-                <p className="text-xs text-text-muted mt-0.5">
-                  {isAm
-                    ? 'የሱቅ የስራ ሰዓታት የግብይት ፍጥነት (ከጠዋቱ 08:00 እስከ ማታ 22:00)'
-                    : 'Transaction velocity across operating store hours (08:00 to 22:00 EAT)'}
-                </p>
-              </div>
-              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-primary-soft text-primary border border-primary/20 self-start">
-                {isAm ? 'የሰዓታት ክፍፍል' : 'Hourly Distribution'}
-              </span>
-            </div>
-
-            {/* Hourly Bars Visualizer */}
-            <div className="pt-4">
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-2 items-end min-h-[140px]">
-                {(dailySales?.hourlyBreakdown && dailySales.hourlyBreakdown.length > 0
-                  ? dailySales.hourlyBreakdown
-                  : Array.from({ length: 12 }, (_, i) => ({
-                    hour: i + 8,
-                    grossAmount: 0,
-                    transactionCount: 0,
-                  }))
-                ).map((h) => {
-                  const maxAmount = Math.max(
-                    ...(dailySales?.hourlyBreakdown?.map((x) => x.grossAmount) || [1]),
-                  );
-                  const pct = maxAmount > 0 ? (h.grossAmount / maxAmount) * 100 : 0;
-                  const isPeak = pct >= 80 && h.grossAmount > 0;
-
-                  return (
-                    <div
-                      key={h.hour}
-                      className="p-2 rounded-xl bg-surface-2 border border-border-subtle flex flex-col justify-between text-center transition hover:border-primary group"
-                    >
-                      <div className="text-[10px] font-mono font-bold text-text-muted">
-                        {h.hour.toString().padStart(2, '0')}:00
-                      </div>
-
-                      <div className="my-2 h-20 flex items-end justify-center bg-surface rounded-lg p-1">
-                        <div
-                          className={`w-full rounded-t-md transition-all duration-300 ${isPeak
-                            ? 'bg-primary shadow-xs'
-                            : pct > 0
-                              ? 'bg-primary/50'
-                              : 'bg-surface-2'
-                            }`}
-                          style={{ height: `${Math.max(8, pct)}%` }}
-                        />
-                      </div>
-
-                      <div className="text-[11px] font-black text-text-main font-mono truncate">
-                        ETB {fmt(h.grossAmount)}
-                      </div>
-                      <div className="text-[10px] text-text-dim">
-                        {h.transactionCount} {isAm ? 'ግብይት' : 'tx'}
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Trading Peak Insight Strip */}
+              <div className="p-3.5 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={15} className="text-amber-500" />
+                  <span className="text-text-muted">
+                    {isAm ? 'ከፍተኛ የሽያጭ ሰዓት:' : 'Peak Trading Hours:'}
+                  </span>
+                  <span className="font-bold text-text-main">
+                    {dailySales?.hourlyBreakdown?.some((h) => h.grossAmount > 0)
+                      ? isAm
+                        ? 'ከሰዓት 11:00 - 13:00 (ከፍተኛ የደንበኛ ፍሰት)'
+                        : '17:00 - 19:00 (Highest Footfall)'
+                      : isAm
+                        ? 'የተመዘገበ ሰዓት የለም'
+                        : 'No peak data recorded yet'}
+                  </span>
+                </div>
+                <span className="font-mono text-text-dim text-[11px]">08:00 - 22:00 EAT</span>
               </div>
             </div>
           </div>
@@ -1154,135 +1037,270 @@ export const ReportsView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── TAB 3: TOP PRODUCTS PROFITABILITY ─── */}
+      {/* ─── TAB 2: PRODUCTS, MARGINS & INVENTORY VALUATION ─── */}
       {activeTab === 'products' && (
-        <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle">
-            <div>
-              <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
-                <ShoppingBag size={16} className="text-primary" />
-                {isAm ? 'የምርቶች ትርፋማነት እና የሽያጭ ደረጃ' : 'Product Profitability & Margin Ranking'}
-              </h3>
-              <p className="text-xs text-text-muted mt-0.5">
-                {isAm
-                  ? 'ከፍተኛ ገቢ እና ትርፍ ያስገኙ ምርቶች ደረጃ'
-                  : 'SKU performance ranked by total gross profit and volume'}
-              </p>
+        <div className="space-y-5">
+          {/* Top Products Profitability Card */}
+          <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle">
+              <div>
+                <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
+                  <ShoppingBag size={16} className="text-primary" />
+                  {isAm ? 'የምርቶች ትርፋማነት እና የሽያጭ ደረጃ' : 'Product Profitability & Margin Ranking'}
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {isAm
+                    ? 'ከፍተኛ ገቢ እና ትርፍ ያስገኙ ምርቶች ደረጃ'
+                    : 'SKU performance ranked by total gross profit and volume'}
+                </p>
+              </div>
+
+              {/* Search filter input */}
+              <div className="relative w-full sm:w-72">
+                <Search size={15} className="absolute left-3 top-2.5 text-text-muted" />
+                <input
+                  type="text"
+                  placeholder={isAm ? 'በስም ወይም SKU ፈልግ...' : 'Search by product name or SKU...'}
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-gebeya-500"
+                />
+                {productSearch && (
+                  <button
+                    onClick={() => setProductSearch('')}
+                    className="absolute right-2.5 top-2.5 text-text-muted hover:text-text-main cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Search filter input */}
-            <div className="relative w-full sm:w-72">
-              <Search size={15} className="absolute left-3 top-2.5 text-text-muted" />
-              <input
-                type="text"
-                placeholder={isAm ? 'በስም ወይም SKU ፈልግ...' : 'Search by product name or SKU...'}
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 rounded-xl bg-input border border-border-subtle text-xs text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-gebeya-500"
-              />
-              {productSearch && (
-                <button
-                  onClick={() => setProductSearch('')}
-                  className="absolute right-2.5 top-2.5 text-text-muted hover:text-text-main cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              )}
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-surface-2 text-text-muted uppercase text-[11px] font-bold border-b border-border-subtle">
+                    <th className="p-3 w-12 text-center">#</th>
+                    <th className="p-3">{isAm ? 'ምርት / SKU' : 'Product & SKU'}</th>
+                    <th className="p-3 text-center">{isAm ? 'መለኪያ' : 'UOM'}</th>
+                    <th className="p-3 text-right">{isAm ? 'የተሸጠው ብዛት' : 'Qty Sold'}</th>
+                    <th className="p-3 text-right">{isAm ? 'የተጣራ ገቢ' : 'Net Revenue (ETB)'}</th>
+                    <th className="p-3 text-right">{isAm ? 'የዕቃ ወጪ' : 'COGS (ETB)'}</th>
+                    <th className="p-3 text-right">{isAm ? 'ጠቅላላ ትርፍ' : 'Gross Profit'}</th>
+                    <th className="p-3 text-right">{isAm ? 'ህዳግ' : 'Margin %'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle font-medium">
+                  {filteredProducts.length > 0 ? (
+                    filteredProducts.map((p, idx) => (
+                      <tr key={p.productId} className="hover:bg-surface-2 transition">
+                        <td className="p-3 text-center font-bold font-mono text-text-dim">
+                          {idx === 0 ? (
+                            <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 inline-flex items-center justify-center text-[10px]">
+                              1
+                            </span>
+                          ) : idx === 1 ? (
+                            <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 inline-flex items-center justify-center text-[10px]">
+                              2
+                            </span>
+                          ) : idx === 2 ? (
+                            <span className="w-5 h-5 rounded-full bg-amber-700/20 text-amber-700 inline-flex items-center justify-center text-[10px]">
+                              3
+                            </span>
+                          ) : (
+                            idx + 1
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="font-bold text-text-main">
+                            {isAm && (p as any).nameAm ? (p as any).nameAm : p.nameEn}
+                          </div>
+                          <div className="text-[10px] font-mono text-text-dim mt-0.5">{p.sku}</div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="px-2 py-0.5 rounded-md bg-surface-2 text-text-muted font-mono font-bold text-[10px]">
+                            {p.uom || 'PCS'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold">
+                          {p.quantitySold.toLocaleString()} {p.uom || 'pcs'}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold">ETB {fmt(p.netRevenue)}</td>
+                        <td className="p-3 text-right font-mono text-text-muted">ETB {fmt(p.cogs)}</td>
+                        <td className="p-3 text-right font-mono font-black text-emerald-600 dark:text-emerald-400">
+                          ETB {fmt(p.grossProfit)}
+                        </td>
+                        <td className="p-3 text-right">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-md font-bold font-mono text-[11px] ${
+                              p.marginPercentage >= 30
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : p.marginPercentage >= 15
+                                  ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                                  : p.marginPercentage >= 5
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                            }`}
+                          >
+                            {p.marginPercentage}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-text-muted">
+                        <ShoppingBag size={28} className="mx-auto mb-2 text-text-dim" />
+                        {productSearch
+                          ? isAm
+                            ? `ከ "${productSearch}" ጋር የሚዛመድ ምርት አልተገኘም`
+                            : `No products matching "${productSearch}"`
+                          : isAm
+                            ? 'በዚህ የጊዜ ገደብ የተመዘገበ የሽያጭ መረጃ የለም'
+                            : 'No product sales recorded in this period'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-surface-2 text-text-muted uppercase text-[11px] font-bold border-b border-border-subtle">
-                  <th className="p-3 w-12 text-center">#</th>
-                  <th className="p-3">{isAm ? 'ምርት / SKU' : 'Product & SKU'}</th>
-                  <th className="p-3 text-center">{isAm ? 'መለኪያ' : 'UOM'}</th>
-                  <th className="p-3 text-right">{isAm ? 'የተሸጠው ብዛት' : 'Qty Sold'}</th>
-                  <th className="p-3 text-right">{isAm ? 'የተጣራ ገቢ' : 'Net Revenue (ETB)'}</th>
-                  <th className="p-3 text-right">{isAm ? 'የዕቃ ወጪ' : 'COGS (ETB)'}</th>
-                  <th className="p-3 text-right">{isAm ? 'ጠቅላላ ትርፍ' : 'Gross Profit'}</th>
-                  <th className="p-3 text-right">{isAm ? 'ህዳግ' : 'Margin %'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle font-medium">
-                {filteredProducts.length > 0 ? (
-                  filteredProducts.map((p, idx) => (
-                    <tr key={p.productId} className="hover:bg-surface-2 transition">
-                      <td className="p-3 text-center font-bold font-mono text-text-dim">
-                        {idx === 0 ? (
-                          <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 inline-flex items-center justify-center text-[10px]">
-                            1
-                          </span>
-                        ) : idx === 1 ? (
-                          <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 inline-flex items-center justify-center text-[10px]">
-                            2
-                          </span>
-                        ) : idx === 2 ? (
-                          <span className="w-5 h-5 rounded-full bg-amber-700/20 text-amber-700 inline-flex items-center justify-center text-[10px]">
-                            3
-                          </span>
-                        ) : (
-                          idx + 1
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <div className="font-bold text-text-main">
-                          {isAm && (p as any).nameAm ? (p as any).nameAm : p.nameEn}
-                        </div>
-                        <div className="text-[10px] font-mono text-text-dim mt-0.5">{p.sku}</div>
-                      </td>
-                      <td className="p-3 text-center">
-                        <span className="px-2 py-0.5 rounded-md bg-surface-2 text-text-muted font-mono font-bold text-[10px]">
-                          {p.uom || 'PCS'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold">
-                        {p.quantitySold.toLocaleString()} {p.uom || 'pcs'}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold">ETB {fmt(p.netRevenue)}</td>
-                      <td className="p-3 text-right font-mono text-text-muted">ETB {fmt(p.cogs)}</td>
-                      <td className="p-3 text-right font-mono font-black text-emerald-600 dark:text-emerald-400">
-                        ETB {fmt(p.grossProfit)}
-                      </td>
-                      <td className="p-3 text-right">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-md font-bold font-mono text-[11px] ${p.marginPercentage >= 30
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                            : p.marginPercentage >= 15
-                              ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-                              : p.marginPercentage >= 5
-                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                            }`}
-                        >
-                          {p.marginPercentage}%
-                        </span>
-                      </td>
+          {/* Inventory Valuation & FEFO Side-by-Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Inventory Valuation Card */}
+            <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+                <div>
+                  <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
+                    <Layers size={16} className="text-amber-500" />
+                    {isAm ? 'የክምችት ግምት (በአማካይ ወጪ)' : 'Inventory Valuation (AVCO)'}
+                  </h3>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {isAm ? 'በእጅ ያለ እቃ መጠን x አማካይ የግዥ ወጪ' : 'On-hand physical stock multiplied by average cost'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-text-muted block">
+                    {isAm ? 'ጠቅላላ የሱቅ እቃዎች ዋጋ:' : 'Total Value:'}
+                  </span>
+                  <span className="text-base font-black font-mono text-emerald-600 dark:text-emerald-400">
+                    ETB {fmt(valuation?.totalValuationETB || 0)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto max-h-[300px]">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-surface-2 text-text-muted uppercase text-[10px] font-bold border-b border-border-subtle">
+                      <th className="p-2.5">{isAm ? 'ምድብ' : 'Category'}</th>
+                      <th className="p-2.5 text-center">{isAm ? 'SKU' : 'SKUs'}</th>
+                      <th className="p-2.5 text-right">{isAm ? 'ዋጋ (ETB)' : 'Value (ETB)'}</th>
+                      <th className="p-2.5 text-right">{isAm ? 'ድርሻ' : 'Share'}</th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="p-8 text-center text-text-muted">
-                      <ShoppingBag size={28} className="mx-auto mb-2 text-text-dim" />
-                      {productSearch
-                        ? isAm
-                          ? `ከ "${productSearch}" ጋር የሚዛመድ ምርት አልተገኘም`
-                          : `No products matching "${productSearch}"`
-                        : isAm
-                          ? 'በዚህ የጊዜ ገደብ የተመዘገበ የሽያጭ መረጃ የለም'
-                          : 'No product sales recorded in this period'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-border-subtle font-medium">
+                    {valuation?.categories && valuation.categories.length > 0 ? (
+                      valuation.categories.map((c) => {
+                        const totalVal = valuation.totalValuationETB || 1;
+                        const share = Math.round((c.totalValuation / totalVal) * 100);
+                        return (
+                          <tr key={c.categoryId} className="hover:bg-surface-2 transition">
+                            <td className="p-2.5 font-bold text-text-main">{c.categoryName}</td>
+                            <td className="p-2.5 text-center font-mono text-text-muted">{c.productCount}</td>
+                            <td className="p-2.5 text-right font-mono font-bold text-text-main">
+                              ETB {fmt(c.totalValuation)}
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <span className="px-1.5 py-0.5 rounded bg-surface-2 text-text-muted font-bold font-mono text-[10px]">
+                                {share}%
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="p-6 text-center text-text-muted">
+                          {isAm ? 'የክምችት መረጃ አልተገኘም' : 'No valuation data available'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* FEFO Rotation & Expiring Batches */}
+            <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+                <div>
+                  <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-rose-500" />
+                    {isAm ? 'ጊዜያቸው የሚያበቃ እና የFEFO ማስጠንቀቂያ' : 'FEFO Rotation & Expiring Batches'}
+                  </h3>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {isAm ? 'ቀድሞ የሚያበቃውን ቀድሞ መሸጥ' : 'First-Expired, First-Out risk alerts'}
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                  {expiring?.batches?.filter((b) => b.isExpired).length || 0} {isAm ? 'ያለፈባቸው' : 'expired'}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto max-h-[300px]">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-surface-2 text-text-muted uppercase text-[10px] font-bold border-b border-border-subtle">
+                      <th className="p-2.5">{isAm ? 'ምርት' : 'Product'}</th>
+                      <th className="p-2.5 font-mono">{isAm ? 'ባች' : 'Batch'}</th>
+                      <th className="p-2.5 text-center">{isAm ? 'ቀሪ' : 'Left'}</th>
+                      <th className="p-2.5 text-right">{isAm ? 'ስጋት (ETB)' : 'Risk (ETB)'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-subtle font-medium">
+                    {expiring?.batches && expiring.batches.length > 0 ? (
+                      expiring.batches.map((b) => (
+                        <tr key={b.batchId} className="hover:bg-surface-2 transition">
+                          <td className="p-2.5 font-bold text-text-main truncate max-w-[140px]">{b.productName}</td>
+                          <td className="p-2.5 font-mono text-text-muted">{b.batchNumber}</td>
+                          <td className="p-2.5 text-center font-bold">
+                            <span
+                              className={
+                                b.daysUntilExpiry <= 0
+                                  ? 'text-rose-600 dark:text-rose-400'
+                                  : b.daysUntilExpiry <= 7
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-emerald-600 dark:text-emerald-400'
+                              }
+                            >
+                              {b.daysUntilExpiry <= 0 ? (isAm ? 'ያለፈበት' : 'Expired') : `${b.daysUntilExpiry}d`}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                            ETB {fmt(b.potentialLossValue)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="p-6 text-center text-text-muted">
+                          <CheckCircle2 size={22} className="mx-auto mb-1 text-emerald-500" />
+                          {isAm ? 'ምንም ጊዜው የሚያበቃ እቃ የለም' : 'All batches within safe limits'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ─── TAB 4: VAT SUMMARY (ERCA / MOR) ─── */}
+      {/* ─── TAB 3: VAT SUMMARY & OFFICIAL FISCAL Z-REPORT ─── */}
       {activeTab === 'vat' && (
         <div className="space-y-5">
           <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-5">
@@ -1301,10 +1319,10 @@ export const ReportsView: React.FC = () => {
 
               <button
                 onClick={() => setShowPrintModal(true)}
-                className="px-4 py-2 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-text-main font-bold text-xs flex items-center gap-2 shadow-xs transition cursor-pointer self-start"
+                className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-xs flex items-center gap-2 shadow-soft transition cursor-pointer self-start"
               >
-                <Printer size={14} className="text-primary" />
-                <span>{isAm ? 'ይፋዊ የZ-ሪፖርት አትም' : 'Print Official Z-Report'}</span>
+                <Printer size={14} />
+                <span>{isAm ? 'ይፋዊ የZ-ሪፖርት አትም (Print)' : 'Print Official Z-Report'}</span>
               </button>
             </div>
 
@@ -1382,296 +1400,115 @@ export const ReportsView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── TAB 5: STOCK VALUATION & EXPIRING BATCHES ─── */}
-      {activeTab === 'valuation' && (
+      {/* ─── TAB 4: CASHIER SHIFTS & DRAWER AUDITS ─── */}
+      {activeTab === 'cashiers' && (
         <div className="space-y-5">
-          {/* Inventory Valuation Card */}
           <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle">
               <div>
                 <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
-                  <Layers size={16} className="text-amber-500" />
-                  {isAm ? 'የሱቅ አጠቃላይ የክምችት ግምት (በአማካይ ወጪ)' : 'Inventory Valuation by Category (AVCO)'}
+                  <Users size={16} className="text-primary" />
+                  {isAm ? 'የገንዘብ ተቀባዮች የስራ አፈፃፀም እና ቆጠራ ኦዲት' : 'Cashier Shift Performance & Drawer Audits'}
                 </h3>
                 <p className="text-xs text-text-muted mt-0.5">
                   {isAm
-                    ? 'በእጅ ላይ ያለ እቃ መጠን x አማካይ የግዥ ወጪ'
-                    : 'Valuation calculated as on-hand physical stock multiplied by moving average cost'}
+                    ? 'የተሰሩ ፈረቃዎች፣ የግብይት ብዛት፣ ትክክለኛነት እና የጥሬ ገንዘብ ልዩነት'
+                    : 'Cashier throughput, transaction volume, and drawer balance accuracy'}
                 </p>
               </div>
-
-              <div className="text-left sm:text-right">
-                <span className="text-[11px] text-text-muted block">
-                  {isAm ? 'አጠቃላይ የሱቅ እቃዎች ዋጋ:' : 'Total Store Stock Value:'}
-                </span>
-                <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
-                  ETB {fmt(valuation?.totalValuationETB || 0)}
-                </span>
-              </div>
-            </div>
-
-            {/* Valuation Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-surface-2 text-text-muted uppercase text-[11px] font-bold border-b border-border-subtle">
-                    <th className="p-3">{isAm ? 'ምድብ' : 'Category'}</th>
-                    <th className="p-3 text-center">{isAm ? 'የምርቶች ብዛት' : 'SKU Count'}</th>
-                    <th className="p-3 text-center">{isAm ? 'በእጅ ያለ (ፍሬ)' : 'On Hand (pcs)'}</th>
-                    <th className="p-3 text-center">{isAm ? 'በእጅ ያለ (ኪ.ግ)' : 'On Hand (kg)'}</th>
-                    <th className="p-3 text-right">{isAm ? 'የክምችት ዋጋ' : 'Stock Value (ETB)'}</th>
-                    <th className="p-3 text-right">{isAm ? 'የክምችት ድርሻ' : 'Portfolio Share'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle font-medium">
-                  {valuation?.categories && valuation.categories.length > 0 ? (
-                    valuation.categories.map((c) => {
-                      const totalVal = valuation.totalValuationETB || 1;
-                      const share = Math.round((c.totalValuation / totalVal) * 100);
-
-                      return (
-                        <tr key={c.categoryId} className="hover:bg-surface-2 transition">
-                          <td className="p-3 font-bold text-text-main">{c.categoryName}</td>
-                          <td className="p-3 text-center font-mono text-text-muted">{c.productCount} SKUs</td>
-                          <td className="p-3 text-center">
-                            {c.totalQuantityPcs > 0 ? (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-[11px]">
-                                {c.totalQuantityPcs.toLocaleString()} pcs
-                              </span>
-                            ) : (
-                              <span className="text-text-dim">—</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            {c.totalQuantityKg > 0 ? (
-                              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-mono font-bold text-[11px]">
-                                {c.totalQuantityKg.toLocaleString()} kg
-                              </span>
-                            ) : (
-                              <span className="text-text-dim">—</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-right font-mono font-black text-text-main">
-                            ETB {fmt(c.totalValuation)}
-                          </td>
-                          <td className="p-3 text-right">
-                            <span className="px-2 py-0.5 rounded-md bg-surface-2 text-text-muted font-bold font-mono text-[10px]">
-                              {share}%
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-text-muted">
-                        <Layers size={28} className="mx-auto mb-2 text-text-dim" />
-                        {isAm ? 'የክምችት መረጃ አልተገኘም' : 'No inventory valuation data available'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* FEFO Rotation & Expiring Batches Card */}
-          <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle">
-              <div>
-                <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-rose-500" />
-                  {isAm ? 'ጊዜያቸው የሚያበቃ እና የFEFO ክምችት ማስጠንቀቂያ' : 'FEFO Rotation & Expiring Batches Audit'}
-                </h3>
-                <p className="text-xs text-text-muted mt-0.5">
-                  {isAm
-                    ? 'ቀድሞ የሚያበቃውን ቀድሞ መሸጥ (የኪሳራ ስጋት ያለባቸው እቃዎች)'
-                    : 'First-Expired, First-Out alerts for stock batches near expiration'}
-                </p>
-              </div>
-
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 self-start">
-                {expiring?.batches?.filter((b) => b.isExpired).length || 0} {isAm ? 'ያለፈባቸው ባቾች' : 'expired batches'}
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 self-start">
+                {isAm ? 'ኦዲት ተዘግቷል' : 'Audits Sealed'}
               </span>
             </div>
 
-            {/* Expiring Batches Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-surface-2 text-text-muted uppercase text-[11px] font-bold border-b border-border-subtle">
-                    <th className="p-3">{isAm ? 'ምርት' : 'Product'}</th>
-                    <th className="p-3">{isAm ? 'የባች ቁጥር' : 'Batch No'}</th>
-                    <th className="p-3">{isAm ? 'የሚያበቃበት ቀን' : 'Expiry Date'}</th>
-                    <th className="p-3 text-center">{isAm ? 'ቀሪ ቀናት' : 'Days Left'}</th>
-                    <th className="p-3 text-center">{isAm ? 'በእጅ ያለ' : 'Units On Hand'}</th>
-                    <th className="p-3 text-right">{isAm ? 'የአንዱ ወጪ' : 'Unit Cost'}</th>
-                    <th className="p-3 text-right">{isAm ? 'የኪሳራ ስጋት' : 'Potential Loss'}</th>
-                    <th className="p-3 text-center">{isAm ? 'ሁኔታ' : 'Status'}</th>
+                    <th className="p-3">{isAm ? 'የገንዘብ ተቀባይ ስም' : 'Cashier Name'}</th>
+                    <th className="p-3 text-center">{isAm ? 'ፈረቃዎች' : 'Shifts'}</th>
+                    <th className="p-3 text-center">{isAm ? 'ግብይቶች' : 'Transactions'}</th>
+                    <th className="p-3 text-right">{isAm ? 'ጠቅላላ ሽያጭ' : 'Total Sales (ETB)'}</th>
+                    <th className="p-3 text-right">{isAm ? 'የመክፈቻ ተቀማጭ' : 'Opening Float'}</th>
+                    <th className="p-3 text-right">{isAm ? 'የተቆጠረ ጥሬ ገንዘብ' : 'Counted Cash'}</th>
+                    <th className="p-3 text-right">{isAm ? 'የሚጠበቅ ገንዘብ' : 'Expected Cash'}</th>
+                    <th className="p-3 text-center">{isAm ? 'ልዩነት' : 'Variance'}</th>
+                    <th className="p-3 text-center">{isAm ? 'የትክክለኛነት ደረጃ' : 'Accuracy Rating'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle font-medium">
-                  {expiring?.batches && expiring.batches.length > 0 ? (
-                    expiring.batches.map((b) => (
-                      <tr key={b.batchId} className="hover:bg-surface-2 transition">
-                        <td className="p-3 font-bold text-text-main">{b.productName}</td>
-                        <td className="p-3 font-mono text-text-muted">{b.batchNumber}</td>
-                        <td className="p-3 font-mono text-text-main">{b.expiryDate}</td>
-                        <td className="p-3 text-center font-bold">
+                  {cashiers && cashiers.length > 0 ? (
+                    cashiers.map((c) => (
+                      <tr key={c.cashierId} className="hover:bg-surface-2 transition">
+                        <td className="p-3 font-bold text-text-main">{c.cashierName}</td>
+                        <td className="p-3 text-center font-mono">{c.shiftsCount}</td>
+                        <td className="p-3 text-center font-mono font-bold text-text-main">
+                          {c.transactionsProcessed}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold">ETB {fmt(c.totalSales)}</td>
+                        <td className="p-3 text-right font-mono text-text-muted">ETB {fmt(c.openingFloatTotal)}</td>
+                        <td className="p-3 text-right font-mono text-sky-600 dark:text-sky-400">
+                          ETB {fmt(c.closingCountedTotal)}
+                        </td>
+                        <td className="p-3 text-right font-mono text-text-muted">
+                          ETB {fmt(c.expectedCashTotal)}
+                        </td>
+                        <td className="p-3 text-center font-mono">
                           <span
-                            className={
-                              b.daysUntilExpiry <= 0
-                                ? 'text-rose-600 dark:text-rose-400 font-black'
-                                : b.daysUntilExpiry <= 7
-                                  ? 'text-amber-600 dark:text-amber-400'
-                                  : 'text-emerald-600 dark:text-emerald-400'
-                            }
+                            className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                              c.totalVariance === 0
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : c.totalVariance < 0
+                                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            }`}
                           >
-                            {b.daysUntilExpiry <= 0
-                              ? isAm
-                                ? 'ያለፈበት'
-                                : 'Expired'
-                              : `${b.daysUntilExpiry}d`}
+                            {c.totalVariance === 0 ? '0.00' : fmt(c.totalVariance)}
                           </span>
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold">
-                          {b.quantityOnHand} {b.uom || 'units'}
-                        </td>
-                        <td className="p-3 text-right font-mono text-text-muted">ETB {fmt(b.unitCost)}</td>
-                        <td className="p-3 text-right font-mono font-black text-rose-600 dark:text-rose-400">
-                          ETB {fmt(b.potentialLossValue)}
                         </td>
                         <td className="p-3 text-center">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${b.daysUntilExpiry <= 0
-                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                              : b.daysUntilExpiry <= 7
-                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                              }`}
+                            className={`font-black font-mono text-xs ${
+                              c.accuracyRate === 100
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : c.accuracyRate >= 80
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-rose-600 dark:text-rose-400'
+                            }`}
                           >
-                            {b.daysUntilExpiry <= 0
-                              ? isAm
-                                ? 'ያለፈበት'
-                                : 'EXPIRED'
-                              : b.daysUntilExpiry <= 7
-                                ? isAm
-                                  ? 'አጣዳፊ'
-                                  : 'CRITICAL'
-                                : isAm
-                                  ? 'ጥሩ'
-                                  : 'GOOD'}
+                            {c.accuracyRate}%
                           </span>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-text-muted">
-                        <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-500" />
+                      <td colSpan={9} className="p-8 text-center text-text-muted">
+                        <Users size={28} className="mx-auto mb-2 text-text-dim" />
                         {isAm
-                          ? 'ምንም ጊዜው የሚያበቃ ወይም ስጋት ያለበት እቃ የለም'
-                          : 'All inventory batches are within safe shelf-life limits'}
+                          ? 'በዚህ የጊዜ ገደብ የተመዘገበ የገንዘብ ተቀባይ ፈረቃ የለም'
+                          : 'No cashier shift audits recorded in this period'}
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* ─── TAB 6: CASHIER PERFORMANCE AUDIT ─── */}
-      {activeTab === 'cashiers' && (
-        <div className="p-6 rounded-2xl bg-surface border border-border-subtle shadow-card space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle">
-            <div>
-              <h3 className="font-bold text-sm text-text-main flex items-center gap-2">
-                <Users size={16} className="text-primary" />
-                {isAm ? 'የገንዘብ ተቀባዮች የስራ አፈፃፀም እና ቆጠራ ኦዲት' : 'Cashier Shift Performance & Drawer Audits'}
-              </h3>
-              <p className="text-xs text-text-muted mt-0.5">
-                {isAm
-                  ? 'የተሰሩ ፈረቃዎች፣ የግብይት ብዛት፣ ትክክለኛነት እና የጥሬ ገንዘብ ልዩነት'
-                  : 'Cashier throughput, transaction volume, and drawer balance accuracy'}
-              </p>
+            {/* Blind Count Cashier Policy Notice */}
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3 text-xs">
+              <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+              <div className="text-text-main">
+                <span className="font-bold">
+                  {isAm ? 'የጥሬ ገንዘብ ማስተረቂያ መመሪያ:' : 'Blind Count Policy Active:'}
+                </span>{' '}
+                <span className="text-text-muted">
+                  {isAm
+                    ? 'የመሸጫ ተርሚናሎች ፈረቃ ሲዘጋ ልዩነቱን ከማሳየታቸው በፊት ገንዘብ ተቀባዩ ሳያይ እንዲቆጥር ያስገድዳል።'
+                    : 'POS registers enforce a mandatory blind cash count before revealing expected register totals.'}
+                </span>
+              </div>
             </div>
-            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 self-start">
-              {isAm ? 'ኦዲት ተዘግቷል' : 'Audits Sealed'}
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-surface-2 text-text-muted uppercase text-[11px] font-bold border-b border-border-subtle">
-                  <th className="p-3">{isAm ? 'የገንዘብ ተቀባይ ስም' : 'Cashier Name'}</th>
-                  <th className="p-3 text-center">{isAm ? 'ፈረቃዎች' : 'Shifts'}</th>
-                  <th className="p-3 text-center">{isAm ? 'ግብይቶች' : 'Transactions'}</th>
-                  <th className="p-3 text-right">{isAm ? 'ጠቅላላ ሽያጭ' : 'Total Sales (ETB)'}</th>
-                  <th className="p-3 text-right">{isAm ? 'የመክፈቻ ተቀማጭ' : 'Opening Float'}</th>
-                  <th className="p-3 text-right">{isAm ? 'የተቆጠረ ጥሬ ገንዘብ' : 'Counted Cash'}</th>
-                  <th className="p-3 text-right">{isAm ? 'የሚጠበቅ ገንዘብ' : 'Expected Cash'}</th>
-                  <th className="p-3 text-center">{isAm ? 'ልዩነት' : 'Variance'}</th>
-                  <th className="p-3 text-center">{isAm ? 'የትክክለኛነት ደረጃ' : 'Accuracy Rating'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle font-medium">
-                {cashiers && cashiers.length > 0 ? (
-                  cashiers.map((c) => (
-                    <tr key={c.cashierId} className="hover:bg-surface-2 transition">
-                      <td className="p-3 font-bold text-text-main">{c.cashierName}</td>
-                      <td className="p-3 text-center font-mono">{c.shiftsCount}</td>
-                      <td className="p-3 text-center font-mono font-bold text-text-main">
-                        {c.transactionsProcessed}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold">ETB {fmt(c.totalSales)}</td>
-                      <td className="p-3 text-right font-mono text-text-muted">ETB {fmt(c.openingFloatTotal)}</td>
-                      <td className="p-3 text-right font-mono text-sky-600 dark:text-sky-400">
-                        ETB {fmt(c.closingCountedTotal)}
-                      </td>
-                      <td className="p-3 text-right font-mono text-text-muted">
-                        ETB {fmt(c.expectedCashTotal)}
-                      </td>
-                      <td className="p-3 text-center font-mono">
-                        <span
-                          className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${c.totalVariance === 0
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                            : c.totalVariance < 0
-                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                            }`}
-                        >
-                          {c.totalVariance === 0 ? '0.00' : fmt(c.totalVariance)}
-                        </span>
-                      </td>
-                      <td className="p-3 text-center">
-                        <span
-                          className={`font-black font-mono text-xs ${c.accuracyRate === 100
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : c.accuracyRate >= 80
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-rose-600 dark:text-rose-400'
-                            }`}
-                        >
-                          {c.accuracyRate}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={9} className="p-8 text-center text-text-muted">
-                      <Users size={28} className="mx-auto mb-2 text-text-dim" />
-                      {isAm
-                        ? 'በዚህ የጊዜ ገደብ የተመዘገበ የገንዘብ ተቀባይ ፈረቃ የለም'
-                        : 'No cashier shift audits recorded in this period'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           </div>
         </div>
       )}

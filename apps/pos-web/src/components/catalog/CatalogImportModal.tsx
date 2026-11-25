@@ -44,7 +44,7 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
   onImportCompleted,
 }) => {
   const { language, t } = useI18n();
-  const { currentUser } = useAuth();
+  const { currentUser, fetchWithAuth } = useAuth();
   const isAm = language === 'am';
 
   const [activeTab, setActiveTab] = useState<'excel' | 'zip'>('excel');
@@ -95,21 +95,21 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
       const formData = new FormData();
       formData.append('file', selected);
 
-      const token = localStorage.getItem('gebeyaos_access_token');
       const branchId = currentUser?.branchId || '';
+      const headers: Record<string, string> = {
+        'x-user-id': currentUser?.id || '',
+        ...(branchId ? { 'x-branch-id': branchId } : {}),
+      };
 
-      const res = await fetch('/api/inventory/import/validate', {
+      const res = await fetchWithAuth('/api/inventory/import/validate', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          ...(branchId ? { 'x-branch-id': branchId } : {}),
-        },
+        headers,
         body: formData,
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to validate file.');
+        throw new Error(err.message || (isAm ? 'ፋይሉን ማረጋገጥ አልተቻለም' : 'Failed to validate file.'));
       }
 
       const data = await res.json();
@@ -163,10 +163,10 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
     try {
       const formData = new FormData();
       formData.append('zip', zipFile);
-      const res = await fetch('/api/media/products/bulk-zip', {
+      const res = await fetchWithAuth('/api/media/products/bulk-zip', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('gebeyaos_access_token') || ''}`,
+          'x-user-id': currentUser?.id || '',
         },
         body: formData,
       });
@@ -203,14 +203,13 @@ export const CatalogImportModal: React.FC<CatalogImportModalProps> = ({
     setCommitting(true);
     setError(null);
     try {
-      const token = localStorage.getItem('gebeyaos_access_token');
       const branchId = currentUser?.branchId || '';
 
-      const res = await fetch('/api/inventory/import/commit', {
+      const res = await fetchWithAuth('/api/inventory/import/commit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          'x-user-id': currentUser?.id || '',
           ...(branchId ? { 'x-branch-id': branchId } : {}),
         },
         body: JSON.stringify({

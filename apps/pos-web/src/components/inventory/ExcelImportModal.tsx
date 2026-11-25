@@ -35,7 +35,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
   onCommitSuccess,
   existingProducts,
 }) => {
-  const { currentUser, assignedBranches, terminalConfig } = useAuth();
+  const { currentUser, assignedBranches, terminalConfig, fetchWithAuth } = useAuth();
   const branchId =
     currentUser?.branchId ||
     terminalConfig?.branchId ||
@@ -84,11 +84,10 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
       const formData = new FormData();
       formData.append('file', selected);
 
-      const token = localStorage.getItem('gebeyaos_access_token');
-      const res = await fetch('/api/inventory/import/validate', {
+      const res = await fetchWithAuth('/api/inventory/import/validate', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          'x-user-id': currentUser?.id || '',
           ...(branchId ? { 'x-branch-id': branchId } : {}),
         },
         body: formData,
@@ -146,7 +145,6 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
     }
 
     try {
-      const token = localStorage.getItem('gebeyaos_access_token');
       const payload = {
         fileName,
         fileHash: validationData?.fileHash || `hash-${Date.now()}`,
@@ -156,11 +154,11 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         rows: editableRows,
       };
 
-      const res = await fetch('/api/inventory/import/commit', {
+      const res = await fetchWithAuth('/api/inventory/import/commit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          'x-user-id': currentUser?.id || '',
           ...(branchId ? { 'x-branch-id': branchId } : {}),
         },
         body: JSON.stringify(payload),
@@ -193,10 +191,11 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
   const handleUndoRecentImport = async () => {
     if (!commitResult) return;
     try {
-      const token = localStorage.getItem('gebeyaos_access_token');
-      await fetch(`/api/inventory/import/${commitResult.batchId}/undo`, {
+      await fetchWithAuth(`/api/inventory/import/${commitResult.batchId}/undo`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          'x-user-id': currentUser?.id || '',
+        },
       });
     } catch {
       // offline fallback
