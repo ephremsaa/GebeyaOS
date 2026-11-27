@@ -28,6 +28,8 @@ import {
   PlatformUpdatePlanDto,
   SubmitTenantApplicationDto,
   RejectApplicationDto,
+  PortalLoginDto,
+  VerifyLicenseDto,
 } from './dto/platform-admin.dto';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 import {
@@ -325,5 +327,42 @@ export class PlatformAdminController {
       dto.reason,
       ip,
     );
+  }
+
+  // Verified Supermarket Owner Download Portal & License Key Verification
+
+  @Post('portal/login')
+  async portalLogin(@Body() dto: PortalLoginDto) {
+    return this.platformAdminService.portalLogin(dto.emailOrPhone, dto.password);
+  }
+
+  @Get('portal/status')
+  async getPortalStatus(@Headers('authorization') authHeader?: string) {
+    const { applicationId } = this.platformAdminService.verifyPortalToken(authHeader);
+    return this.platformAdminService.getPortalStatus(applicationId);
+  }
+
+  @Get('portal/download')
+  async downloadInstaller(
+    @Headers('authorization') authHeader: string | undefined,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { applicationId } = this.platformAdminService.verifyPortalToken(authHeader);
+    const payload = await this.platformAdminService.getPortalDownloadPayload(applicationId);
+
+    res.setHeader('Content-Type', payload.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${payload.filename}"`);
+
+    if (payload.filePath) {
+      res.sendFile(payload.filePath);
+    } else if (payload.fallbackBuffer) {
+      res.setHeader('Content-Length', payload.fallbackBuffer.length);
+      res.end(payload.fallbackBuffer);
+    }
+  }
+
+  @Post('license/verify')
+  async verifyLicenseKey(@Body() dto: VerifyLicenseDto) {
+    return this.platformAdminService.verifyLicenseKey(dto.licenseKey);
   }
 }

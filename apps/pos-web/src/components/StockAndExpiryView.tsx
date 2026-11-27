@@ -5,7 +5,6 @@ import {
   Calendar,
   Layers,
   Search,
-  Filter,
   Plus,
   RefreshCw,
   Clock,
@@ -16,28 +15,22 @@ import {
   FileEdit,
   ClipboardList,
   Eye,
-  Lock,
-  ArrowUpDown,
   X,
   ShieldAlert,
-  Archive,
   Tag,
   FileSpreadsheet,
   Printer,
   CheckSquare,
   Square,
-  TrendingDown,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
 import { useBrand } from '../brand/BrandContext';
 import { posApi } from '../utils/pos-api';
 import {
-  StockAdjustmentReasonCode,
   computeDaysLeftInAddis,
   getExpiryStatus,
   formatEthiopianDisplayDate,
-  formatDaysLeftHuman,
 } from '@gebeyaos/shared-types';
 import { AddStockChooserModal } from './inventory/AddStockChooserModal';
 import { ScanStockDrawer } from './inventory/ScanStockDrawer';
@@ -45,7 +38,7 @@ import { ManualStockDrawer } from './inventory/ManualStockDrawer';
 import { ExcelImportModal } from './inventory/ExcelImportModal';
 import { ImportHistoryModal } from './inventory/ImportHistoryModal';
 import { ProductLedgerDrawer } from './inventory/ProductLedgerDrawer';
-import { BarcodeLabelModal, LabelProductItem } from './catalog/BarcodeLabelModal';
+import { StockAdjustmentModal } from './inventory/StockAdjustmentModal';
 
 interface StockItem {
   id: string;
@@ -190,12 +183,6 @@ export const StockAndExpiryView: React.FC = () => {
   // Stock Adjustment Modal
   const [isAdjModalOpen, setIsAdjModalOpen] = useState<boolean>(false);
   const [adjProductId, setAdjProductId] = useState<string>('');
-  const [adjReason, setAdjReason] = useState<StockAdjustmentReasonCode>('DAMAGED_GOODS');
-  const [adjQuantity, setAdjQuantity] = useState<number>(-1);
-  const [adjNotes, setAdjNotes] = useState<string>('');
-  const [managerPin, setManagerPin] = useState<string>('');
-  const [adjError, setAdjError] = useState<string | null>(null);
-  const [adjSubmitting, setAdjSubmitting] = useState<boolean>(false);
 
   // Single Item Stock Count Modal (Inline Stocktake)
   const [countTarget, setCountTarget] = useState<StockItem | null>(null);
@@ -203,10 +190,6 @@ export const StockAndExpiryView: React.FC = () => {
   const [countReason, setCountReason] = useState<string>('Physical stock verification');
   const [countSubmitting, setCountSubmitting] = useState<boolean>(false);
   const [countError, setCountError] = useState<string | null>(null);
-
-  // Thermal Label Printing
-  const [isLabelModalOpen, setIsLabelModalOpen] = useState<boolean>(false);
-  const [selectedForLabels, setSelectedForLabels] = useState<LabelProductItem[]>([]);
 
   // Write Off Expired Batch State
   const [writeOffBatch, setWriteOffBatch] = useState<BatchItem | null>(null);
@@ -687,74 +670,7 @@ export const StockAndExpiryView: React.FC = () => {
   // Open Adjust Modal
   const handleOpenAdjustment = (product: StockItem) => {
     setAdjProductId(product.id);
-    setAdjReason('DAMAGED_GOODS');
-    setAdjQuantity(-1);
-    setAdjNotes('');
-    setManagerPin('');
-    setAdjError(null);
     setIsAdjModalOpen(true);
-  };
-
-  // Submit Adjustment
-  const handleSubmitAdjustment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAdjError(null);
-
-    if (!canCreateAdjustment) {
-      setAdjError('You do not have permission to adjust inventory.');
-      return;
-    }
-    if (!adjProductId) {
-      setAdjError('Please select an item.');
-      return;
-    }
-    if (adjQuantity === 0) {
-      setAdjError('Quantity change cannot be zero.');
-      return;
-    }
-    if (!adjNotes.trim()) {
-      setAdjError(t('inventory.reasonRequired'));
-      return;
-    }
-
-    setAdjSubmitting(true);
-    try {
-      const res = await (fetchWithAuth || fetch)('/api/inventory/adjustments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-branch-id': currentUser?.branchId || '00000000-0000-0000-0000-000000000001',
-          'x-user-id': currentUser?.id || '00000000-0000-0000-0000-000000000002',
-        },
-        body: JSON.stringify({
-          reasonCode: adjReason,
-          notes: adjNotes.trim(),
-          items: [
-            {
-              productId: adjProductId,
-              quantityChange: Number(adjQuantity),
-            },
-          ],
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const errMsg = Array.isArray(errData.message)
-          ? errData.message.join(', ')
-          : errData.message || 'Failed to submit adjustment';
-        throw new Error(errMsg);
-      }
-
-      setSuccessMsg(t('inventory.stockUpdatedSuccess', { name: products.find((p) => p.id === adjProductId)?.name_en || 'Product' }));
-      setIsAdjModalOpen(false);
-      fetchData();
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (err: any) {
-      setAdjError(err.message || 'Failed to submit adjustment');
-    } finally {
-      setAdjSubmitting(false);
-    }
   };
 
   // Open Count Modal
@@ -2167,106 +2083,18 @@ export const StockAndExpiryView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── 7. Stock Adjustment Modal ─── */}
-      {isAdjModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">
-          <div className="bg-surface rounded-2xl shadow-card border border-border-subtle w-full max-w-md p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-600 flex items-center justify-center">
-                  <FileEdit size={20} />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-text-main">
-                    {t('inventory.adjustStock')}
-                  </h3>
-                  <p className="text-xs text-text-muted">
-                    {products.find((p) => p.id === adjProductId)?.name_en || 'Select Item'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsAdjModalOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-surface-2 dark:hover:bg-surface-2 flex items-center justify-center text-text-muted"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {adjError && (
-              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 text-xs font-semibold flex items-center gap-2">
-                <AlertCircle size={15} />
-                <span>{adjError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmitAdjustment} className="space-y-4">
-              <div>
-                <label className="text-[15px] font-bold text-text-main block mb-1.5">
-                  Reason Code *
-                </label>
-                <select
-                  value={adjReason}
-                  onChange={(e) => setAdjReason(e.target.value as StockAdjustmentReasonCode)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-bold text-text-main"
-                >
-                  <option value="DAMAGED_GOODS">Damaged / Spoilage</option>
-                  <option value="EXPIRED_GOODS">Expired Goods</option>
-                  <option value="THEFT_OR_SHRINKAGE">Lost / Unaccounted Theft</option>
-                  <option value="COUNT_CORRECTION">Correction / Variance</option>
-                  <option value="INTERNAL_USE">Internal Supermarket Use</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[15px] font-bold text-text-main block mb-1.5">
-                  Quantity Adjustment (Negative to deduct, Positive to add) *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={adjQuantity}
-                  onChange={(e) => setAdjQuantity(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-mono font-bold text-text-main"
-                />
-              </div>
-
-              <div>
-                <label className="text-[15px] font-bold text-text-main block mb-1.5">
-                  Audit Notes / Reason *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Expired batch discarded, broken during stocking"
-                  value={adjNotes}
-                  onChange={(e) => setAdjNotes(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border-subtle text-xs font-semibold text-text-main"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAdjModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border-subtle text-[15px] font-bold text-text-main transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={adjSubmitting}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-                >
-                  {adjSubmitting && <RefreshCw size={13} className="animate-spin" />}
-                  Save Adjustment
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* ─── 7. Unified Stock Adjustment Modal ─── */}
+      <StockAdjustmentModal
+        isOpen={isAdjModalOpen}
+        product={products.find((p) => p.id === adjProductId) || null}
+        onClose={() => setIsAdjModalOpen(false)}
+        onSuccess={(msg) => {
+          setSuccessMsg(msg);
+          setIsAdjModalOpen(false);
+          fetchData();
+          setTimeout(() => setSuccessMsg(null), 4000);
+        }}
+      />
       {/* ─── 8. Write Off Expired Batch Modal ─── */}
       {writeOffBatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in select-none">

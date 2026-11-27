@@ -30,6 +30,7 @@ import {
   Lock,
   RotateCcw,
   Trash2,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
@@ -40,6 +41,7 @@ import { ProductDrawer, ProductDrawerData } from './ProductDrawer';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { PriceHistoryModal } from './PriceHistoryModal';
 import { CatalogImportModal } from './CatalogImportModal';
+import { StockAdjustmentModal } from '../inventory/StockAdjustmentModal';
 
 interface ProductItem {
   id: string;
@@ -130,6 +132,10 @@ export const ProductCatalogView: React.FC = () => {
 
   const [isLabelModalOpen, setIsLabelModalOpen] = useState<boolean>(false);
   const [selectedForLabels, setSelectedForLabels] = useState<LabelProductItem[]>([]);
+
+  // Stock Adjustment & Write-off Modal (Merged into Items)
+  const [adjustTarget, setAdjustTarget] = useState<ProductItem | null>(null);
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState<boolean>(false);
 
   // Archive Confirmation with Stock Warning Modal
   const [archiveTarget, setArchiveTarget] = useState<ProductItem | null>(null);
@@ -1594,6 +1600,18 @@ export const ProductCatalogView: React.FC = () => {
                             <Edit2 size={13} />
                           </button>
 
+                          {/* Adjust Stock / Damaged / Expired / Count Correction */}
+                          <button
+                            title={language === 'am' ? 'ክምችት አስተካክል (የተበላሸ፣ የጠፋ፣ ቆጠራ...)' : 'Adjust Stock (Damaged, Expired, Theft, Count)'}
+                            onClick={() => {
+                              setAdjustTarget(p);
+                              setIsAdjustModalOpen(true);
+                            }}
+                            className="w-7 h-7 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center transition cursor-pointer"
+                          >
+                            <SlidersHorizontal size={13} />
+                          </button>
+
                           {/* Print Label */}
                           <button
                             title="Print Thermal Barcode Label"
@@ -1641,6 +1659,19 @@ export const ProductCatalogView: React.FC = () => {
                                 >
                                   <Edit2 size={13} />
                                   <span>{t('catalog.editProduct')}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    setAdjustTarget(p);
+                                    setIsAdjustModalOpen(true);
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-xl hover:bg-surface-2 dark:hover:bg-surface-2 text-xs font-bold flex items-center gap-2 text-amber-600 dark:text-amber-400 cursor-pointer"
+                                >
+                                  <SlidersHorizontal size={13} />
+                                  <span>{language === 'am' ? 'ክምችት አስተካክል' : 'Adjust Stock'}</span>
                                 </button>
 
                                 <button
@@ -2270,6 +2301,20 @@ export const ProductCatalogView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Unified Stock Adjustment Modal (Damaged, Expired, Theft, Correction, Internal Use) */}
+      <StockAdjustmentModal
+        isOpen={isAdjustModalOpen}
+        product={adjustTarget}
+        onClose={() => {
+          setIsAdjustModalOpen(false);
+          setAdjustTarget(null);
+        }}
+        onSuccess={(msg) => {
+          setDeleteNotice({ type: 'success', message: msg });
+          fetchProducts();
+        }}
+      />
 
       {/* Action Result Notice Toast */}
       {deleteNotice && (

@@ -17,6 +17,7 @@ import { PlatformAdminConsole } from './components/platform/PlatformAdminConsole
 import { TenantOnboardingWizard } from './components/onboarding/TenantOnboardingWizard';
 import { RegisterApplicationPage } from './components/auth/RegisterApplicationPage';
 import { GebeyaOSPublicSite } from './components/public/GebeyaOSPublicSite';
+import { OwnerDownloadPortal } from './components/portal/OwnerDownloadPortal';
 
 // ── The 7 pages + Dashboard ──
 import { DashboardView } from './components/DashboardView';          // Dashboard (Owner / Manager Home)
@@ -56,6 +57,7 @@ function resolveHashTab(): NavTabId | null {
   if (
     raw === 'platform' ||
     raw === 'register' ||
+    raw === 'portal' ||
     raw === 'website' ||
     raw === 'landing' ||
     raw.startsWith('onboarding')
@@ -85,6 +87,9 @@ const MainApp: React.FC = () => {
   const [isRegisterRoute, setIsRegisterRoute] = useState<boolean>(
     () => window.location.hash === '#register' || window.location.pathname.startsWith('/register'),
   );
+  const [isPortalRoute, setIsPortalRoute] = useState<boolean>(
+    () => window.location.hash === '#portal' || window.location.pathname.startsWith('/portal'),
+  );
   const [isWebsiteRoute, setIsWebsiteRoute] = useState<boolean>(
     () =>
       window.location.hash === '#website' ||
@@ -100,6 +105,9 @@ const MainApp: React.FC = () => {
       );
       setIsRegisterRoute(
         window.location.hash === '#register' || window.location.pathname.startsWith('/register'),
+      );
+      setIsPortalRoute(
+        window.location.hash === '#portal' || window.location.pathname.startsWith('/portal'),
       );
       setIsWebsiteRoute(
         window.location.hash === '#website' ||
@@ -220,6 +228,17 @@ const MainApp: React.FC = () => {
         onBackToLogin={() => {
           window.location.hash = '';
           setIsRegisterRoute(false);
+        }}
+      />
+    );
+  }
+
+  if (isPortalRoute) {
+    return (
+      <OwnerDownloadPortal
+        onBackToLogin={() => {
+          window.location.hash = '';
+          setIsPortalRoute(false);
         }}
       />
     );

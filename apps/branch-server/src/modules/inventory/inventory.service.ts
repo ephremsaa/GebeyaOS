@@ -764,8 +764,10 @@ export class InventoryService {
       for (const item of dto.items) {
         // Map reason code to movement type
         let movementType: StockMovementType = 'ADJUSTMENT';
-        if (dto.reasonCode === 'DAMAGED_GOODS') movementType = 'DAMAGE';
-        else if (dto.reasonCode === 'EXPIRED') movementType = 'EXPIRED';
+        const rc = String(dto.reasonCode);
+        if (rc === 'DAMAGED_GOODS') movementType = 'DAMAGE';
+        else if (rc === 'EXPIRED') movementType = 'EXPIRED';
+        else if (rc === 'COUNT_CORRECTION' || rc === 'CORRECTION') movementType = 'COUNT_VARIANCE';
 
         const itemRes = await client.query<any>(
           `INSERT INTO stock_adjustment_items (

@@ -1774,6 +1774,11 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                             <span>{app.city}</span>
                             {app.address && <span>• {app.address}</span>}
                           </div>
+                          {app.businessLicenseNo && (
+                            <div className="text-[10px] font-mono text-amber-300 mt-0.5">
+                              License / TIN: {app.businessLicenseNo}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="font-semibold text-slate-200">{app.ownerFullName}</div>
@@ -1799,6 +1804,11 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                             {app.status === 'PENDING' && <Clock size={11} />}
                             {app.status}
                           </span>
+                          {app.licenseKey && (
+                            <div className="mt-1.5 font-mono text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md inline-block select-all">
+                              {app.licenseKey}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3.5 px-4 text-slate-400 text-[11px] max-w-xs truncate">
                           {app.notes || '—'}

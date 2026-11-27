@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Store, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Store, ShieldCheck, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, KeyRound, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
 
@@ -7,8 +7,12 @@ export const SetupWizard: React.FC = () => {
   const { executeSetup, isLoading } = useAuth();
   const { t, language, setLanguage } = useI18n();
 
-  const [step, setStep] = useState<number>(1);
+  // step 0: License Key, step 1: Store & Tax, step 2: Language & Receipts, step 3: Admin Account
+  const [step, setStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  const [licenseKey, setLicenseKey] = useState('');
+  const [verifyingLicense, setVerifyingLicense] = useState(false);
+  const [licenseVerified, setLicenseVerified] = useState(false);
 
   // Form State
   const [companyName, setCompanyName] = useState('');
@@ -86,7 +90,7 @@ export const SetupWizard: React.FC = () => {
             </div>
           </div>
           <span className="text-xs font-bold px-3 py-1 rounded-full bg-secondary text-primary border border-primary/20">
-            {language === 'am' ? `ደረጃ ${step} ከ 3` : `Step ${step} of 3`}
+            {language === 'am' ? `ደረጃ ${step + 1} ከ 4` : `Step ${step + 1} of 4`}
           </span>
         </div>
 
@@ -94,6 +98,104 @@ export const SetupWizard: React.FC = () => {
           <div className="flex items-center gap-2 text-sm p-3 rounded-xl bg-danger/10 text-danger border border-danger/20">
             <AlertCircle size={18} />
             <span>{error}</span>
+          </div>
+        )}
+
+        {/* Step 0 (UI Step 1): License Key Activation */}
+        {step === 0 && (
+          <div className="flex flex-col gap-4 animate-in fade-in duration-150">
+            <h2 className="text-base font-bold text-text-main flex items-center gap-2">
+              <KeyRound size={18} className="text-primary" />
+              {language === 'am' ? 'የሱፐርማርኬት ፈቃድ ቁልፍ (License Key) ያስገቡ' : 'Enter Activation / License Key'}
+            </h2>
+            <p className="text-xs text-text-muted">
+              {language === 'am'
+                ? 'ከGebeyaOS ፖርታል ያገኙትን ልዩ የፈቃድ ቁልፍ (GBY-XXXX-XXXX-XXXX) በማስገባት መደብርዎን ያረጋግጡ።'
+                : 'Enter the unique License Key from your GebeyaOS Owner Portal to verify and bind this local server to your supermarket.'}
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1">
+                {language === 'am' ? 'የፈቃድ ቁልፍ (License Key)' : 'License Key *'}
+              </label>
+              <input
+                type="text"
+                placeholder="GBY-XXXX-XXXX-XXXX"
+                value={licenseKey}
+                onChange={(e) => setLicenseKey(e.target.value.toUpperCase())}
+                className="w-full px-4 py-3 rounded-xl bg-input border border-border-subtle text-text-main font-mono text-base tracking-widest uppercase focus:outline-hidden focus:border-primary"
+              />
+            </div>
+
+            {licenseVerified && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 size={16} />
+                <span>
+                  {language === 'am'
+                    ? 'የፈቃድ ቁልፉ በተሳካ ሁኔታ ተረጋግጧል!'
+                    : 'License Key verified! Store details pre-filled.'}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setStep(1);
+                }}
+                className="text-xs font-bold text-text-muted hover:text-text-main cursor-pointer"
+              >
+                {language === 'am' ? 'ያለ ቁልፍ ቀጥል (Offline Demo)' : 'Skip for Offline Evaluation →'}
+              </button>
+
+              <button
+                type="button"
+                disabled={verifyingLicense}
+                onClick={async () => {
+                  setError(null);
+                  if (!licenseKey.trim()) {
+                    setError(
+                      language === 'am'
+                        ? 'እባክዎ የፈቃድ ቁልፍዎን ያስገቡ'
+                        : 'Please enter your License Key.',
+                    );
+                    return;
+                  }
+                  setVerifyingLicense(true);
+                  try {
+                    const res = await fetch('/api/platform/license/verify', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ licenseKey: licenseKey.trim() }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                      throw new Error(data.message || 'Invalid License Key');
+                    }
+                    setLicenseVerified(true);
+                    if (data.supermarketName) {
+                      setCompanyName(data.supermarketName);
+                      setTradeName(data.supermarketName);
+                      setReceiptHeader(`${data.supermarketName} - ${data.city || 'Addis Ababa'}`);
+                    }
+                    if (!branchCode) setBranchCode('MAIN-01');
+                    if (!branchName) setBranchName(data.city || 'Main Branch');
+                    setStep(1);
+                  } catch (err: any) {
+                    setError(err.message || 'Could not verify License Key');
+                  } finally {
+                    setVerifyingLicense(false);
+                  }
+                }}
+                className="btn-primary px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold text-sm cursor-pointer disabled:opacity-50"
+              >
+                {verifyingLicense && <RefreshCw size={15} className="animate-spin" />}
+                <span>{language === 'am' ? 'አረጋግጥ እና ቀጥል' : 'Verify & Continue'}</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
           </div>
         )}
 

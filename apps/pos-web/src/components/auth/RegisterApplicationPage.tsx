@@ -13,6 +13,9 @@ import {
   Store,
   Monitor,
   GitBranch,
+  FileBadge,
+  Lock,
+  ExternalLink,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 
@@ -56,6 +59,8 @@ export const RegisterApplicationPage: React.FC<RegisterApplicationPageProps> = (
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('Addis Ababa');
   const [address, setAddress] = useState('');
+  const [businessLicenseNo, setBusinessLicenseNo] = useState('');
+  const [portalPassword, setPortalPassword] = useState('');
   const [branchesCount, setBranchesCount] = useState<number>(1);
   const [terminalsCount, setTerminalsCount] = useState<number>(2);
   const [notes, setNotes] = useState('');
@@ -113,6 +118,22 @@ export const RegisterApplicationPage: React.FC<RegisterApplicationPageProps> = (
       );
       return;
     }
+    if (!businessLicenseNo.trim()) {
+      setError(
+        isAm
+          ? 'እባክዎ የንግድ ፈቃድ ወይም TIN ቁጥር ያስገቡ'
+          : 'Business License or TIN number is required',
+      );
+      return;
+    }
+    if (portalPassword.length < 6) {
+      setError(
+        isAm
+          ? 'የፖርታል የይለፍ ቃል ቢያንስ 6 ፊደላት/ቁጥሮች መሆን አለበት'
+          : 'Portal password must be at least 6 characters',
+      );
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -126,6 +147,8 @@ export const RegisterApplicationPage: React.FC<RegisterApplicationPageProps> = (
           email: email.trim().toLowerCase(),
           city: city.trim(),
           address: address.trim() || undefined,
+          businessLicenseNo: businessLicenseNo.trim(),
+          portalPassword,
           notes: `[Code: ${trimmedCode} | Branches: ${branchesCount} | Terminals: ${terminalsCount}] ${notes.trim()}`,
         }),
       });
@@ -207,13 +230,24 @@ export const RegisterApplicationPage: React.FC<RegisterApplicationPageProps> = (
               </div>
             </div>
 
-            <button
-              onClick={onBackToLogin}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all shadow-md"
-            >
-              <ArrowLeft size={14} />
-              {isAm ? 'ወደ መግቢያ ገጽ ተመለስ' : 'Return to Login'}
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={onBackToLogin}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+              >
+                <ArrowLeft size={14} />
+                {isAm ? 'ወደ መግቢያ ገጽ ተመለስ' : 'Return to Login'}
+              </button>
+              <button
+                onClick={() => {
+                  window.location.hash = '#portal';
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+              >
+                <ExternalLink size={14} />
+                {isAm ? 'ሁኔታን ይከታተሉ / ፖርታል ይክፈቱ' : 'Track Approval Status / Download Portal'}
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -379,6 +413,39 @@ export const RegisterApplicationPage: React.FC<RegisterApplicationPageProps> = (
                   max={100}
                   value={terminalsCount}
                   onChange={(e) => setTerminalsCount(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-hidden focus:border-emerald-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                  <FileBadge size={13} className="text-emerald-400" />
+                  {isAm ? 'የንግድ ፈቃድ / TIN ቁጥር' : 'Business License / TIN No.'} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. BL-2026-004812 / TIN 00123456"
+                  value={businessLicenseNo}
+                  onChange={(e) => setBusinessLicenseNo(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-hidden focus:border-emerald-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                  <Lock size={13} className="text-emerald-400" />
+                  {isAm ? 'የፖርታል መግቢያ የይለፍ ቃል' : 'Portal Account Password'} *
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  placeholder={isAm ? 'ቢያንስ 6 ፊደላት/ቁጥሮች' : 'Min 6 characters (for status & download)'}
+                  value={portalPassword}
+                  onChange={(e) => setPortalPassword(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-hidden focus:border-emerald-500 transition-colors"
                 />
               </div>

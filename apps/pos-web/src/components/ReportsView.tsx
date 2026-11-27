@@ -8,10 +8,8 @@ import {
   PieChart,
   Download,
   RefreshCw,
-  Clock,
   Building,
   CheckCircle2,
-  Calendar,
   ChevronDown,
   Printer,
   FileSpreadsheet,
@@ -20,21 +18,14 @@ import {
   ShoppingBag,
   ShieldCheck,
   ArrowUpRight,
-  ArrowDownRight,
   X,
   Search,
   Banknote,
   Smartphone,
   CreditCard,
-  Check,
-  Info,
   CalendarDays,
   Sparkles,
-  ExternalLink,
-  ChevronRight,
-  AlertCircle,
   PackageCheck,
-  Percent,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
@@ -58,7 +49,7 @@ interface BranchOption {
 
 export const ReportsView: React.FC = () => {
   const { currentUser, assignedBranches } = useAuth();
-  const { t, language } = useI18n();
+  const { language } = useI18n();
   const brand = useBrand();
 
   const isAm = language === 'am';

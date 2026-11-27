@@ -45,11 +45,11 @@ import {
   PlatformChangePasswordDto,
   PlatformReauthDto,
   SubmitTenantApplicationDto,
-  RejectApplicationDto,
 } from './dto/platform-admin.dto';
 import { TenantExportService, TenantExportResult } from './tenant-export.service';
 
-const PLATFORM_SESSION_EXPIRY = 900; // 15 minutes access token
+const LICENSE_SECRET = process.env.GEBEYAOS_LICENSE_SECRET || 'gebeyaos-offline-license-secret-2026';
+const LICENSE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 @Injectable()
 export class PlatformAdminService {
@@ -1354,10 +1354,14 @@ export class PlatformAdminService {
    */
   async submitApplication(dto: SubmitTenantApplicationDto, ipAddress?: string): Promise<{ id: string; message: string; status: string }> {
     const appId = generateUuidV7();
+    const portalPasswordHash = dto.portalPassword
+      ? await argon2.hash(dto.portalPassword, { type: argon2.argon2id })
+      : null;
+
     await this.db.query(
       `INSERT INTO tenant_applications (
-        id, supermarket_name, owner_full_name, phone, email, city, address, notes, status, ip_address
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9)`,
+        id, supermarket_name, owner_full_name, phone, email, city, address, business_license_no, portal_password_hash, notes, status, ip_address
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'PENDING', $11)`,
       [
         appId,
         dto.supermarketName.trim(),
@@ -1366,6 +1370,8 @@ export class PlatformAdminService {
         dto.email.trim().toLowerCase(),
         dto.city.trim(),
         dto.address ? dto.address.trim() : null,
+        dto.businessLicenseNo ? dto.businessLicenseNo.trim() : null,
+        portalPasswordHash,
         dto.notes ? dto.notes.trim() : null,
         ipAddress || null,
       ],
@@ -1397,6 +1403,8 @@ export class PlatformAdminService {
       email: r.email,
       city: r.city,
       address: r.address,
+      businessLicenseNo: r.business_license_no,
+      licenseKey: r.license_key,
       notes: r.notes,
       status: r.status,
       rejectionReason: r.rejection_reason,
@@ -1411,7 +1419,86 @@ export class PlatformAdminService {
   }
 
   /**
-   * Approve application: creates tenant, generates 72-hour invite token, updates application, logs audit
+   * Generate a signed offline-verifiable Activation / License Key: GBY-XXXX-XXXX-CCCC
+   */
+  private generateLicenseKey(): string {
+    const bytes = crypto.randomBytes(8);
+    let body = '';
+    for (let i = 0; i < 8; i++) {
+      body += LICENSE_ALPHABET[bytes[i] % LICENSE_ALPHABET.length];
+    }
+    const part1 = body.slice(0, 4);
+    const part2 = body.slice(4, 8);
+    const sig = crypto
+      .createHmac('sha256', LICENSE_SECRET)
+      .update(`${part1}-${part2}`)
+      .digest('hex')
+      .slice(0, 4)
+      .toUpperCase();
+    return `GBY-${part1}-${part2}-${sig}`;
+  }
+
+  /**
+   * Validate License Key signature offline + look up bound supermarket metadata if available
+   */
+  async verifyLicenseKey(rawKey: string) {
+    const normalized = String(rawKey || '').trim().toUpperCase();
+    const match = /^GBY-([A-Z0-9]{4})-([A-Z0-9]{4})-([A-F0-9]{4})$/.exec(normalized);
+    if (!match) {
+      throw new BadRequestException('Invalid license key format. Expected GBY-XXXX-XXXX-XXXX.');
+    }
+
+    const [, part1, part2, check] = match;
+    const expectedCheck = crypto
+      .createHmac('sha256', LICENSE_SECRET)
+      .update(`${part1}-${part2}`)
+      .digest('hex')
+      .slice(0, 4)
+      .toUpperCase();
+
+    if (check !== expectedCheck) {
+      throw new BadRequestException('License key verification failed. Please check the key from your portal.');
+    }
+
+    // Check if the application exists in local/portal DB
+    const appRes = await this.db.query(
+      `SELECT id, supermarket_name, owner_full_name, city, address, business_license_no, status, tenant_id
+       FROM tenant_applications
+       WHERE license_key = $1
+       LIMIT 1`,
+      [normalized],
+    );
+
+    if (appRes.rows.length > 0) {
+      const app = appRes.rows[0];
+      if (app.status !== 'APPROVED') {
+        throw new ForbiddenException('This license key is not active or has not been approved.');
+      }
+      return {
+        valid: true,
+        licenseKey: normalized,
+        supermarketName: app.supermarket_name,
+        ownerFullName: app.owner_full_name,
+        city: app.city,
+        address: app.address,
+        businessLicenseNo: app.business_license_no,
+        currency: 'ETB',
+        vatRate: 0.15,
+      };
+    }
+
+    // Offline signed key fallback (valid signature even when branch server is air-gapped)
+    return {
+      valid: true,
+      licenseKey: normalized,
+      supermarketName: null,
+      currency: 'ETB',
+      vatRate: 0.15,
+    };
+  }
+
+  /**
+   * Approve application: creates tenant, generates License Key + 72-hour invite token, updates application, logs audit
    */
   async approveApplication(applicationId: string, adminId: string, ipAddress?: string) {
     const appRes = await this.db.query(`SELECT * FROM tenant_applications WHERE id = $1`, [applicationId]);
@@ -1435,7 +1522,9 @@ export class PlatformAdminService {
       ipAddress,
     );
 
-    // Update application record
+    const licenseKey = this.generateLicenseKey();
+
+    // Update application record with license_key
     await this.db.query(
       `UPDATE tenant_applications SET
         status = 'APPROVED',
@@ -1443,9 +1532,10 @@ export class PlatformAdminService {
         approved_at = CURRENT_TIMESTAMP,
         tenant_id = $2,
         invite_token = $3,
+        license_key = $4,
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4`,
-      [adminId, created.tenant.id, created.inviteToken, applicationId],
+       WHERE id = $5`,
+      [adminId, created.tenant.id, created.inviteToken, licenseKey, applicationId],
     );
 
     await this.logPlatformAction({
@@ -1459,12 +1549,14 @@ export class PlatformAdminService {
         ownerFullName: app.owner_full_name,
         phone: app.phone,
         email: app.email,
+        licenseKey,
       },
     });
 
     return {
       applicationId,
       status: 'APPROVED',
+      licenseKey,
       tenant: created.tenant,
       inviteLink: created.inviteLink,
       inviteToken: created.inviteToken,
@@ -1510,6 +1602,182 @@ export class PlatformAdminService {
       applicationId,
       status: 'REJECTED',
       message: 'Application rejected',
+    };
+  }
+
+  /**
+   * Supermarket Owner Portal Login (check status, view License Key, download installer)
+   */
+  async portalLogin(emailOrPhone: string, password: string) {
+    const cleanInput = emailOrPhone.trim();
+    const res = await this.db.query(
+      `SELECT * FROM tenant_applications
+       WHERE LOWER(email) = LOWER($1) OR phone = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [cleanInput],
+    );
+
+    if (res.rows.length === 0) {
+      throw new UnauthorizedException('No registration found for this email or phone.');
+    }
+
+    const app = res.rows[0];
+    if (!app.portal_password_hash) {
+      throw new UnauthorizedException('Portal password was not set for this application. Please contact support.');
+    }
+
+    const valid = await argon2.verify(app.portal_password_hash, password);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid email/phone or password.');
+    }
+
+    const portalToken = jwt.sign(
+      {
+        sub: app.id,
+        role: 'PORTAL_OWNER',
+        email: app.email,
+      },
+      PLATFORM_JWT_SECRET,
+      { expiresIn: '2h' },
+    );
+
+    const isApproved = app.status === 'APPROVED';
+
+    return {
+      portalToken,
+      application: {
+        id: app.id,
+        supermarketName: app.supermarket_name,
+        ownerFullName: app.owner_full_name,
+        email: app.email,
+        phone: app.phone,
+        city: app.city,
+        address: app.address,
+        businessLicenseNo: app.business_license_no,
+        status: app.status,
+        rejectionReason: app.rejection_reason,
+        approvedAt: app.approved_at ? app.approved_at.toISOString() : null,
+        createdAt: app.created_at.toISOString(),
+        licenseKey: isApproved ? app.license_key : null,
+        downloadReady: isApproved,
+      },
+    };
+  }
+
+  /**
+   * Verify Owner Portal Bearer Token
+   */
+  verifyPortalToken(authHeader?: string): { applicationId: string; email: string } {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Missing portal authorization token.');
+    }
+    const token = authHeader.slice(7).trim();
+    try {
+      const payload = jwt.verify(token, PLATFORM_JWT_SECRET) as any;
+      if (payload.role !== 'PORTAL_OWNER' || !payload.sub) {
+        throw new UnauthorizedException('Invalid portal token.');
+      }
+      return { applicationId: payload.sub, email: payload.email };
+    } catch {
+      throw new UnauthorizedException('Portal session expired. Please sign in again.');
+    }
+  }
+
+  /**
+   * Get live application status for logged-in supermarket owner
+   */
+  async getPortalStatus(applicationId: string) {
+    const res = await this.db.query(`SELECT * FROM tenant_applications WHERE id = $1`, [applicationId]);
+    if (res.rows.length === 0) {
+      throw new NotFoundException('Application not found');
+    }
+    const app = res.rows[0];
+    const isApproved = app.status === 'APPROVED';
+    return {
+      id: app.id,
+      supermarketName: app.supermarket_name,
+      ownerFullName: app.owner_full_name,
+      email: app.email,
+      phone: app.phone,
+      city: app.city,
+      address: app.address,
+      businessLicenseNo: app.business_license_no,
+      status: app.status,
+      rejectionReason: app.rejection_reason,
+      approvedAt: app.approved_at ? app.approved_at.toISOString() : null,
+      createdAt: app.created_at.toISOString(),
+      licenseKey: isApproved ? app.license_key : null,
+      downloadReady: isApproved,
+    };
+  }
+
+  /**
+   * Strictly gated download access: blocks PENDING or REJECTED accounts with 403 Forbidden
+   */
+  async getPortalDownloadPayload(applicationId: string): Promise<{
+    filename: string;
+    filePath?: string;
+    fallbackBuffer?: Buffer;
+    mimeType: string;
+  }> {
+    const res = await this.db.query(`SELECT * FROM tenant_applications WHERE id = $1`, [applicationId]);
+    if (res.rows.length === 0) {
+      throw new NotFoundException('Application not found');
+    }
+    const app = res.rows[0];
+
+    if (app.status !== 'APPROVED') {
+      throw new ForbiddenException(
+        'Download access is locked until your supermarket registration is approved by an administrator.',
+      );
+    }
+
+    const fs = await import('fs');
+    const path = await import('path');
+    const candidates = [
+      path.resolve(process.cwd(), 'releases', 'GebeyaOS-Setup.exe'),
+      path.resolve(process.cwd(), '..', '..', 'releases', 'GebeyaOS-Setup.exe'),
+      path.resolve(process.cwd(), 'releases', 'GebeyaOS-Local-Server.zip'),
+      path.resolve(process.cwd(), '..', '..', 'releases', 'GebeyaOS-Local-Server.zip'),
+    ];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        const ext = path.extname(candidate).toLowerCase();
+        return {
+          filename: path.basename(candidate),
+          filePath: candidate,
+          mimeType: ext === '.exe' ? 'application/vnd.microsoft.portable-executable' : 'application/zip',
+        };
+      }
+    }
+
+    // Fallback: generate a pre-configured Windows Quick-Install & License Bundle manifest (.cmd)
+    const slug = String(app.supermarket_name || 'supermarket')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-');
+    const scriptContent = [
+      '@echo off',
+      'title GebeyaOS Supermarket Local Server Launcher',
+      'echo ======================================================',
+      `echo   GebeyaOS Verified Installer - ${app.supermarket_name}`,
+      `echo   License Key: ${app.license_key}`,
+      'echo ======================================================',
+      'echo.',
+      'echo Copy this file into your GebeyaOS package folder and run:',
+      'echo   powershell -ExecutionPolicy Bypass -File scripts\\windows\\install.ps1',
+      'echo.',
+      'echo Then open http://localhost:3001 and enter your License Key:',
+      `echo   ${app.license_key}`,
+      'echo.',
+      'pause',
+    ].join('\r\n');
+
+    return {
+      filename: `GebeyaOS-Installer-${slug}.cmd`,
+      fallbackBuffer: Buffer.from(scriptContent, 'utf8'),
+      mimeType: 'application/octet-stream',
     };
   }
 

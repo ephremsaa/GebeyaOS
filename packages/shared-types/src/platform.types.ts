@@ -137,6 +137,8 @@ export interface TenantApplicationItem {
   email: string;
   city: string;
   address?: string | null;
+  businessLicenseNo?: string | null;
+  licenseKey?: string | null;
   notes?: string | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejectionReason?: string | null;

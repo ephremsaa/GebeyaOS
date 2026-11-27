@@ -156,7 +156,31 @@ export class SubmitTenantApplicationDto {
 
   @IsString()
   @IsOptional()
+  businessLicenseNo?: string;
+
+  @IsString()
+  @IsOptional()
+  portalPassword?: string;
+
+  @IsString()
+  @IsOptional()
   notes?: string;
+}
+
+export class PortalLoginDto {
+  @IsString()
+  @IsNotEmpty()
+  emailOrPhone!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  password!: string;
+}
+
+export class VerifyLicenseDto {
+  @IsString()
+  @IsNotEmpty()
+  licenseKey!: string;
 }
 
 export class RejectApplicationDto {
