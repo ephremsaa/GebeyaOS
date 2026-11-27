@@ -17,6 +17,8 @@
     "clean:supermarkets": "node scripts/reset-supermarkets.js",
     "create-platform-admin": "node scripts/create-platform-admin.js",
     "build": "npm run build --workspaces --if-present",
+    "start": "node apps/branch-server/dist/main.js",
+    "migrate:cloud": "node scripts/migrate-cloud.js",
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "playwright test",
     "i18n:check": "node scripts/i18n-check.js"

@@ -42,12 +42,18 @@ function isForbiddenSecret(value: string): boolean {
 export function validateEnv(): BranchServerEnv {
   const errors: string[] = [];
 
+  const hasDatabaseUrl = Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '');
+
   // ── Required string fields ──────────────────────────────────────────────
   const requiredStrings: Array<[string, string]> = [
-    ['DB_HOST',       'PostgreSQL host (e.g. localhost or 127.0.0.1)'],
-    ['DB_USER',       'PostgreSQL username'],
-    ['DB_PASSWORD',   'PostgreSQL password'],
-    ['DB_NAME',       'PostgreSQL database name (e.g. gebeyaos_branch)'],
+    ...(hasDatabaseUrl
+      ? []
+      : ([
+          ['DB_HOST',     'PostgreSQL host (e.g. localhost or 127.0.0.1)'],
+          ['DB_USER',     'PostgreSQL username'],
+          ['DB_PASSWORD', 'PostgreSQL password'],
+          ['DB_NAME',     'PostgreSQL database name (e.g. gebeyaos_branch)'],
+        ] as Array<[string, string]>)),
     ['JWT_SECRET',    '32+ random bytes for JWT signing (run: openssl rand -hex 32)'],
     ['ENCRYPTION_KEY','32+ random bytes for data encryption (run: openssl rand -hex 32)'],
   ];
@@ -63,7 +69,9 @@ export function validateEnv(): BranchServerEnv {
   const isProd = process.env.NODE_ENV === 'production';
 
   if (isProd) {
-    const secretFields = ['DB_PASSWORD', 'JWT_SECRET', 'ENCRYPTION_KEY'];
+    const secretFields = hasDatabaseUrl
+      ? ['JWT_SECRET', 'ENCRYPTION_KEY']
+      : ['DB_PASSWORD', 'JWT_SECRET', 'ENCRYPTION_KEY'];
     for (const field of secretFields) {
       const val = process.env[field] ?? '';
       if (isForbiddenSecret(val)) {

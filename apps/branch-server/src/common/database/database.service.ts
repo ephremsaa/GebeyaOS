@@ -19,16 +19,24 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     // Parse PostgreSQL DATE (OID 1082) as exact YYYY-MM-DD string without timezone shifting
     types.setTypeParser(1082, (val: string) => val);
 
-    this.pool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      database: process.env.DB_NAME || 'gebeyaos_branch',
-      max: parseInt(process.env.DB_POOL_MAX || '20', 10),
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    });
+    this.pool = process.env.DATABASE_URL
+      ? new Pool({
+          connectionString: process.env.DATABASE_URL,
+          ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
+          max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 5000,
+        })
+      : new Pool({
+          host: process.env.DB_HOST || 'localhost',
+          port: parseInt(process.env.DB_PORT || '5432', 10),
+          user: process.env.DB_USER || 'postgres',
+          password: process.env.DB_PASSWORD || 'postgres',
+          database: process.env.DB_NAME || 'gebeyaos_branch',
+          max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 5000,
+        });
 
     this.pool.on('error', (err) => {
       this.logger.error('Unexpected error on idle PostgreSQL client', err.stack);
