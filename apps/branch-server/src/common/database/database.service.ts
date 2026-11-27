@@ -1,5 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@nestjs/common';
 import { Pool, PoolClient, QueryResult, QueryResultRow, types } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
 import { TenantContextService } from '../tenant/tenant-context.service';
 
 @Injectable()
@@ -15,7 +17,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     this.tenantContextService = tenantContextService || new TenantContextService();
   }
 
-  onModuleInit() {
+  async onModuleInit() {
     // Parse PostgreSQL DATE (OID 1082) as exact YYYY-MM-DD string without timezone shifting
     types.setTypeParser(1082, (val: string) => val);
 
@@ -41,6 +43,45 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     this.pool.on('error', (err) => {
       this.logger.error('Unexpected error on idle PostgreSQL client', err.stack);
     });
+
+    await this.ensureMigrationsApplied();
+  }
+
+  private async ensureMigrationsApplied() {
+    try {
+      const check = await this.pool.query(
+        `SELECT COUNT(*) AS cnt FROM information_schema.tables
+         WHERE table_schema = 'public'
+           AND table_name IN ('tenants', 'branches', 'products', 'sales', 'platform_admins')`,
+      );
+      const count = parseInt(check.rows[0]?.cnt || '0', 10);
+      if (count >= 5) return;
+
+      const candidates = [
+        path.resolve(process.cwd(), 'database/migrations'),
+        path.resolve(__dirname, '../../../../database/migrations'),
+        path.resolve(__dirname, '../../../../../database/migrations'),
+      ];
+      const migrationsDir = candidates.find((p) => fs.existsSync(p));
+      if (!migrationsDir) {
+        this.logger.warn('Migrations directory not found for auto-migration.');
+        return;
+      }
+
+      const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
+      this.logger.log(`Auto-applying ${files.length} SQL migrations from ${migrationsDir}...`);
+      for (const file of files) {
+        try {
+          const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+          await this.pool.query(sql);
+        } catch (err: any) {
+          this.logger.warn(`Migration ${file}: ${err.message}`);
+        }
+      }
+      this.logger.log('Auto-migrations complete.');
+    } catch (err: any) {
+      this.logger.warn(`Auto-migration check skipped: ${err.message}`);
+    }
   }
 
   async onModuleDestroy() {

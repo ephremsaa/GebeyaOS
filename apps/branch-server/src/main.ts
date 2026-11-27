@@ -55,10 +55,10 @@ async function bootstrap() {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           imgSrc: ["'self'", 'data:', 'blob:'],
           connectSrc: ["'self'"],
-          fontSrc: ["'self'"],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           objectSrc: ["'none'"],
           upgradeInsecureRequests: [],
         },
@@ -67,7 +67,7 @@ async function bootstrap() {
     }),
   );
 
-  // ── 3. CORS – restricted to configured origins + LAN terminals ──────────
+  // ── 3. CORS – restricted to configured origins, cloud domains & LAN terminals ──
   const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
     origin: (origin, callback) => {
@@ -76,7 +76,9 @@ async function bootstrap() {
       if (allowedOrigins.includes(origin)) return callback(null, true);
       // Allow local LAN cashier terminal origins (e.g. 192.168.x.x, 10.x.x.x, 172.16-31.x.x)
       const isLanOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin);
-      if (isLanOrigin) return callback(null, true);
+      // Allow Railway / Render / Cloud Run hosted portal origins (same-origin module/css requests)
+      const isCloudOrigin = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.(up\.railway\.app|onrender\.com|run\.app)$/.test(origin);
+      if (isLanOrigin || isCloudOrigin) return callback(null, true);
       logger.warn(`CORS blocked request from origin: ${origin}`);
       callback(new Error(`Origin ${origin} not allowed by CORS policy`));
     },
