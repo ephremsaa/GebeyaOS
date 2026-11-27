@@ -365,4 +365,16 @@ export class PlatformAdminController {
   async verifyLicenseKey(@Body() dto: VerifyLicenseDto) {
     return this.platformAdminService.verifyLicenseKey(dto.licenseKey);
   }
+
+  @Get('bootstrap-status')
+  async getBootstrapStatus() {
+    return this.platformAdminService.getBootstrapStatus();
+  }
+
+  @Post('bootstrap')
+  async bootstrapFirstAdmin(
+    @Body() dto: { username: string; fullName: string; email: string; password: string },
+  ) {
+    return this.platformAdminService.bootstrapFirstAdmin(dto);
+  }
 }

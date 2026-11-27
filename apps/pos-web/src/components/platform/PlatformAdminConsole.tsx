@@ -65,6 +65,23 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  // First-time cloud bootstrap state (when 0 platform admins exist)
+  const [needsBootstrap, setNeedsBootstrap] = useState<boolean>(false);
+  const [bootFullName, setBootFullName] = useState('');
+  const [bootEmail, setBootEmail] = useState('');
+  const [bootSaving, setBootSaving] = useState(false);
+
+  useEffect(() => {
+    if (!platformToken) {
+      fetch(`${API_BASE}/bootstrap-status`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && d.needsBootstrap) setNeedsBootstrap(true);
+        })
+        .catch(() => {});
+    }
+  }, [platformToken]);
+
   // 2FA Stage: 'none' | 'challenge' | 'enrollment'
   const [twoFaStage, setTwoFaStage] = useState<'none' | 'challenge' | 'enrollment'>('none');
   const [twoFaTempToken, setTwoFaTempToken] = useState<string>('');
@@ -1197,6 +1214,92 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
             </div>
           )}
 
+          {needsBootstrap ? (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setLoginError(null);
+                setBootSaving(true);
+                try {
+                  const res = await fetch(`${API_BASE}/bootstrap`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      username: loginUsername.trim(),
+                      fullName: bootFullName.trim() || loginUsername.trim(),
+                      email: bootEmail.trim(),
+                      password: loginPassword,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.message || 'Bootstrap failed');
+                  setNeedsBootstrap(false);
+                } catch (err: any) {
+                  setLoginError(err.message || 'Failed to create initial Super Admin');
+                } finally {
+                  setBootSaving(false);
+                }
+              }}
+              className="space-y-3.5"
+            >
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-semibold">
+                First-time setup: Create your initial Platform Super Admin account.
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Username *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. admin"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white font-mono focus:outline-hidden focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ephrem"
+                  value={bootFullName}
+                  onChange={(e) => setBootFullName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-hidden focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Email *</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="admin@gebeyaos.com"
+                  value={bootEmail}
+                  onChange={(e) => setBootEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-hidden focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Password (min 10 chars) *</label>
+                <input
+                  type="password"
+                  required
+                  minLength={10}
+                  placeholder="••••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-hidden focus:border-emerald-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={bootSaving}
+                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {bootSaving ? <RefreshCw size={15} className="animate-spin" /> : <ShieldCheck size={16} />}
+                <span>Create Super Admin</span>
+              </button>
+            </form>
+          ) : (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -1242,6 +1345,7 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
               )}
             </button>
           </form>
+          )}
 
           {/* Quick helper */}
           <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">

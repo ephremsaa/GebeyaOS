@@ -1782,6 +1782,44 @@ export class PlatformAdminService {
   }
 
   /**
+   * Check whether any platform admin exists yet (used for one-time cloud bootstrap)
+   */
+  async getBootstrapStatus(): Promise<{ needsBootstrap: boolean }> {
+    const res = await this.db.query<{ count: string }>(`SELECT COUNT(*) as count FROM platform_admins`);
+    return { needsBootstrap: parseInt(res.rows[0]?.count || '0', 10) === 0 };
+  }
+
+  /**
+   * One-time initial Platform Super Admin creation (permanently locked once 1 admin exists)
+   */
+  async bootstrapFirstAdmin(dto: { username: string; fullName: string; email: string; password: string }) {
+    const check = await this.db.query<{ count: string }>(`SELECT COUNT(*) as count FROM platform_admins`);
+    if (parseInt(check.rows[0]?.count || '0', 10) > 0) {
+      throw new ForbiddenException('Platform admin already exists. Initial setup is locked.');
+    }
+
+    if (!dto.username?.trim() || !dto.email?.trim() || !dto.password || dto.password.length < 10) {
+      throw new BadRequestException('Username, email, and a password of at least 10 characters are required.');
+    }
+
+    const adminId = generateUuidV7();
+    const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
+
+    await this.db.query(
+      `INSERT INTO platform_admins (
+        id, username, full_name, email, role, password_hash, totp_enabled, is_active, token_version
+       ) VALUES ($1, $2, $3, $4, 'SUPER_ADMIN', $5, FALSE, TRUE, 1)`,
+      [adminId, dto.username.trim(), (dto.fullName || dto.username).trim(), dto.email.trim().toLowerCase(), passwordHash],
+    );
+
+    return {
+      success: true,
+      username: dto.username.trim(),
+      message: 'Initial Super Admin created. Sign in now to enroll 2FA.',
+    };
+  }
+
+  /**
    * Internal helper: write immutable record to platform_audit_logs
    */
   private async logPlatformAction(params: {
