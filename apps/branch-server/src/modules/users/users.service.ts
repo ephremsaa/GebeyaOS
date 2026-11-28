@@ -299,16 +299,17 @@ export class UsersService {
       }
 
       await client.query(
-        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, 'USER_UPDATED', 'users', $3, $4)`,
+        `INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, 'USER_UPDATED', 'users', $4, $5)`,
         [
           generateUuidV7(),
+          currentUser.tenant_id,
           adminId,
           userId,
           JSON.stringify({ changes: dto }),
         ],
       );
-    });
+    }, currentUser.tenant_id);
 
     return { success: true, message: 'User updated successfully' };
   }
@@ -617,23 +618,24 @@ export class UsersService {
       if (dto.permissions && dto.permissions.length > 0) {
         for (const permId of dto.permissions) {
           await client.query(
-            `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-            [roleId, permId],
+            `INSERT INTO role_permissions (role_id, permission_id, tenant_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+            [roleId, permId, tenantId],
           );
         }
       }
 
       await client.query(
         `INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, 'ROLE_CREATED', 'roles', $3, $4)`,
+         VALUES ($1, $2, $3, 'ROLE_CREATED', 'roles', $4, $5)`,
         [
           generateUuidV7(),
+          tenantId,
           adminId,
           roleId,
           JSON.stringify({ name: roleName, permissions: dto.permissions || [] }),
         ],
       );
-    });
+    }, tenantId);
 
     return {
       id: roleId,
@@ -666,15 +668,16 @@ export class UsersService {
       throw new BadRequestException('Cannot delete role with assigned users. Reassign users first.');
     }
 
+    const tenantId = this.tenantContextService?.getTenantId() || '01900000-0000-7000-8000-000000000001';
     await this.db.withTransaction(async (client) => {
       await client.query(`DELETE FROM role_permissions WHERE role_id = $1`, [roleId]);
       await client.query(`DELETE FROM roles WHERE id = $1`, [roleId]);
       await client.query(
-        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, 'ROLE_DELETED', 'roles', $3, $4)`,
-        [generateUuidV7(), adminId, roleId, JSON.stringify({ name: roleRes.rows[0].name })],
+        `INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, 'ROLE_DELETED', 'roles', $4, $5)`,
+        [generateUuidV7(), tenantId, adminId, roleId, JSON.stringify({ name: roleRes.rows[0].name })],
       );
-    });
+    }, tenantId);
 
     return { success: true, message: 'Role deleted successfully' };
   }
@@ -683,8 +686,9 @@ export class UsersService {
    * 8c. Update Role Permissions & Discount Limit
    */
   async updateRolePermissions(adminId: string, roleId: string, dto: UpdateRolePermissionsDto) {
-    const roleRes = await this.db.query(`SELECT id, name FROM roles WHERE id = $1`, [roleId]);
+    const roleRes = await this.db.query(`SELECT id, name, tenant_id FROM roles WHERE id = $1`, [roleId]);
     if (roleRes.rows.length === 0) throw new NotFoundException('Role not found.');
+    const tenantId = roleRes.rows[0].tenant_id || this.tenantContextService?.getTenantId() || '01900000-0000-7000-8000-000000000001';
 
     await this.db.withTransaction(async (client) => {
       // Clear existing
@@ -693,8 +697,8 @@ export class UsersService {
       // Insert new permissions
       for (const permId of dto.permissionIds) {
         await client.query(
-          `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-          [roleId, permId],
+          `INSERT INTO role_permissions (role_id, permission_id, tenant_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+          [roleId, permId, tenantId],
         );
       }
 
@@ -706,10 +710,11 @@ export class UsersService {
       }
 
       await client.query(
-        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, 'ROLE_PERMISSIONS_CHANGED', 'roles', $3, $4)`,
+        `INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, 'ROLE_PERMISSIONS_CHANGED', 'roles', $4, $5)`,
         [
           generateUuidV7(),
+          tenantId,
           adminId,
           roleId,
           JSON.stringify({
@@ -719,7 +724,7 @@ export class UsersService {
           }),
         ],
       );
-    });
+    }, tenantId);
 
     return { success: true, message: 'Role permissions updated successfully' };
   }
@@ -775,10 +780,10 @@ export class UsersService {
           const roleId = res.rows[0].id;
           for (const permId of r.perms) {
             await this.db.query(
-              `INSERT INTO role_permissions (role_id, permission_id)
-               SELECT $1, id FROM permissions WHERE id = $2
+              `INSERT INTO role_permissions (role_id, permission_id, tenant_id)
+               SELECT $1, id, $3 FROM permissions WHERE id = $2
                ON CONFLICT DO NOTHING`,
-              [roleId, permId],
+              [roleId, permId, tenantId],
             );
           }
         }

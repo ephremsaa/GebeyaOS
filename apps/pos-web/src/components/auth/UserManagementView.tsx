@@ -701,7 +701,7 @@ export const UserManagementView: React.FC = () => {
 
     try {
       const token = localStorage.getItem('gebeyaos_access_token');
-      await fetch(`/api/users/roles/${roleId}/permissions`, {
+      const res = await fetch(`/api/users/roles/${roleId}/permissions`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -712,8 +712,17 @@ export const UserManagementView: React.FC = () => {
           maxDiscountPercentage: targetRole.maxDiscountPercentage,
         }),
       });
-    } catch {
-      // offline fallback
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to update role permissions');
+      }
+    } catch (err: any) {
+      setRoles((prev) =>
+        prev.map((r) => (r.id === roleId ? { ...r, permissions: targetRole.permissions } : r)),
+      );
+      setErrorMsg(err.message || 'Failed to update role permissions');
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
     }
 
     setSuccessMsg(`Updated permissions for ${targetRole.name}.`);

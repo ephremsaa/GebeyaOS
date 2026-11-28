@@ -177,8 +177,8 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
 
     try {
       if (isLockScreen) {
-        // Unlock existing terminal session
-        const res = await unlockSession(pin);
+        // Unlock existing terminal session (or switch to selected cashier)
+        const res = await unlockSession(pin, selectedCashier?.id);
         if (!res.success) {
           triggerHaptic([100, 50, 100, 50, 100]);
           setIsShaking(true);
