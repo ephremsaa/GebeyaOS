@@ -1187,29 +1187,29 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
 
     // Step 1: Username & Password Login Screen
     return (
-      <div className="min-h-screen w-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-slate-100 font-sans select-none">
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="min-h-screen w-screen flex flex-col items-center justify-center p-6 bg-[#060913] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/35 via-[#060913] to-[#060913] text-slate-100 font-sans select-none">
+        <div className="w-full max-w-md bg-[#0B1120]/95 border border-slate-800/80 rounded-3xl p-8 shadow-2xl shadow-black/50 relative overflow-hidden backdrop-blur-xl">
+          <div className="absolute -top-24 -right-24 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <ShieldAlert size={26} />
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-950/30">
+              <ShieldAlert size={28} />
             </div>
             <div>
-              <div className="text-[11px] font-bold tracking-wider text-emerald-400 uppercase">
+              <div className="text-xs font-bold tracking-widest text-emerald-400 uppercase">
                 Platform Control Plane
               </div>
-              <h1 className="text-xl font-bold tracking-tight text-white">Operator Sign In</h1>
+              <h1 className="text-2xl font-extrabold tracking-tight text-white mt-0.5">Operator Sign In</h1>
             </div>
           </div>
 
-          <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
             Multi-tenant fleet administration, supermarket provisioning, plan licensing, and break-glass support access.
           </p>
 
           {loginError && (
-            <div className="p-3.5 mb-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-center gap-2.5">
-              <AlertTriangle size={16} className="shrink-0 text-amber-400" />
+            <div className="p-4 mb-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-sm flex items-center gap-3">
+              <AlertTriangle size={18} className="shrink-0 text-amber-400" />
               <span>{loginError}</span>
             </div>
           )}
@@ -1240,46 +1240,46 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                   setBootSaving(false);
                 }
               }}
-              className="space-y-3.5"
+              className="space-y-4"
             >
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-semibold">
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-sm font-semibold">
                 First-time setup: Create your initial Platform Super Admin account.
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Username *</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Username *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. admin"
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white font-mono focus:outline-hidden focus:border-emerald-500"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white font-mono focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Full Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Ephrem"
                   value={bootFullName}
                   onChange={(e) => setBootFullName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-hidden focus:border-emerald-500"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Email *</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Email *</label>
                 <input
                   type="email"
                   required
                   placeholder="admin@gebeyaos.com"
                   value={bootEmail}
                   onChange={(e) => setBootEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-hidden focus:border-emerald-500"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Password (min 10 chars) *</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Password (min 10 chars) *</label>
                 <input
                   type="password"
                   required
@@ -1287,22 +1287,22 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                   placeholder="••••••••••"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-hidden focus:border-emerald-500"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
               <button
                 type="submit"
                 disabled={bootSaving}
-                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-emerald-950/40"
               >
-                {bootSaving ? <RefreshCw size={15} className="animate-spin" /> : <ShieldCheck size={16} />}
+                {bootSaving ? <RefreshCw size={17} className="animate-spin" /> : <ShieldCheck size={18} />}
                 <span>Create Super Admin</span>
               </button>
             </form>
           ) : (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Operator Username or Email
               </label>
               <input
@@ -1311,12 +1311,12 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                 onChange={(e) => setLoginUsername(e.target.value)}
                 required
                 placeholder="e.g. platform_admin"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition-all font-mono"
+                className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition-all font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Operator Master Password
               </label>
               <input
@@ -1325,22 +1325,22 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                 onChange={(e) => setLoginPassword(e.target.value)}
                 required
                 placeholder="••••••••••••"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition-all font-mono"
+                className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition-all font-mono"
               />
             </div>
 
             <button
               type="submit"
               disabled={isLoggingIn}
-              className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/30 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2"
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-950/40 active:scale-98 transition-all flex items-center justify-center gap-2.5 mt-2 cursor-pointer"
             >
               {isLoggingIn ? (
                 <>
-                  <RefreshCw size={16} className="animate-spin" /> Verifying Credentials...
+                  <RefreshCw size={17} className="animate-spin" /> Verifying Credentials...
                 </>
               ) : (
                 <>
-                  <Lock size={16} /> Enter Platform Control Plane
+                  <Lock size={17} /> Enter Platform Control Plane
                 </>
               )}
             </button>
@@ -1419,123 +1419,60 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
   };
 
   return (
-    <div className="min-h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden">
-      {/* 1. Control Plane Header */}
-      <header className="px-6 py-3.5 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 shrink-0 z-20 backdrop-blur-md">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xs shrink-0">
-            <ShieldAlert size={24} />
+    <div className="min-h-screen w-screen bg-[#060913] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/25 via-[#060913] to-[#060913] text-slate-100 flex flex-col font-sans select-none overflow-hidden">
+      {/* 1. Control Plane Top Bar */}
+      <header className="h-16 px-6 bg-[#0B1120]/95 border-b border-slate-800/80 flex items-center justify-between gap-4 shrink-0 z-20 backdrop-blur-md">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xs shrink-0">
+            <ShieldAlert size={22} />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <span className="font-extrabold text-lg tracking-tight text-white">GebeyaOS Platform Console</span>
-              {roleBadge()}
+              <span className="font-extrabold text-base sm:text-lg tracking-tight text-white truncate">
+                GebeyaOS Platform Console
+              </span>
+              <span className="shrink-0">{roleBadge()}</span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">Fleet Control &amp; Supermarket Tenant Isolation</p>
+            <p className="text-xs text-slate-400 hidden sm:block truncate">
+              Fleet Control &amp; Supermarket Tenant Isolation
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <div className="text-sm font-bold text-slate-100">{adminUser?.fullName || 'Operator'}</div>
-            <div className="text-xs font-mono text-emerald-400">{adminUser?.email || 'admin@gebeyaos.et'}</div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="text-right hidden md:block px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
+            <div className="text-xs font-bold text-slate-100 leading-tight">{adminUser?.fullName || 'Operator'}</div>
+            <div className="text-[11px] font-mono text-emerald-400 leading-tight">{adminUser?.email || 'admin@gebeyaos.et'}</div>
           </div>
 
           <button
             onClick={() => setShowChangePasswordModal(true)}
             title="Change Master Password"
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-2 transition-all cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700/80 flex items-center gap-2 transition-all cursor-pointer"
           >
-            <KeyRound size={15} /> Password
+            <KeyRound size={15} />
+            <span className="hidden sm:inline">Password</span>
           </button>
 
           {onExit && (
             <button
               onClick={onExit}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700 transition-all flex items-center gap-2 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700/80 transition-all flex items-center gap-2 cursor-pointer"
             >
-              <ArrowRight size={15} /> Exit to POS
+              <ArrowRight size={15} />
+              <span>Exit to POS</span>
             </button>
           )}
 
           <button
             onClick={handleLogout}
             title="Log Out Operator"
-            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-400 text-slate-300 border border-slate-700 transition-all cursor-pointer"
+            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-400 text-slate-300 border border-slate-700/80 transition-all cursor-pointer"
           >
-            <LogOut size={18} />
+            <LogOut size={17} />
           </button>
         </div>
       </header>
-
-      {/* Navigation Tab Bar */}
-      <div className="px-6 py-2.5 bg-slate-900/60 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto shrink-0">
-        <button
-          onClick={() => setCurrentTab('tenants')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            currentTab === 'tenants'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-          }`}
-        >
-          <Building2 size={17} />
-          <span>Supermarkets</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'tenants' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
-            {tenants.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setCurrentTab('applications')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            currentTab === 'applications'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-          }`}
-        >
-          <FileText size={17} />
-          <span>Applications</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${
-            currentTab === 'applications'
-              ? 'bg-white/20 text-white'
-              : pendingApplicationsCount > 0
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                : 'bg-slate-800 text-slate-300'
-          }`}>
-            {pendingApplicationsCount}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setCurrentTab('sessions')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            currentTab === 'sessions'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-          }`}
-        >
-          <Laptop size={17} />
-          <span>Operator Sessions</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'sessions' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
-            {sessionsList.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setCurrentTab('audit')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            currentTab === 'audit'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-          }`}
-        >
-          <Clock size={17} />
-          <span>Platform Audit</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'audit' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
-            {auditLogs.length}
-          </span>
-        </button>
-      </div>
 
       {/* 2. Break-Glass Support Access Banner */}
       {activeSupportSession && (
@@ -1552,51 +1489,144 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
           </div>
           <button
             onClick={handleRevokeSupport}
-            className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold text-[11px] transition-all cursor-pointer"
+            className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold text-xs transition-all cursor-pointer"
           >
             Terminate Support Session
           </button>
         </div>
       )}
 
-      {/* 3. Main Workspace */}
-      <main className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-        {currentTab === 'tenants' && (
-          <>
-            {/* Metric KPI cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Building2 size={28} />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-slate-400">Total Supermarkets</div>
-                  <div className="text-3xl font-black text-white tracking-tight mt-0.5">{tenants.length}</div>
-                  <div className="text-xs text-emerald-400 mt-0.5 font-medium">{activeTenantsCount} Active Supermarkets</div>
-                </div>
-              </div>
+      {/* 3. Sidebar Navigation + Main Workspace */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+        <aside className="w-full lg:w-64 bg-[#0B1120]/70 border-b lg:border-b-0 lg:border-r border-slate-800/80 p-3.5 lg:p-4 flex lg:flex-col gap-1.5 overflow-x-auto lg:overflow-y-auto shrink-0">
+          <div className="hidden lg:block text-[11px] font-bold tracking-widest text-slate-500 uppercase px-3 py-1.5">
+            Control Plane
+          </div>
 
-              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
-                  <HardDrive size={28} />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-slate-400">Branch LAN Servers</div>
-                  <div className="text-3xl font-black text-white tracking-tight mt-0.5">{totalBranches}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">Offline-capable edge nodes</div>
-                </div>
-              </div>
+          <button
+            onClick={() => setCurrentTab('tenants')}
+            className={`px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-between gap-2.5 whitespace-nowrap cursor-pointer ${
+              currentTab === 'tenants'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-950/40'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <Building2 size={18} />
+              <span>Supermarkets</span>
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'tenants' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
+              {tenants.length}
+            </span>
+          </button>
 
-              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Laptop size={28} />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-slate-400">POS Terminals</div>
-                  <div className="text-3xl font-black text-white tracking-tight mt-0.5">{totalTerminals}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">Lane checkouts active</div>
-                </div>
+          <button
+            onClick={() => setCurrentTab('applications')}
+            className={`px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-between gap-2.5 whitespace-nowrap cursor-pointer ${
+              currentTab === 'applications'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-950/40'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <FileText size={18} />
+              <span>Applications</span>
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${
+              currentTab === 'applications'
+                ? 'bg-white/20 text-white'
+                : pendingApplicationsCount > 0
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-slate-800 text-slate-300'
+            }`}>
+              {pendingApplicationsCount > 0 ? pendingApplicationsCount : applications.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('sessions')}
+            className={`px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-between gap-2.5 whitespace-nowrap cursor-pointer ${
+              currentTab === 'sessions'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-950/40'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <Laptop size={18} />
+              <span>Operator Sessions</span>
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'sessions' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
+              {sessionsList.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('audit')}
+            className={`px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-between gap-2.5 whitespace-nowrap cursor-pointer ${
+              currentTab === 'audit'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-950/40'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <Clock size={18} />
+              <span>Platform Audit</span>
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'audit' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
+              {auditLogs.length}
+            </span>
+          </button>
+
+          <div className="hidden lg:block mt-auto pt-4 border-t border-slate-800/70">
+            <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800/80 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                <ShieldCheck size={15} />
+                <span>Tenant Isolation Active</span>
               </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                PostgreSQL RLS &amp; Argon2id operator sessions enforced.
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        <main className="flex-1 overflow-y-auto p-5 lg:p-8 flex flex-col gap-6">
+          {currentTab === 'tenants' && (
+            <>
+              {/* Metric KPI cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-[#0B1120]/90 border border-slate-800/80 shadow-lg shadow-black/20 flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Building2 size={28} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-400">Total Supermarkets</div>
+                    <div className="text-3xl font-black text-white tracking-tight mt-0.5">{tenants.length}</div>
+                    <div className="text-xs text-emerald-400 mt-0.5 font-medium">{activeTenantsCount} Active Supermarkets</div>
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#0B1120]/90 border border-slate-800/80 shadow-lg shadow-black/20 flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-sky-500/15 border border-sky-500/25 text-sky-400 flex items-center justify-center shrink-0">
+                    <HardDrive size={28} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-400">Branch LAN Servers</div>
+                    <div className="text-3xl font-black text-white tracking-tight mt-0.5">{totalBranches}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">Offline-capable edge nodes</div>
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#0B1120]/90 border border-slate-800/80 shadow-lg shadow-black/20 flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-violet-500/15 border border-violet-500/25 text-violet-400 flex items-center justify-center shrink-0">
+                    <Laptop size={28} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-400">POS Terminals</div>
+                    <div className="text-3xl font-black text-white tracking-tight mt-0.5">{totalTerminals}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">Lane checkouts active</div>
+                  </div>
+                </div>
 
               <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
@@ -2157,6 +2187,7 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
           </div>
         )}
       </main>
+      </div>
 
       {/* MODAL: Re-Authentication for Sensitive Actions */}
       {showReauthModal && (
