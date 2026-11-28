@@ -71,6 +71,7 @@ export const PosCheckout: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
+  const [mobilePane, setMobilePane] = useState<'catalog' | 'basket'>('catalog');
 
   // Modals state
   const [weighedProduct, setWeighedProduct] = useState<PosCatalogItem | null>(null);
@@ -629,10 +630,39 @@ export const PosCheckout: React.FC = () => {
         onStartRequestedHandled={() => setIsStartDayRequested(false)}
       />
 
+      {/* Mobile Catalog / Basket Switcher */}
+      <div className="lg:hidden px-3 py-2 bg-surface border-b border-border-subtle flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={() => setMobilePane('catalog')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            mobilePane === 'catalog'
+              ? 'bg-primary text-white shadow-soft'
+              : 'bg-surface-2 text-text-muted'
+          }`}
+        >
+          {t('common.itemsTab') || 'Products'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePane('basket')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            mobilePane === 'basket'
+              ? 'bg-primary text-white shadow-soft'
+              : 'bg-surface-2 text-text-muted'
+          }`}
+        >
+          <span>Basket ({cart.reduce((s, i) => s + (Number.isInteger(i.quantity) ? i.quantity : 1), 0)})</span>
+          {finalCartTotal > 0 && (
+            <span className="font-mono">• {formatCurrency(finalCartTotal)}</span>
+          )}
+        </button>
+      </div>
+
       {/* Main Workspace (Left Products + Right Basket) */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* 1. Left (flexible): Search field 52px, Category pills 44px, Product Grid */}
-        <div className="flex-1 flex flex-col p-6 overflow-hidden min-w-0">
+        <div className={`flex-1 flex-col p-3 sm:p-6 overflow-hidden min-w-0 ${mobilePane === 'catalog' ? 'flex' : 'hidden lg:flex'}`}>
           {/* Friendly Start your day banner if shift is not started */}
           {!isShiftOpen && !isLoadingShift && (
             <div className="mb-4 p-4 rounded-2xl bg-primary-soft/30 border border-primary/25 flex items-center justify-between shadow-soft flex-shrink-0 animate-in fade-in">
@@ -729,7 +759,7 @@ export const PosCheckout: React.FC = () => {
               />
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(175px,1fr))] gap-2.5 sm:gap-3">
               {filteredProducts.map((product) => {
                 const productName = language === 'am' && product.nameAm ? product.nameAm : product.nameEn;
                 const isOut = product.stockOnHand <= 0;
@@ -803,6 +833,7 @@ export const PosCheckout: React.FC = () => {
       </div>
 
       {/* 2. Right (380px, surface, left border): Basket Panel */}
+      <div className={`${mobilePane === 'basket' ? 'flex w-full lg:w-auto' : 'hidden lg:flex'} h-full overflow-hidden`}>
       <BasketPanel
         cart={cart}
         onUpdateQuantity={handleUpdateQuantity}
@@ -831,6 +862,7 @@ export const PosCheckout: React.FC = () => {
         onOpenRefund={() => setIsRefundModalOpen(true)}
         basketDiscount={basketDiscount}
       />
+      </div>
       </div>
 
       {/* 3. Weight Entry Modal for scale items */}

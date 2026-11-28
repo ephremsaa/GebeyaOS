@@ -137,9 +137,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   return (
-    <header className="h-14 px-5 bg-surface border-b border-border-subtle flex items-center justify-between flex-shrink-0 relative z-30 select-none">
+    <header className="h-14 px-3 sm:px-5 bg-surface border-b border-border-subtle flex items-center justify-between flex-shrink-0 relative z-30 select-none gap-2">
       {/* Left: Product Logo, Brand, Store Badge, and Branch Pill */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2 min-w-0">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-soft flex-shrink-0 font-extrabold text-sm overflow-hidden">
           {brand.logoUrl ? (
             <img src={brand.logoUrl} alt={brandName} className="w-full h-full object-cover" />
@@ -147,8 +147,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span>{initialLetter}</span>
           )}
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="font-bold text-lg tracking-tight text-text-main">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="font-bold text-base sm:text-lg tracking-tight text-text-main truncate max-w-[130px] sm:max-w-none">
             {brandName}
           </span>
           {brand.showPoweredBy && (
@@ -191,7 +191,17 @@ export const TopBar: React.FC<TopBarProps> = ({
       )}
 
       {/* Right Controls: Notifications, Language, Theme, Status & User Menu */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {onOpenCommandPalette && (
+          <button
+            type="button"
+            onClick={onOpenCommandPalette}
+            className="md:hidden w-8 h-8 rounded-full bg-surface-2 hover:bg-border-subtle border border-border-subtle flex items-center justify-center text-text-muted hover:text-text-main transition-colors cursor-pointer shadow-soft"
+            aria-label={t('common.commandPalette')}
+          >
+            <Search size={15} strokeWidth={1.75} />
+          </button>
+        )}
         {/* Notifications Icon Button */}
         {onOpenNotifications && (
           <button
@@ -268,7 +278,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
           {/* User Menu Dropdown */}
           {isMenuOpen && (
-            <div className="absolute right-0 top-12 w-[340px] sm:w-[360px] bg-surface rounded-2xl shadow-2xl border border-border-subtle p-4 flex flex-col gap-3 animate-in fade-in duration-fast z-50">
+            <div className="absolute right-0 top-12 w-[340px] sm:w-[360px] max-w-[calc(100vw-1.5rem)] bg-surface rounded-2xl shadow-2xl border border-border-subtle p-4 flex flex-col gap-3 animate-in fade-in duration-fast z-50">
               {/* Profile Card */}
               <div className="p-3.5 rounded-2xl bg-surface-2/80 border border-border-subtle flex flex-col gap-2.5">
                 <div className="flex items-center justify-between gap-3">

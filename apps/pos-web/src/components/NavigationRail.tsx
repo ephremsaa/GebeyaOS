@@ -144,8 +144,9 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   const visibleTabs = tabs.filter((tab) => tab.allowed);
 
   return (
+    <>
     <aside
-      className={`transition-all duration-200 select-none z-30 flex flex-col justify-between text-white shrink-0 shadow-xl ${
+      className={`hidden md:flex transition-all duration-200 select-none z-30 flex-col justify-between text-white shrink-0 shadow-xl ${
         isCollapsed ? 'w-[76px]' : 'w-[240px]'
       }`}
       style={{
@@ -252,6 +253,41 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
         )}
       </div>
     </aside>
+
+    {/* Mobile Bottom Navigation Bar */}
+    <nav
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 h-16 bg-surface/95 backdrop-blur-xl border-t border-border-subtle flex items-center justify-around px-1 shadow-2xl select-none"
+      aria-label="Mobile navigation"
+    >
+      {visibleTabs.map((item) => {
+        const isActive = activeTab === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onTabChange(item.id)}
+            className={`relative flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 transition-all active:scale-95 cursor-pointer ${
+              isActive
+                ? 'text-primary font-bold bg-primary-soft/60'
+                : 'text-text-muted hover:text-text-main font-medium'
+            }`}
+            aria-label={item.label}
+            aria-current={isActive ? 'page' : undefined}
+          >
+            <div className="relative flex items-center justify-center">
+              {item.icon}
+              {item.id === 'stock' && hasCriticalAlerts && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500" />
+              )}
+            </div>
+            <span className="text-[10px] leading-tight truncate max-w-full">
+              {item.label}
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+    </>
   );
 };
 
