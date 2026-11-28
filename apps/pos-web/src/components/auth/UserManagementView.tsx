@@ -195,7 +195,7 @@ export const UserManagementView: React.FC = () => {
     setNewRole('CASHIER');
     setNewBranchCode(currentUser?.branchId || branches[0]?.id || '');
     setNewInitialPass('Gebeya@2026');
-    setForcePassChange(true);
+    setForcePassChange(false);
     setIsAddModalOpen(true);
   };
 

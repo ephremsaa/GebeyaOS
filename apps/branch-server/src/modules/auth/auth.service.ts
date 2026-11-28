@@ -973,7 +973,7 @@ export class AuthService {
       branchCode: matchedUser.branch_code || 'POS-LANE',
       branchName: matchedUser.branch_name || 'Checkout Terminal',
       permissions: matchedUser.permissions || [],
-      forcePasswordChange: !!matchedUser.force_password_change,
+      forcePasswordChange: false,
     };
 
     const tokens = await this.tokenSvc.createTenantSessionTokens(
