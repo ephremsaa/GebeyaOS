@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
 import { Camera, X, Flashlight, AlertCircle, Keyboard } from 'lucide-react';
 
 interface CameraBarcodeScannerProps {
@@ -15,21 +16,25 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
   title = 'Scan Product Barcode',
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
+  const onDetectedRef = useRef(onDetected);
+  const onCloseRef = useRef(onClose);
+  onDetectedRef.current = onDetected;
+  onCloseRef.current = onClose;
+
   const [error, setError] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
   const [manualCode, setManualCode] = useState('');
-  const [detectorSupported, setDetectorSupported] = useState(true);
 
   useEffect(() => {
     if (!isOpen) return;
 
     let cancelled = false;
-    let rafTimer: number | null = null;
-    let detector: any = null;
+    let handled = false;
+    const reader = new BrowserMultiFormatReader();
 
-    const startCamera = async () => {
+    const startScanner = async () => {
       setError(null);
       setTorchOn(false);
       setHasTorch(false);
@@ -39,78 +44,51 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
         return;
       }
 
+      if (!videoRef.current) return;
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+        const controls = await reader.decodeFromConstraints(
+          {
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
           },
-          audio: false,
-        });
+          videoRef.current,
+          (result) => {
+            if (cancelled || handled || !result) return;
+            const code = result.getText()?.trim();
+            if (code) {
+              handled = true;
+              try {
+                navigator.vibrate?.([60]);
+              } catch {}
+              controlsRef.current?.stop();
+              onDetectedRef.current(code);
+              onCloseRef.current();
+            }
+          },
+        );
 
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          controls.stop();
           return;
         }
+        controlsRef.current = controls;
 
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
-        }
-
-        const track = stream.getVideoTracks()[0];
-        const caps = track?.getCapabilities?.() as any;
-        if (caps?.torch) {
-          setHasTorch(true);
-        }
-
-        const BarcodeDetectorCtor = (window as any).BarcodeDetector;
-        if (!BarcodeDetectorCtor) {
-          setDetectorSupported(false);
-          return;
-        }
-
-        setDetectorSupported(true);
-        detector = new BarcodeDetectorCtor({
-          formats: [
-            'ean_13',
-            'ean_8',
-            'upc_a',
-            'upc_e',
-            'code_128',
-            'code_39',
-            'itf',
-            'qr_code',
-          ],
-        });
-
-        const scanFrame = async () => {
-          if (cancelled) return;
-          try {
-            if (videoRef.current && videoRef.current.readyState >= 2) {
-              const barcodes = await detector.detect(videoRef.current);
-              if (barcodes && barcodes.length > 0 && barcodes[0]?.rawValue) {
-                const code = String(barcodes[0].rawValue).trim();
-                if (code) {
-                  try {
-                    navigator.vibrate?.([60]);
-                  } catch {}
-                  onDetected(code);
-                  onClose();
-                  return;
-                }
-              }
-            }
-          } catch {
-            // ignore transient frame errors
+        // Check torch capability on active stream
+        try {
+          const stream = videoRef.current?.srcObject as MediaStream | null;
+          const track = stream?.getVideoTracks()?.[0];
+          const caps = track?.getCapabilities?.() as any;
+          if (caps?.torch) {
+            setHasTorch(true);
           }
-          rafTimer = window.setTimeout(scanFrame, 160);
-        };
-
-        rafTimer = window.setTimeout(scanFrame, 250);
+        } catch {}
       } catch (err: any) {
+        if (cancelled) return;
         setError(
           err?.name === 'NotAllowedError'
             ? 'Camera permission denied. Please allow camera access in your browser settings.'
@@ -119,20 +97,24 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
       }
     };
 
-    startCamera();
+    startScanner();
 
     return () => {
       cancelled = true;
-      if (rafTimer !== null) clearTimeout(rafTimer);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
+      try {
+        controlsRef.current?.stop();
+        controlsRef.current = null;
+      } catch {}
+      try {
+        const stream = videoRef.current?.srcObject as MediaStream | null;
+        stream?.getTracks().forEach((t) => t.stop());
+      } catch {}
     };
   }, [isOpen]);
 
   const toggleTorch = async () => {
-    const track = streamRef.current?.getVideoTracks()?.[0];
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    const track = stream?.getVideoTracks()?.[0];
     if (!track) return;
     try {
       const next = !torchOn;
@@ -222,11 +204,6 @@ export const CameraBarcodeScanner: React.FC<CameraBarcodeScannerProps> = ({
           }}
           className="p-4 bg-surface border-t border-border-subtle flex flex-col gap-2.5"
         >
-          {!detectorSupported && !error && (
-            <p className="text-[11px] text-amber-400 font-medium">
-              Auto-detection is not supported in this browser; enter barcode manually below or use Chrome on Android.
-            </p>
-          )}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Keyboard size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
