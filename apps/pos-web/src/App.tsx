@@ -260,7 +260,7 @@ const MainApp: React.FC = () => {
     return <SetupWizard />;
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || currentUser?.forcePasswordChange) {
     return (
       <>
         <LoginPage onSwitchToPin={() => setShowPinModal(true)} />

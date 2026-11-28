@@ -610,10 +610,11 @@ export const UserManagementView: React.FC = () => {
   const handleAdminResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUserForModal) return;
+    setErrorMsg(null);
 
     try {
       const token = localStorage.getItem('gebeyaos_access_token');
-      await fetch(`/api/users/${selectedUserForModal.id}/reset-password`, {
+      const res = await fetch(`/api/users/${selectedUserForModal.id}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -621,8 +622,13 @@ export const UserManagementView: React.FC = () => {
         },
         body: JSON.stringify({ newPassword: resetPassValue, forcePasswordChange: true }),
       });
-    } catch {
-      // offline fallback
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to reset password');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to reset password');
+      return;
     }
 
     setUsers((prev) =>
@@ -645,10 +651,11 @@ export const UserManagementView: React.FC = () => {
   const handleAdminResetPin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUserForModal) return;
+    setErrorMsg(null);
 
     try {
       const token = localStorage.getItem('gebeyaos_access_token');
-      await fetch(`/api/users/${selectedUserForModal.id}/reset-pin`, {
+      const res = await fetch(`/api/users/${selectedUserForModal.id}/reset-pin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -656,8 +663,13 @@ export const UserManagementView: React.FC = () => {
         },
         body: JSON.stringify({ newPin: resetPinValue }),
       });
-    } catch {
-      // offline fallback
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to reset PIN');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to reset PIN');
+      return;
     }
 
     setIsResetPinModalOpen(false);

@@ -830,6 +830,7 @@ export class AuthService {
           await this.db.query(
             `UPDATE users SET pin_failed_attempts = $1, pin_locked_until = $2 WHERE id = $3`,
             [failedAttempts, lockTime, u.id],
+            u.tenant_id,
           );
           await this.auditSecurity.logAuthEvent({
             tenantId: u.tenant_id,

@@ -480,6 +480,7 @@ export class UsersService {
    */
   async adminResetPassword(adminId: string, userId: string, dto: AdminResetPasswordDto) {
     const newHash = await this.hash(dto.newPassword);
+    const tenantId = this.tenantContextService?.getTenantId() || '01900000-0000-7000-8000-000000000001';
 
     await this.db.withTransaction(async (client) => {
       await client.query(
@@ -501,16 +502,17 @@ export class UsersService {
       );
 
       await client.query(
-        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, 'ADMIN_PASSWORD_RESET', 'users', $3, $4)`,
+        `INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, 'ADMIN_PASSWORD_RESET', 'users', $4, $5)`,
         [
           generateUuidV7(),
+          tenantId,
           adminId,
           userId,
           JSON.stringify({ forcePasswordChange: dto.forcePasswordChange ?? true }),
         ],
       );
-    });
+    }, tenantId);
 
     return { success: true, message: 'Password reset successfully' };
   }
@@ -526,6 +528,7 @@ export class UsersService {
       await client.query(
         `UPDATE users
          SET pin_hash = $1,
+             pin_salt = NULL,
              pin_failed_attempts = 0,
              pin_locked_until = NULL,
              token_version = token_version + 1,
@@ -539,7 +542,7 @@ export class UsersService {
          VALUES ($1, $2, $3, 'ADMIN_PIN_RESET', 'users', $4, $5)`,
         [generateUuidV7(), tenantId, adminId, userId, JSON.stringify({ pinLength: dto.newPin.length })],
       );
-    });
+    }, tenantId);
 
     return { success: true, message: 'Cashier PIN reset successfully' };
   }

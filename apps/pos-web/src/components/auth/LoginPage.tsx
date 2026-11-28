@@ -42,6 +42,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
     forgotPassword,
     resetPassword,
     updateUserPassword,
+    currentUser,
   } = useAuth();
   const { t, language, setLanguage, isDarkMode, toggleDarkMode } = useI18n();
   const brand = useBrand();
@@ -73,7 +74,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
 
   // Force Password Change state
-  const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
+  const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(
+    Boolean(currentUser?.forcePasswordChange),
+  );
+
+  useEffect(() => {
+    if (currentUser?.forcePasswordChange) {
+      setIsForcedPasswordChange(true);
+    }
+  }, [currentUser?.forcePasswordChange]);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [forceChangeError, setForceChangeError] = useState<string | null>(null);
