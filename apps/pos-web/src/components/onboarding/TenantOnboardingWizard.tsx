@@ -15,6 +15,9 @@ import {
   Globe,
   Copy,
   Check,
+  Upload,
+  Trash2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
@@ -47,6 +50,41 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
   // Branding
   const [logoUrl, setLogoUrl] = useState('');
   const [receiptHeader, setReceiptHeader] = useState('');
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo image must be smaller than 5 MB.');
+      return;
+    }
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      if (file.type === 'image/svg+xml') {
+        setLogoUrl(result);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 256;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          setLogoUrl(canvas.toDataURL('image/png'));
+        } else {
+          setLogoUrl(result);
+        }
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+  };
   const [receiptFooter, setReceiptFooter] = useState('Thank you for shopping with us! / እናመሰግናለን!');
 
   // First Branch
@@ -313,14 +351,65 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
         {step === 2 && (
           <div className="space-y-4 text-xs">
             <div>
-              <label className="block font-semibold text-slate-300 mb-1">Supermarket Logo URL</label>
-              <input
-                type="url"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://example.com/logo.png (optional)"
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-hidden focus:border-emerald-500"
-              />
+              <label className="block font-semibold text-slate-300 mb-1.5">
+                Supermarket Logo <span className="text-slate-500 font-normal">(optional)</span>
+              </label>
+
+              {logoUrl ? (
+                <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={logoUrl}
+                      alt="Supermarket logo"
+                      className="w-12 h-12 rounded-xl object-contain bg-white p-1 border border-slate-600"
+                    />
+                    <div>
+                      <div className="font-bold text-emerald-400 text-xs">Logo Uploaded</div>
+                      <div className="text-[11px] text-slate-400">Ready for POS &amp; receipt header</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-semibold cursor-pointer transition">
+                      Change
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        className="hidden"
+                        onChange={handleLogoFileChange}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setLogoUrl('')}
+                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 cursor-pointer transition"
+                      title="Remove logo"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-3 p-4 rounded-xl bg-slate-800/60 hover:bg-slate-800 border-2 border-dashed border-slate-700 hover:border-emerald-500/60 cursor-pointer transition">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Upload size={18} />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <ImageIcon size={13} className="text-emerald-400" />
+                      <span>Click to upload supermarket logo</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      PNG, JPG, WebP, or SVG (auto-resized for receipts)
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={handleLogoFileChange}
+                  />
+                </label>
+              )}
             </div>
 
             <div>
@@ -350,6 +439,13 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
               <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">
                 80mm Thermal Receipt Simulation
               </div>
+              {logoUrl && (
+                <img
+                  src={logoUrl}
+                  alt="Receipt logo preview"
+                  className="h-10 mx-auto object-contain mb-1 rounded bg-white/95 p-0.5"
+                />
+              )}
               <div className="font-bold text-slate-200">{receiptHeader || companyName}</div>
               <div>TIN: {tinNumber} • VAT: 15%</div>
               <div className="border-t border-dashed border-slate-800 my-1 pt-1">==============================</div>
