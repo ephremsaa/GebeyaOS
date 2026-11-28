@@ -74,6 +74,7 @@ export const PosCheckout: React.FC = () => {
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<'catalog' | 'basket'>('catalog');
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState<boolean>(false);
+  const [scanNotice, setScanNotice] = useState<{ type: 'success' | 'warn'; text: string } | null>(null);
 
   // Modals state
   const [weighedProduct, setWeighedProduct] = useState<PosCatalogItem | null>(null);
@@ -261,8 +262,8 @@ export const PosCheckout: React.FC = () => {
     }
   };
 
-  const handleBarcodeSubmit = (overrideCode?: string) => {
-    const code = (overrideCode ?? searchQuery).trim();
+  const handleBarcodeSubmit = () => {
+    const code = searchQuery.trim();
     if (!code) return;
 
     if (!isShiftOpen) {
@@ -309,12 +310,14 @@ export const PosCheckout: React.FC = () => {
       }
     }
 
-    // Standard barcode or SKU match
+    // Standard barcode or SKU match (also handle UPC-A/EAN-13 leading-zero variance)
+    const strippedCode = code.replace(/^0+/, '');
     const found = catalog.find(
       (p) =>
-        p.barcode === code ||
-        p.sku.toLowerCase() === code.toLowerCase() ||
-        p.nameEn.toLowerCase() === code.toLowerCase(),
+        p.barcode?.trim() === code ||
+        (strippedCode && p.barcode?.trim().replace(/^0+/, '') === strippedCode) ||
+        p.sku?.toLowerCase() === code.toLowerCase() ||
+        p.nameEn?.toLowerCase() === code.toLowerCase(),
     );
 
     if (found) {
@@ -329,7 +332,13 @@ export const PosCheckout: React.FC = () => {
         addToCart(found, 1);
       }
       setSearchQuery('');
+      setScanNotice({ type: 'success', text: `Added "${found.nameEn}" (${code})` });
+      setTimeout(() => setScanNotice(null), 3000);
       searchInputRef.current?.focus();
+    } else {
+      setSearchQuery(code);
+      setScanNotice({ type: 'warn', text: `No product matched barcode "${code}"` });
+      setTimeout(() => setScanNotice(null), 4000);
     }
   };
 
@@ -687,6 +696,27 @@ export const PosCheckout: React.FC = () => {
             </div>
           )}
 
+          {scanNotice && (
+            <div
+              className={`mb-2.5 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shrink-0 animate-in fade-in ${
+                scanNotice.type === 'success'
+                  ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-amber-500/15 border border-amber-500/30 text-amber-300'
+              }`}
+            >
+              <span>{scanNotice.text}</span>
+              {scanNotice.type === 'success' && (
+                <button
+                  type="button"
+                  onClick={() => setMobilePane('basket')}
+                  className="lg:hidden underline font-extrabold cursor-pointer"
+                >
+                  View Basket
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Search Field (52px high, search icon, F2 hint, clear button) */}
           <div className="mb-3.5 flex-shrink-0 flex items-center gap-3">
             <div className="flex-1">
@@ -694,12 +724,23 @@ export const PosCheckout: React.FC = () => {
                 ref={searchInputRef}
                 value={searchQuery}
                 onValueChange={setSearchQuery}
-                onSearchSubmit={() => handleBarcodeSubmit()}
+                onSearchSubmit={handleBarcodeSubmit}
                 placeholder={t('scanOrSearchPlaceholder')}
                 shortcut="F2"
                 size="lg"
               />
             </div>
+            <button
+              type="button"
+              onClick={refreshCatalog}
+              disabled={isLoadingCatalog}
+              className="h-[52px] px-3.5 rounded-xl border border-border-subtle bg-surface hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors flex items-center justify-center cursor-pointer shadow-soft"
+              title="Refresh Catalog"
+              aria-label="Refresh"
+            >
+              <RefreshCw size={18} className={isLoadingCatalog ? 'animate-spin text-primary' : ''} />
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setIsCameraScannerOpen(true)}
@@ -722,225 +763,236 @@ export const PosCheckout: React.FC = () => {
           </button>
         </div>
 
-          {/* Category Pills (44px, horizontally scrollable) */}
-          {distinctCategories.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3.5 flex-shrink-0 no-scrollbar select-none">
+        {/* Category Pills (44px, horizontally scrollable) */}
+        {distinctCategories.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3.5 flex-shrink-0 no-scrollbar select-none">
+            <Pill
+              active={selectedCategory === 'ALL'}
+              onClick={() => setSelectedCategory('ALL')}
+            >
+              {language === 'am' ? 'ሁሉ' : 'All'}
+            </Pill>
+            <Pill
+              active={selectedCategory === 'FAVORITES'}
+              onClick={() => setSelectedCategory('FAVORITES')}
+            >
+              {language === 'am' ? '⭐ ተወዳጆች' : '⭐ Favorites'}
+            </Pill>
+            {distinctCategories.map((cat) => (
               <Pill
-                active={selectedCategory === 'ALL'}
-                onClick={() => setSelectedCategory('ALL')}
+                key={cat}
+                active={selectedCategory === cat}
+                onClick={() => setSelectedCategory(cat)}
               >
-                {language === 'am' ? 'ሁሉ' : 'All'}
+                {cat}
               </Pill>
-              <Pill
-                active={selectedCategory === 'FAVORITES'}
-                onClick={() => setSelectedCategory('FAVORITES')}
-              >
-                {language === 'am' ? '⭐ ተወዳጆች' : '⭐ Favorites'}
-              </Pill>
-              {distinctCategories.map((cat) => (
-                <Pill
-                  key={cat}
-                  active={selectedCategory === cat}
-                  onClick={() => setSelectedCategory(cat)}
-                >
-                  {cat}
-                </Pill>
-              ))}
+            ))}
+          </div>
+        )}
+
+        {/* Product Grid: auto-fill minmax(180px, 1fr), gap 12px (gap-3) */}
+        <div className="flex-1 overflow-y-auto pr-1">
+          {isLoadingCatalog && catalog.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-text-muted">
+              <RefreshCw size={28} className="animate-spin text-primary mr-2" />
+              <span>{t('checkout.loadingCatalog')}</span>
             </div>
-          )}
+          ) : filteredProducts.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <EmptyState
+                icon={<PackageX size={36} className="text-text-muted" />}
+                title={language === 'am' ? 'ምንም ምርቶች አልተገኙም' : 'No products found'}
+                subtitle={
+                  searchQuery
+                    ? (language === 'am' ? 'ለፍለጋዎ የሚዛመድ ምርት የለም።' : `No product matches "${searchQuery}".`)
+                    : (language === 'am' ? 'በዚህ ቅርንጫፍ እስካሁን የተመዘገበ ምርት የለም። እባክዎ ካታሎግ ውስጥ ምርት ያስገቡ።' : 'No products exist in this branch catalog yet. Add products to get started.')
+                }
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(175px,1fr))] gap-2.5 sm:gap-3">
+              {filteredProducts.map((product) => {
+                const productName = language === 'am' && product.nameAm ? product.nameAm : product.nameEn;
+                const isOut = product.stockOnHand <= 0;
+                const isLow = product.stockOnHand > 0 && product.stockOnHand <= product.minStockLevel;
+                const isRecentlyAdded = recentlyAddedId === product.id;
+                const price = product.effectivePrice ?? product.basePrice;
 
-          {/* Product Grid: auto-fill minmax(180px, 1fr), gap 12px (gap-3) */}
-          <div className="flex-1 overflow-y-auto pr-1">
-            {isLoadingCatalog && catalog.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-text-muted">
-                <RefreshCw size={28} className="animate-spin text-primary mr-2" />
-                <span>{t('checkout.loadingCatalog')}</span>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="h-full flex items-center justify-center">
-                <EmptyState
-                  icon={<PackageX size={36} className="text-text-muted" />}
-                  title={language === 'am' ? 'ምንም ምርቶች አልተገኙም' : 'No products found'}
-                  subtitle={
-                    searchQuery
-                      ? (language === 'am' ? 'ለፍለጋዎ የሚዛመድ ምርት የለም።' : `No product matches "${searchQuery}".`)
-                      : (language === 'am' ? 'በዚህ ቅርንጫፍ እስካሁን የተመዘገበ ምርት የለም። እባክዎ ካታሎግ ውስጥ ምርት ያስገቡ።' : 'No products exist in this branch catalog yet. Add products to get started.')
-                  }
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(175px,1fr))] gap-2.5 sm:gap-3">
-                {filteredProducts.map((product) => {
-                  const productName = language === 'am' && product.nameAm ? product.nameAm : product.nameEn;
-                  const isOut = product.stockOnHand <= 0;
-                  const isLow = product.stockOnHand > 0 && product.stockOnHand <= product.minStockLevel;
-                  const isRecentlyAdded = recentlyAddedId === product.id;
-                  const price = product.effectivePrice ?? product.basePrice;
-
-                  return (
-                    <div
-                      key={product.id}
-                      data-testid="product-card"
-                      data-product-out={isOut}
-                      onClick={() => !isOut && handleProductCardClick(product)}
-                      className={`bg-surface border border-border-subtle rounded-xl min-h-[108px] p-3.5 flex flex-col justify-between transition-all duration-fast shadow-soft select-none ${isOut
-                        ? 'opacity-40 cursor-not-allowed bg-surface-2/60 pointer-events-none'
-                        : isRecentlyAdded
-                          ? 'border-primary ring-2 ring-primary/25 bg-primary-soft/30 scale-[0.98]'
-                          : 'cursor-pointer hover:border-border-strong hover:shadow-md active:scale-[0.98]'
-                        }`}
-                    >
-                      {/* Top Details */}
-                      <div>
-                        <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                          <h3 className="font-semibold text-[14px] text-text-main line-clamp-2 leading-snug">
-                            {productName}
-                          </h3>
-                          {product.isWeighed && (
-                            <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-warning-soft text-warning text-[11px] font-semibold flex items-center gap-1 select-none">
-                              <Scale size={11} strokeWidth={1.75} />
-                              {t('weighedBadge')}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Stock Badge */}
-                        {isOut ? (
-                          <span className="text-[12px] font-medium text-danger">
-                            {t('outOfStock')}
-                          </span>
-                        ) : isLow ? (
-                          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-warning">
-                            <AlertTriangle size={12} strokeWidth={1.75} />
-                            {t('lowStock')} ({product.stockOnHand})
-                          </span>
-                        ) : null}
-                      </div>
-
-                      {/* Bottom Price */}
-                      <div className="pt-2 flex items-baseline justify-between mt-auto">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-[20px] font-semibold text-text-main tabular-nums font-mono leading-none">
-                            {formatCurrency(price)}
-                          </span>
-                          {product.isPriceOverridden && (
-                            <span className="text-[10px] font-semibold text-primary px-1 py-0.2 bg-primary-soft rounded">
-                              Branch
-                            </span>
-                          )}
-                        </div>
+                return (
+                  <div
+                    key={product.id}
+                    data-testid="product-card"
+                    data-product-out={isOut}
+                    onClick={() => !isOut && handleProductCardClick(product)}
+                    className={`bg-surface border border-border-subtle rounded-xl min-h-[108px] p-3.5 flex flex-col justify-between transition-all duration-fast shadow-soft select-none ${isOut
+                      ? 'opacity-40 cursor-not-allowed bg-surface-2/60 pointer-events-none'
+                      : isRecentlyAdded
+                        ? 'border-primary ring-2 ring-primary/25 bg-primary-soft/30 scale-[0.98]'
+                        : 'cursor-pointer hover:border-border-strong hover:shadow-md active:scale-[0.98]'
+                      }`}
+                  >
+                    {/* Top Details */}
+                    <div>
+                      <div className="flex items-start justify-between gap-1.5 mb-1.5">
+                        <h3 className="font-semibold text-[14px] text-text-main line-clamp-2 leading-snug">
+                          {productName}
+                        </h3>
                         {product.isWeighed && (
-                          <span className="text-xs text-text-muted font-normal">/{t('weighedUnitKg')}</span>
+                          <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-warning-soft text-warning text-[11px] font-semibold flex items-center gap-1 select-none">
+                            <Scale size={11} strokeWidth={1.75} />
+                            {t('weighedBadge')}
+                          </span>
                         )}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* 2. Right (380px, surface, left border): Basket Panel */}
-        <div className={`${mobilePane === 'basket' ? 'flex w-full lg:w-auto' : 'hidden lg:flex'} h-full overflow-hidden`}>
-          <BasketPanel
-            cart={cart}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveItem}
-            onClearBasket={handleClearBasket}
-            onHoldBasket={handleHoldBasket}
-            onResumeBasket={() => {
-              if (heldBaskets.length === 1) {
-                handleResumeBasket(heldBaskets[0]);
-              } else {
-                setIsHeldDrawerOpen(true);
-              }
-            }}
-            hasHeldBasket={heldBaskets.length > 0}
-            heldBasketsCount={heldBaskets.length}
-            onOpenHeldBaskets={() => setIsHeldDrawerOpen(true)}
-            onOpenPayment={() => {
-              if (!isShiftOpen) {
-                setIsStartDayRequested(true);
-                return;
-              }
-              setIsPaymentOpen(true);
-            }}
-            onOpenLineDiscount={handleOpenLineDiscount}
-            onOpenBasketDiscount={handleOpenBasketDiscount}
-            onOpenRefund={() => setIsRefundModalOpen(true)}
-            basketDiscount={basketDiscount}
-          />
+                      {/* Stock Badge */}
+                      {isOut ? (
+                        <span className="text-[12px] font-medium text-danger">
+                          {t('outOfStock')}
+                        </span>
+                      ) : isLow ? (
+                        <span className="inline-flex items-center gap-1 text-[12px] font-medium text-warning">
+                          <AlertTriangle size={12} strokeWidth={1.75} />
+                          {t('lowStock')} ({product.stockOnHand})
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Bottom Price */}
+                    <div className="pt-2 flex items-baseline justify-between mt-auto">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-[20px] font-semibold text-text-main tabular-nums font-mono leading-none">
+                          {formatCurrency(price)}
+                        </span>
+                        {product.isPriceOverridden && (
+                          <span className="text-[10px] font-semibold text-primary px-1 py-0.2 bg-primary-soft rounded">
+                            Branch
+                          </span>
+                        )}
+                      </div>
+                      {product.isWeighed && (
+                        <span className="text-xs text-text-muted font-normal">/{t('weighedUnitKg')}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 3. Weight Entry Modal for scale items */}
-      <WeightModal
-        isOpen={!!weighedProduct}
-        onClose={() => setWeighedProduct(null)}
-        product={weighedProduct as any}
-        onConfirm={(prod, weightKg) => {
-          addToCart(prod as any, weightKg, weightKg * 1000);
-          setWeighedProduct(null);
-        }}
-      />
-
-      {/* 4. Payment Modal with Multi-Tender & Split Options */}
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-        totalAmount={finalCartTotal}
-        onCompleteSale={handleCompleteSale}
-        onPrintReceipt={() => {
-          // Open thermal receipt modal
-        }}
-        onNewSale={handleNewSale}
-        completedReceiptNo={completedReceiptNo}
-        isSubmitting={isSubmittingPayment}
-      />
-
-      {/* 5. 80mm ESC/POS Thermal Receipt Modal with Audited Reprint */}
-      {completedReceiptText && (
-        <ReceiptModal
-          receiptText={completedReceiptText}
-          receiptNumber={completedReceiptNo || ''}
-          saleId={completedSaleId || undefined}
-          onClose={() => {
-            setCompletedReceiptText(null);
-            handleNewSale();
+      {/* 2. Right (380px, surface, left border): Basket Panel */}
+      <div className={`${mobilePane === 'basket' ? 'flex w-full lg:w-auto' : 'hidden lg:flex'} h-full overflow-hidden`}>
+        <BasketPanel
+          cart={cart}
+          onUpdateQuantity={handleUpdateQuantity}
+          onRemoveItem={handleRemoveItem}
+          onClearBasket={handleClearBasket}
+          onHoldBasket={handleHoldBasket}
+          onResumeBasket={() => {
+            if (heldBaskets.length === 1) {
+              handleResumeBasket(heldBaskets[0]);
+            } else {
+              setIsHeldDrawerOpen(true);
+            }
           }}
-          onReprint={handleReprintReceipt}
+          hasHeldBasket={heldBaskets.length > 0}
+          heldBasketsCount={heldBaskets.length}
+          onOpenHeldBaskets={() => setIsHeldDrawerOpen(true)}
+          onOpenPayment={() => {
+            if (!isShiftOpen) {
+              setIsStartDayRequested(true);
+              return;
+            }
+            setIsPaymentOpen(true);
+          }}
+          onOpenLineDiscount={handleOpenLineDiscount}
+          onOpenBasketDiscount={handleOpenBasketDiscount}
+          onOpenRefund={() => setIsRefundModalOpen(true)}
+          basketDiscount={basketDiscount}
         />
-      )}
+      </div>
+    </div>
 
-      {/* 7. Line & Basket Discount Modal */}
-      <DiscountModal
-        isOpen={discountModalState.isOpen}
-        onClose={() => setDiscountModalState((prev) => ({ ...prev, isOpen: false }))}
-        title={discountModalState.title}
-        grossAmount={discountModalState.grossAmount}
-        userRole={userRole}
-        branchId={branchId}
-        onApplyDiscount={handleApplyDiscount}
-      />
+      {/* 3. Weight Entry Modal for scale items */ }
+  <WeightModal
+    isOpen={!!weighedProduct}
+    onClose={() => setWeighedProduct(null)}
+    product={weighedProduct as any}
+    onConfirm={(prod, weightKg) => {
+      addToCart(prod as any, weightKg, weightKg * 1000);
+      setWeighedProduct(null);
+    }}
+  />
 
-      {/* 8. Persistent Held Baskets Drawer */}
-      <HeldBasketsDrawer
-        isOpen={isHeldDrawerOpen}
-        onClose={() => setIsHeldDrawerOpen(false)}
-        baskets={heldBaskets}
-        onResume={handleResumeBasket}
-        onDelete={handleDeleteHeldBasket}
-      />
+  {/* 4. Payment Modal with Multi-Tender & Split Options */ }
+  <PaymentModal
+    isOpen={isPaymentOpen}
+    onClose={() => setIsPaymentOpen(false)}
+    totalAmount={finalCartTotal}
+    onCompleteSale={handleCompleteSale}
+    onPrintReceipt={() => {
+      // Open thermal receipt modal
+    }}
+    onNewSale={handleNewSale}
+    completedReceiptNo={completedReceiptNo}
+    isSubmitting={isSubmittingPayment}
+  />
 
-      {/* 9. Refund Modal with Supervisor PIN */}
-      <RefundModal
-        isOpen={isRefundModalOpen}
-        onClose={() => setIsRefundModalOpen(false)}
-        branchId={branchId}
-        cashierId={cashierId}
-        currentShiftId={currentShift?.id || '018e0000-0000-7000-8000-000000000050'}
+  {/* 5. 80mm ESC/POS Thermal Receipt Modal with Audited Reprint */ }
+  {
+    completedReceiptText && (
+      <ReceiptModal
+        receiptText={completedReceiptText}
+        receiptNumber={completedReceiptNo || ''}
+        saleId={completedSaleId || undefined}
+        onClose={() => {
+          setCompletedReceiptText(null);
+          handleNewSale();
+        }}
+        onReprint={handleReprintReceipt}
       />
+    )
+  }
+
+  {/* 7. Line & Basket Discount Modal */ }
+  <DiscountModal
+    isOpen={discountModalState.isOpen}
+    onClose={() => setDiscountModalState((prev) => ({ ...prev, isOpen: false }))}
+    title={discountModalState.title}
+    grossAmount={discountModalState.grossAmount}
+    userRole={userRole}
+    branchId={branchId}
+    onApplyDiscount={handleApplyDiscount}
+  />
+
+  {/* 8. Persistent Held Baskets Drawer */ }
+  <HeldBasketsDrawer
+    isOpen={isHeldDrawerOpen}
+    onClose={() => setIsHeldDrawerOpen(false)}
+    baskets={heldBaskets}
+    onResume={handleResumeBasket}
+    onDelete={handleDeleteHeldBasket}
+  />
+
+  {/* 9. Refund Modal with Supervisor PIN */ }
+  <RefundModal
+    isOpen={isRefundModalOpen}
+    onClose={() => setIsRefundModalOpen(false)}
+    branchId={branchId}
+    cashierId={cashierId}
+    currentShiftId={currentShift?.id || '018e0000-0000-7000-8000-000000000050'}
+  />
+
+  {/* 10. Expired Item Scanner Block Modal with Manager Override */ }
+  <ExpiredItemBlockModal
+    isOpen={!!blockedExpiredProduct}
+    product={blockedExpiredProduct}
+    branchId={branchId}
+    onClose={() => setBlockedExpiredProduct(null)}
+    onAuthorizeOverride={handleAuthorizeExpiredOverride}
+  />
 
       {/* 10. Expired Item Scanner Block Modal with Manager Override */}
       <ExpiredItemBlockModal
@@ -958,6 +1010,22 @@ export const PosCheckout: React.FC = () => {
         onDetected={(code) => handleBarcodeSubmit(code)}
         title="Scan Item to Basket"
       />
+
+      {/* Mobile Floating View Basket Pill when items are in cart */}
+      {mobilePane === 'catalog' && cart.length > 0 && (
+        <div className="lg:hidden fixed bottom-20 inset-x-4 z-20 pointer-events-none flex justify-center">
+          <button
+            type="button"
+            onClick={() => setMobilePane('basket')}
+            className="pointer-events-auto w-full max-w-sm py-3 px-4 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold text-sm shadow-2xl flex items-center justify-between cursor-pointer active:scale-98 transition-all"
+          >
+            <span>
+              View Basket ({cart.reduce((s, i) => s + (Number.isInteger(i.quantity) ? i.quantity : 1), 0)})
+            </span>
+            <span className="font-mono">{formatCurrency(finalCartTotal)} →</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
