@@ -579,6 +579,18 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
               </div>
             </div>
 
+            <div>
+              <label className="block font-semibold text-slate-300 mb-1">Owner Phone Number</label>
+              <input
+                type="tel"
+                value={ownerPhone}
+                onChange={(e) => setOwnerPhone(e.target.value)}
+                required
+                placeholder="e.g., +251 91 123 4567"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono focus:outline-hidden focus:border-emerald-500"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-slate-300 mb-1">Master Password (min 8 chars)</label>
