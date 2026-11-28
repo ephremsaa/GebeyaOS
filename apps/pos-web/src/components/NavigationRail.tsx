@@ -11,6 +11,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { useAuth } from '../auth/AuthContext';
@@ -63,6 +65,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('gebeyaos_sidebar_collapsed') === 'true';
   });
+  const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
 
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {
@@ -254,21 +257,24 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
       </div>
     </aside>
 
-    {/* Mobile Bottom Navigation Bar */}
+    {/* Mobile Bottom Navigation Bar (Top 4 Tabs + More Sheet) */}
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 h-16 bg-surface/95 backdrop-blur-xl border-t border-border-subtle flex items-center justify-around px-1 shadow-2xl select-none"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 h-16 bg-surface/95 backdrop-blur-xl border-t border-border-subtle flex items-center justify-around px-2 shadow-2xl select-none"
       aria-label="Mobile navigation"
     >
-      {visibleTabs.map((item) => {
+      {visibleTabs.slice(0, 4).map((item) => {
         const isActive = activeTab === item.id;
         return (
           <button
             key={item.id}
             type="button"
-            onClick={() => onTabChange(item.id)}
-            className={`relative flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 transition-all active:scale-95 cursor-pointer ${
+            onClick={() => {
+              setIsMobileMoreOpen(false);
+              onTabChange(item.id);
+            }}
+            className={`relative flex flex-col items-center justify-center gap-1 px-2 py-1.5 rounded-2xl min-w-0 flex-1 transition-all active:scale-95 cursor-pointer ${
               isActive
-                ? 'text-primary font-bold bg-primary-soft/60'
+                ? 'text-primary font-bold bg-primary-soft/70'
                 : 'text-text-muted hover:text-text-main font-medium'
             }`}
             aria-label={item.label}
@@ -280,13 +286,73 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                 <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500" />
               )}
             </div>
-            <span className="text-[10px] leading-tight truncate max-w-full">
+            <span className="text-[11px] leading-tight truncate max-w-full">
               {item.label}
             </span>
           </button>
         );
       })}
+
+      {visibleTabs.length > 4 && (
+        <button
+          type="button"
+          onClick={() => setIsMobileMoreOpen((prev) => !prev)}
+          className={`relative flex flex-col items-center justify-center gap-1 px-2 py-1.5 rounded-2xl min-w-0 flex-1 transition-all active:scale-95 cursor-pointer ${
+            isMobileMoreOpen || visibleTabs.slice(4).some((t) => t.id === activeTab)
+              ? 'text-primary font-bold bg-primary-soft/70'
+              : 'text-text-muted hover:text-text-main font-medium'
+          }`}
+          aria-label="More navigation"
+        >
+          {isMobileMoreOpen ? <X size={21} strokeWidth={2} /> : <Menu size={21} strokeWidth={2} />}
+          <span className="text-[11px] leading-tight">More</span>
+        </button>
+      )}
     </nav>
+
+    {/* Mobile "More" Drawer Sheet */}
+    {isMobileMoreOpen && (
+      <div
+        className="md:hidden fixed inset-0 z-30 bg-black/60 backdrop-blur-xs flex items-end pb-16"
+        onClick={(e) => e.target === e.currentTarget && setIsMobileMoreOpen(false)}
+      >
+        <div className="w-full bg-surface border-t border-border-subtle rounded-t-3xl p-5 shadow-2xl space-y-3 animate-in slide-in-from-bottom duration-150">
+          <div className="flex items-center justify-between pb-2 border-b border-border-subtle">
+            <span className="text-sm font-extrabold text-text-main">All Sections</span>
+            <button
+              type="button"
+              onClick={() => setIsMobileMoreOpen(false)}
+              className="p-1.5 rounded-xl bg-surface-2 text-text-muted cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            {visibleTabs.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    onTabChange(item.id);
+                    setIsMobileMoreOpen(false);
+                  }}
+                  className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-primary-soft border-primary/30 text-primary font-bold'
+                      : 'bg-surface-2 border-border-subtle text-text-main font-semibold'
+                  }`}
+                >
+                  <span className="shrink-0">{item.icon}</span>
+                  <span className="text-xs truncate">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 };

@@ -20,6 +20,7 @@ import {
   History,
   Palette,
   Trash2,
+  Camera,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/I18nContext';
 import { useAuth } from '../../auth/AuthContext';
@@ -28,6 +29,7 @@ import { generateInternalEan13, generateInternalCode128 } from '../../utils/code
 import { calculateItemVatBreakdown } from '@gebeyaos/shared-types';
 import { PriceHistoryModal } from './PriceHistoryModal';
 import { ExpiryDatePicker } from '../ui/ExpiryDatePicker';
+import { CameraBarcodeScanner } from '../ui/CameraBarcodeScanner';
 import { ProductPhotoUpload } from './ProductPhotoUpload';
 
 export interface ProductDrawerData {
@@ -150,6 +152,7 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
 
   // Inline Barcode Duplicate Check
   const [barcodeChecking, setBarcodeChecking] = useState<boolean>(false);
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState<boolean>(false);
   const [duplicateWarning, setDuplicateWarning] = useState<{
     exists: boolean;
     productName?: string;
@@ -739,14 +742,24 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
                   <span>{isAm ? 'ባርኮድ (ስካን ወይም ፃፍ)' : 'Barcode (Scan or Type)'}</span>
                 </label>
 
-                <button
-                  type="button"
-                  onClick={handleGenerateBarcode}
-                  className="px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-bold flex items-center gap-1.5 transition-colors"
-                >
-                  <Sparkles size={12} />
-                  {isAm ? 'ኮድ አዘጋጅልኝ' : 'Make a code for me'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCameraScannerOpen(true)}
+                    className="px-3 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Camera size={13} />
+                    {isAm ? 'በካሜራ ስካን' : 'Scan Camera'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerateBarcode}
+                    className="px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Sparkles size={12} />
+                    {isAm ? 'ኮድ አዘጋጅልኝ' : 'Make a code for me'}
+                  </button>
+                </div>
               </div>
 
               <div className="relative">
@@ -1151,6 +1164,14 @@ export const ProductDrawer: React.FC<ProductDrawerProps> = ({
           onPriceUpdated={() => { }}
         />
       )}
+
+      {/* Phone Camera Barcode Scanner */}
+      <CameraBarcodeScanner
+        isOpen={isCameraScannerOpen}
+        onClose={() => setIsCameraScannerOpen(false)}
+        onDetected={(code) => setBarcode(code)}
+        title={isAm ? 'ባርኮድ በካሜራ ስካን' : 'Scan Product Barcode'}
+      />
     </div>
   );
 };

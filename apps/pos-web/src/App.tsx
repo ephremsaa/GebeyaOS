@@ -291,7 +291,7 @@ const MainApp: React.FC = () => {
           hasCriticalAlerts={criticalCount > 0}
         />
 
-        <main className="flex-1 flex overflow-hidden bg-page pb-16 md:pb-0">
+        <main className="flex-1 flex overflow-y-auto md:overflow-hidden bg-page pb-20 md:pb-0">
           {/* HOME — Dashboard (Owner & Manager) */}
           {activeTab === 'dashboard' && <DashboardView onNavigate={setActiveTab} />}
 
