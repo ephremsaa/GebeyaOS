@@ -459,13 +459,22 @@ export class ExcelImportService {
     }
 
     const effectiveTenantId = tenantId || this.tenantContext?.getTenantId() || DEFAULT_TENANT_ID;
-    const effectiveBranchId = branchId || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    let effectiveBranchId = branchId;
+    if (!effectiveBranchId || effectiveBranchId.toUpperCase() === 'ALL') {
+      const branchRes = await this.db.query<{ id: string }>(
+        `SELECT id FROM branches WHERE tenant_id = $1 AND is_active = TRUE ORDER BY created_at ASC LIMIT 1`,
+        [effectiveTenantId],
+        effectiveTenantId,
+      );
+      effectiveBranchId = branchRes.rows[0]?.id || '01a19309-1d43-7444-b260-5b2ffac3e40c';
+    }
 
     // Idempotency check: if duplicate hash and not confirmed, throw Conflict
     if (!req.confirmDuplicate) {
       const dup = await this.db.query(
         `SELECT id FROM import_batches WHERE branch_id = $1 AND file_hash = $2 AND status = 'COMPLETED' LIMIT 1`,
         [effectiveBranchId, req.fileHash],
+        effectiveTenantId,
       );
       if (dup?.rows?.length > 0) {
         throw new ConflictException(
@@ -753,7 +762,7 @@ export class ExcelImportService {
         failedCount,
         totalQuantityAdded: totalQtyAdded,
       };
-    });
+    }, effectiveTenantId);
   }
 
   /**

@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import {
   Product,
@@ -15,6 +16,7 @@ import {
   generateUuidV7,
 } from '@gebeyaos/shared-types';
 import { DatabaseService } from '../../common/database/database.service';
+import { TenantContextService } from '../../common/tenant/tenant-context.service';
 import {
   CreateProductDto,
   CreateBarcodeDto,
@@ -48,13 +50,21 @@ export interface ScannedProductLookupResult {
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    @Optional() private readonly tenantContext?: TenantContextService,
+  ) {}
+
+  private getTenantId(): string {
+    return this.tenantContext?.getTenantId() || '01900000-0000-7000-8000-000000000001';
+  }
 
   /**
    * Creates a new product in the central catalog.
    */
   async createProduct(dto: CreateProductDto): Promise<Product> {
     const id = generateUuidV7();
+    const tenantId = this.getTenantId();
     const costPrice = dto.cost_price ?? 0;
     const isVat = dto.is_vat_applicable ?? true;
     const vatRate = dto.vat_rate ?? 0.15;
@@ -77,8 +87,8 @@ export class ProductsService {
           id, sku, name_en, name_am, category_id, uom_code,
           base_price, cost_price, is_vat_applicable, vat_rate,
           is_weighed, scale_plu, min_stock_level, max_stock_level,
-          allow_discount, has_expiry_date, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, TRUE)
+          allow_discount, has_expiry_date, is_active, tenant_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, TRUE, $17)
         RETURNING *`,
         [
           id,
@@ -97,6 +107,7 @@ export class ProductsService {
           dto.max_stock_level || null,
           allowDiscount,
           hasExpiryDate,
+          tenantId,
         ],
       );
 
@@ -141,10 +152,10 @@ export class ProductsService {
     try {
       const result = await this.db.query<ProductBarcode>(
         `INSERT INTO product_barcodes (
-          id, product_id, barcode, barcode_type, pack_multiplier, is_primary
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          id, product_id, barcode, barcode_type, pack_multiplier, is_primary, tenant_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
-        [id, productId, dto.barcode, barcodeType, packMultiplier, isPrimary],
+        [id, productId, dto.barcode, barcodeType, packMultiplier, isPrimary, this.getTenantId()],
       );
 
       return result.rows[0];
@@ -640,14 +651,23 @@ export class ProductsService {
    */
   async createCategory(dto: CreateCategoryDto): Promise<any> {
     const id = generateUuidV7();
-    const res = await this.db.query(
-      `INSERT INTO categories (id, code, name_en, name_am, parent_id, is_active)
-       VALUES ($1, $2, $3, $4, $5, TRUE)
-       RETURNING *`,
-      [id, dto.code, dto.name_en, dto.name_am || null, dto.parent_id || null],
-    );
+    const tenantId = this.getTenantId();
+    const code = dto.code.trim().toUpperCase();
+    try {
+      const res = await this.db.query(
+        `INSERT INTO categories (id, code, name_en, name_am, parent_id, is_active, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, TRUE, $6)
+         RETURNING *`,
+        [id, code, dto.name_en.trim(), dto.name_am?.trim() || null, dto.parent_id || null, tenantId],
+      );
 
-    return res.rows[0];
+      return res.rows[0];
+    } catch (err: any) {
+      if (err.code === '23505') {
+        throw new ConflictException(`Category with code '${code}' already exists.`);
+      }
+      throw err;
+    }
   }
 
   /**

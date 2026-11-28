@@ -45,6 +45,26 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     });
 
     await this.ensureMigrationsApplied();
+    await this.ensureReferenceSeeds();
+  }
+
+  private async ensureReferenceSeeds() {
+    try {
+      await this.pool.query(
+        `INSERT INTO units_of_measure (code, name_en, name_am, allow_fractions) VALUES
+          ('PCS', 'Pieces', 'ፍሬ', FALSE),
+          ('KG', 'Kilograms', 'ኪሎ ግራም', TRUE),
+          ('G', 'Grams', 'ግራም', TRUE),
+          ('L', 'Liters', 'ሊትር', TRUE),
+          ('ML', 'Milliliters', 'ሚሊ ሊትር', TRUE),
+          ('PACK', 'Pack', 'ፓኬት', FALSE),
+          ('BOX', 'Box / Carton', 'ካርቶን', FALSE),
+          ('BUNDLE', 'Bundle', 'እስር', FALSE)
+        ON CONFLICT (code) DO NOTHING`,
+      );
+    } catch (err: any) {
+      this.logger.warn(`Reference UOM seed skipped: ${err.message}`);
+    }
   }
 
   private async ensureMigrationsApplied() {
