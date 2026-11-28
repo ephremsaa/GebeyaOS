@@ -259,7 +259,7 @@ export const StockAndExpiryView: React.FC = () => {
         posApi.getCatalogProducts({
           search: search.trim() || undefined,
           category_id: selectedCategory || undefined,
-          limit: 300,
+          limit: 5000,
           branchId: currentUser?.branchId,
         }),
         fetch('/api/products/categories').then((r) => (r.ok ? r.json() : [])),

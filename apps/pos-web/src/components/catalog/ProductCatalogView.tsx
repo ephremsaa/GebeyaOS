@@ -219,7 +219,7 @@ export const ProductCatalogView: React.FC = () => {
         category_id: selectedCategory || undefined,
         active_only: activeParam,
         low_stock_only: lowStockFilter,
-        limit: 150,
+        limit: 5000,
       });
 
       setProducts(data.rows || []);
