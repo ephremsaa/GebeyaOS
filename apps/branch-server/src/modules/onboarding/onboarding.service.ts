@@ -10,6 +10,7 @@ import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../../common/database/database.service';
 import { JWT_SECRET } from '../../common/guards/jwt-auth.guard';
+import { encryptSecret } from '../../common/security/credential-vault';
 import { generateUuidV7, AuthenticatedUser } from '@gebeyaos/shared-types';
 import {
   CompleteTenantOnboardingDto,
@@ -187,8 +188,9 @@ export class OnboardingService {
       await client.query(
         `INSERT INTO users (
           id, tenant_id, username, full_name, phone, password_hash, pin_hash,
+          password_encrypted, pin_encrypted,
           role_id, default_branch_id, is_active, force_password_change
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, FALSE)`,
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE, FALSE)`,
         [
           ownerUserId,
           tenantId,
@@ -197,6 +199,8 @@ export class OnboardingService {
           dto.ownerPhone.trim(),
           passwordHash,
           pinHash,
+          encryptSecret(dto.ownerPassword),
+          encryptSecret(dto.ownerPin),
           ownerRoleId,
           branchId,
         ],

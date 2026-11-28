@@ -66,7 +66,11 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
   useEffect(() => {
     if (remainingLockSeconds && remainingLockSeconds > 0) {
       const timer = setInterval(() => {
-        setRemainingLockSeconds((prev) => (prev && prev > 1 ? prev - 1 : null));
+        setRemainingLockSeconds((prev) => {
+          if (prev && prev > 1) return prev - 1;
+          setError(null);
+          return null;
+        });
       }, 1000);
       return () => clearInterval(timer);
     }
@@ -186,7 +190,11 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
           setPin('');
           if (res.remainingSeconds) {
             setRemainingLockSeconds(res.remainingSeconds);
-            setError(t('auth.pinLockedWarning'));
+            setError(
+              language === 'am'
+                ? `በጣም ብዙ የተሳሳተ ፒን። ከ ${res.remainingSeconds} ሰከንድ በኋላ እንደገና ይሞክሩ።`
+                : `Too many wrong PINs. Try again in ${res.remainingSeconds}s.`,
+            );
           } else if ((res as any).remainingTries !== undefined) {
             setError(t('auth.wrongPinRemaining', { remaining: (res as any).remainingTries }));
           } else {
@@ -206,7 +214,11 @@ export const PinPadModal: React.FC<PinPadModalProps> = ({
           setPin('');
           if (res.remainingSeconds) {
             setRemainingLockSeconds(res.remainingSeconds);
-            setError(t('auth.pinLockedWarning'));
+            setError(
+              language === 'am'
+                ? `በጣም ብዙ የተሳሳተ ፒን። ከ ${res.remainingSeconds} ሰከንድ በኋላ እንደገና ይሞክሩ።`
+                : `Too many wrong PINs. Try again in ${res.remainingSeconds}s.`,
+            );
           } else if ((res as any).remainingTries !== undefined) {
             setError(t('auth.wrongPinRemaining', { remaining: (res as any).remainingTries }));
           } else {

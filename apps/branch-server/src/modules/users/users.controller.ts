@@ -104,6 +104,15 @@ export class UsersController {
     return this.usersService.adminResetPin(adminId, userId, dto);
   }
 
+  @Get(':id/credentials')
+  @RequirePermissions('admin:users:manage')
+  async getUserCredentials(
+    @CurrentUser('role') requesterRole: string,
+    @Param('id') userId: string,
+  ) {
+    return this.usersService.getUserCredentials(requesterRole, userId);
+  }
+
   @Get('roles/matrix')
   @RequirePermissions('admin:users:manage')
   async listRoles() {

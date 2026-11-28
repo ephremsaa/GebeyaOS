@@ -10,6 +10,7 @@ import {
 import * as argon2 from 'argon2';
 import { DatabaseService } from '../../common/database/database.service';
 import { TenantContextService } from '../../common/tenant/tenant-context.service';
+import { encryptSecret, decryptSecret } from '../../common/security/credential-vault';
 import {
   CreateStaffUserDto,
   UpdateStaffUserDto,
@@ -142,14 +143,16 @@ export class UsersService {
 
     const passwordHash = await this.hash(dto.initialPassword);
     const pinHash = await this.hash(dto.pin);
+    const passwordEncrypted = encryptSecret(dto.initialPassword);
+    const pinEncrypted = encryptSecret(dto.pin);
     const userId = generateUuidV7();
 
     const branchId = await this.resolveBranchId(dto.branchId);
 
     await this.db.withTransaction(async (client) => {
       await client.query(
-        `INSERT INTO users (id, tenant_id, username, full_name, email, phone, password_hash, pin_hash, role_id, default_branch_id, is_active, force_password_change)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11)`,
+        `INSERT INTO users (id, tenant_id, username, full_name, email, phone, password_hash, pin_hash, password_encrypted, pin_encrypted, role_id, default_branch_id, is_active, force_password_change)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, TRUE, $13)`,
         [
           userId,
           tenantId,
@@ -159,6 +162,8 @@ export class UsersService {
           dto.phone.trim(),
           passwordHash,
           pinHash,
+          passwordEncrypted,
+          pinEncrypted,
           roleId,
           branchId,
           dto.forcePasswordChange ?? true,
@@ -481,19 +486,21 @@ export class UsersService {
    */
   async adminResetPassword(adminId: string, userId: string, dto: AdminResetPasswordDto) {
     const newHash = await this.hash(dto.newPassword);
+    const passwordEncrypted = encryptSecret(dto.newPassword);
     const tenantId = this.tenantContextService?.getTenantId() || '01900000-0000-7000-8000-000000000001';
 
     await this.db.withTransaction(async (client) => {
       await client.query(
         `UPDATE users
          SET password_hash = $1,
+             password_encrypted = $2,
              failed_login_attempts = 0,
              locked_until = NULL,
-             force_password_change = $2,
+             force_password_change = $3,
              token_version = token_version + 1,
              updated_at = clock_timestamp()
-         WHERE id = $3`,
-        [newHash, dto.forcePasswordChange ?? true, userId],
+         WHERE id = $4`,
+        [newHash, passwordEncrypted, dto.forcePasswordChange ?? false, userId],
       );
 
       // Invalidate existing sessions to force login with new credentials
@@ -523,19 +530,21 @@ export class UsersService {
    */
   async adminResetPin(adminId: string, userId: string, dto: AdminResetPinDto) {
     const pinHash = await this.hash(dto.newPin);
+    const pinEncrypted = encryptSecret(dto.newPin);
     const tenantId = this.tenantContextService?.getTenantId() || '01900000-0000-7000-8000-000000000001';
 
     await this.db.withTransaction(async (client) => {
       await client.query(
         `UPDATE users
          SET pin_hash = $1,
+             pin_encrypted = $2,
              pin_salt = NULL,
              pin_failed_attempts = 0,
              pin_locked_until = NULL,
              token_version = token_version + 1,
              updated_at = clock_timestamp()
-         WHERE id = $2`,
-        [pinHash, userId],
+         WHERE id = $3`,
+        [pinHash, pinEncrypted, userId],
       );
 
       await client.query(
@@ -727,6 +736,23 @@ export class UsersService {
     }, tenantId);
 
     return { success: true, message: 'Role permissions updated successfully' };
+  }
+
+  async getUserCredentials(requesterRole: string, targetUserId: string) {
+    if (String(requesterRole || '').toUpperCase() !== 'OWNER') {
+      throw new ForbiddenException('Only Supermarket Owners can view saved staff credentials.');
+    }
+    const res = await this.db.query(
+      `SELECT password_encrypted, pin_encrypted FROM users WHERE id = $1 LIMIT 1`,
+      [targetUserId],
+    );
+    if (res.rows.length === 0) {
+      throw new NotFoundException('User not found.');
+    }
+    return {
+      currentPassword: decryptSecret(res.rows[0].password_encrypted),
+      currentPin: decryptSecret(res.rows[0].pin_encrypted),
+    };
   }
 
   /**

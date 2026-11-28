@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../../common/database/database.service';
+import { encryptSecret } from '../../common/security/credential-vault';
 import { PasswordPolicyService } from '../../common/security/password-policy.service';
 import { PinHasherService } from '../../common/security/pin-hasher.service';
 import { TotpService } from '../../common/security/totp.service';
@@ -808,7 +809,7 @@ export class AuthService {
           {
             statusCode: HttpStatus.TOO_MANY_REQUESTS,
             error: 'PIN Locked',
-            message: `Wrong PIN. Account locked for 5 minutes after 5 failed attempts.`,
+            message: `Too many wrong PIN attempts. Try again in ${remainingSeconds} seconds.`,
             remainingSeconds,
           },
           HttpStatus.TOO_MANY_REQUESTS,
@@ -824,9 +825,13 @@ export class AuthService {
       }
 
       if (!match) {
-        const failedAttempts = (u.pin_failed_attempts || 0) + 1;
-        if (failedAttempts >= 5) {
-          const lockTime = new Date(Date.now() + 5 * 60 * 1000);
+        const prevAttempts =
+          u.pin_locked_until && new Date(u.pin_locked_until).getTime() <= Date.now()
+            ? 0
+            : u.pin_failed_attempts || 0;
+        const failedAttempts = prevAttempts + 1;
+        if (failedAttempts >= 3) {
+          const lockTime = new Date(Date.now() + 30 * 1000);
           await this.db.query(
             `UPDATE users SET pin_failed_attempts = $1, pin_locked_until = $2 WHERE id = $3`,
             [failedAttempts, lockTime, u.id],
@@ -846,8 +851,8 @@ export class AuthService {
             {
               statusCode: HttpStatus.TOO_MANY_REQUESTS,
               error: 'PIN Locked',
-              message: `Wrong PIN. Account locked for 5 minutes after 5 failed attempts.`,
-              remainingSeconds: 5 * 60,
+              message: `Wrong PIN 3 times. Try again in 30 seconds.`,
+              remainingSeconds: 30,
             },
             HttpStatus.TOO_MANY_REQUESTS,
           );
@@ -855,8 +860,9 @@ export class AuthService {
           await this.db.query(
             `UPDATE users SET pin_failed_attempts = $1 WHERE id = $2`,
             [failedAttempts, u.id],
+            u.tenant_id,
           );
-          const remaining = 5 - failedAttempts;
+          const remaining = 3 - failedAttempts;
           await this.auditSecurity.logAuthEvent({
             tenantId: u.tenant_id,
             branchId: u.default_branch_id,
@@ -867,7 +873,7 @@ export class AuthService {
             result: 'FAILURE',
             details: { terminalCode: dto.terminalCode, failedAttempts, remainingAttempts: remaining },
           });
-          throw new UnauthorizedException(`Wrong PIN. ${remaining} try${remaining === 1 ? '' : 'ies'} left.`);
+          throw new UnauthorizedException(`Wrong PIN. ${remaining} ${remaining === 1 ? 'try' : 'tries'} left.`);
         }
       }
 
@@ -1209,13 +1215,14 @@ export class AuthService {
     }
 
     const newHash = await this.hashPassword(dto.newPassword);
+    const encryptedPass = encryptSecret(dto.newPassword);
 
     await this.db.withTransaction(async (client) => {
       await client.query(
         `UPDATE users
-         SET password_hash = $1, force_password_change = false, token_version = token_version + 1, updated_at = clock_timestamp()
-         WHERE id = $2`,
-        [newHash, userId],
+         SET password_hash = $1, password_encrypted = $2, force_password_change = false, token_version = token_version + 1, updated_at = clock_timestamp()
+         WHERE id = $3`,
+        [newHash, encryptedPass, userId],
       );
       // Invalidate existing refresh tokens
       await client.query(

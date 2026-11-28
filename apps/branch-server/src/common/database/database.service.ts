@@ -62,6 +62,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           ('BUNDLE', 'Bundle', 'እስር', FALSE)
         ON CONFLICT (code) DO NOTHING`,
       );
+      await this.pool.query(
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_encrypted TEXT;
+         ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_encrypted TEXT;`,
+      );
     } catch (err: any) {
       this.logger.warn(`Reference UOM seed skipped: ${err.message}`);
     }

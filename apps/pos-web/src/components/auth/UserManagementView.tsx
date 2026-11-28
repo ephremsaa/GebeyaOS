@@ -27,6 +27,9 @@ import {
   Pencil,
   Building2,
   Sparkles,
+  Eye,
+  EyeOff,
+  Copy,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
@@ -235,7 +238,38 @@ export const UserManagementView: React.FC = () => {
 
   // Reset form values
   const [resetPassValue, setResetPassValue] = useState('');
+  const [resetPassForceChange, setResetPassForceChange] = useState(false);
   const [resetPinValue, setResetPinValue] = useState('');
+  const [revealedCreds, setRevealedCreds] = useState<{ currentPassword: string | null; currentPin: string | null } | null>(null);
+  const [showRevealedCreds, setShowRevealedCreds] = useState(false);
+  const [loadingCreds, setLoadingCreds] = useState(false);
+
+  const fetchUserCredentials = async (userId: string) => {
+    setLoadingCreds(true);
+    try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const res = await fetch(`/api/users/${userId}/credentials`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRevealedCreds(data);
+        setShowRevealedCreds(true);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.message || 'Could not load credentials');
+      }
+    } catch {
+      setErrorMsg('Could not load credentials');
+    } finally {
+      setLoadingCreds(false);
+    }
+  };
+
+  useEffect(() => {
+    setRevealedCreds(null);
+    setShowRevealedCreds(false);
+  }, [drawerUser?.id]);
 
   // Custom role form state
   const [customRoleName, setCustomRoleName] = useState('');
@@ -620,7 +654,7 @@ export const UserManagementView: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ newPassword: resetPassValue, forcePasswordChange: true }),
+        body: JSON.stringify({ newPassword: resetPassValue, forcePasswordChange: resetPassForceChange }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -633,16 +667,21 @@ export const UserManagementView: React.FC = () => {
 
     setUsers((prev) =>
       prev.map((u) =>
-        u.id === selectedUserForModal.id ? { ...u, forcePasswordChange: true, lockedUntil: null } : u,
+        u.id === selectedUserForModal.id ? { ...u, forcePasswordChange: resetPassForceChange, lockedUntil: null } : u,
       ),
     );
     if (drawerUser && drawerUser.id === selectedUserForModal.id) {
-      setDrawerUser((prev) => (prev ? { ...prev, forcePasswordChange: true, lockedUntil: null } : null));
+      setDrawerUser((prev) => (prev ? { ...prev, forcePasswordChange: resetPassForceChange, lockedUntil: null } : null));
+      if (showRevealedCreds) {
+        setRevealedCreds((prev) => (prev ? { ...prev, currentPassword: resetPassValue } : prev));
+      }
     }
 
     setIsResetPassModalOpen(false);
     setSuccessMsg(
-      `Password reset for @${selectedUserForModal.username}. User will be forced to change password on first login.`,
+      resetPassForceChange
+        ? `Password updated for @${selectedUserForModal.username}. User will change password on next login.`
+        : `Password updated for @${selectedUserForModal.username}. They can sign in immediately.`,
     );
     setTimeout(() => setSuccessMsg(null), 4500);
   };
@@ -670,6 +709,10 @@ export const UserManagementView: React.FC = () => {
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to reset PIN');
       return;
+    }
+
+    if (drawerUser && drawerUser.id === selectedUserForModal.id && showRevealedCreds) {
+      setRevealedCreds((prev) => (prev ? { ...prev, currentPin: resetPinValue } : prev));
     }
 
     setIsResetPinModalOpen(false);
@@ -1741,6 +1784,72 @@ export const UserManagementView: React.FC = () => {
                         : t('staff.normalAttempts')}
                     </span>
                   </div>
+
+                  {currentUser?.role === 'OWNER' && (
+                    <div className="pt-2 mt-1 border-t border-border-subtle/70 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                          Saved Credentials (Owner Only)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (showRevealedCreds) {
+                              setShowRevealedCreds(false);
+                            } else {
+                              fetchUserCredentials(drawerUser.id);
+                            }
+                          }}
+                          disabled={loadingCreds}
+                          className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          {showRevealedCreds ? <EyeOff size={13} /> : <Eye size={13} />}
+                          {loadingCreds ? 'Loading...' : showRevealedCreds ? 'Hide' : 'Show Current Password & PIN'}
+                        </button>
+                      </div>
+
+                      {showRevealedCreds && revealedCreds && (
+                        <div className="grid grid-cols-1 gap-1.5 bg-surface p-2.5 rounded-xl border border-border-subtle text-xs">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-text-muted">Password:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold text-text-main select-all">
+                                {revealedCreds.currentPassword || 'Not recorded (reset to enable)'}
+                              </span>
+                              {revealedCreds.currentPassword && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyPin(revealedCreds.currentPassword || '')}
+                                  className="text-primary hover:text-primary-hover p-1 cursor-pointer"
+                                  title="Copy Password"
+                                >
+                                  <Copy size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-text-muted">Terminal PIN:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold text-emerald-500 tracking-widest select-all">
+                                {revealedCreds.currentPin || 'Not recorded (reset to enable)'}
+                              </span>
+                              {revealedCreds.currentPin && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyPin(revealedCreds.currentPin || '')}
+                                  className="text-primary hover:text-primary-hover p-1 cursor-pointer"
+                                  title="Copy PIN"
+                                >
+                                  <Copy size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2141,20 +2250,45 @@ export const UserManagementView: React.FC = () => {
 
             <form onSubmit={handleAdminResetPassword} className="flex flex-col gap-3">
               <div>
-                <label className="text-xs font-bold text-text-muted block mb-1">{t('staff.newTempPassLabel')}</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-text-muted">{t('staff.newTempPassLabel')}</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setResetPassValue(`Gebeya@${Math.floor(1000 + Math.random() * 9000)}`)}
+                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw size={11} /> Generate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPin(resetPassValue)}
+                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy size={11} /> Copy
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="text"
                   required
                   minLength={8}
-                  className="w-full px-3.5 py-2 rounded-xl bg-input border border-border-subtle font-mono text-xs text-text-main focus:outline-none focus:border-primary transition-colors"
+                  placeholder="Min 8 characters"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-input border border-border-subtle font-mono text-sm text-text-main focus:outline-none focus:border-primary transition-colors"
                   value={resetPassValue}
                   onChange={(e) => setResetPassValue(e.target.value)}
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] border border-amber-500/20">
-                {t('staff.resetPassNotice')}
-              </div>
+              <label className="flex items-center gap-2 text-xs text-text-main cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={resetPassForceChange}
+                  onChange={(e) => setResetPassForceChange(e.target.checked)}
+                  className="rounded border-border-subtle accent-primary"
+                />
+                <span>Force staff member to change password on next login</span>
+              </label>
 
               <div className="flex gap-2.5 mt-2">
                 <button
@@ -2195,14 +2329,23 @@ export const UserManagementView: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-bold text-text-muted">{t('staff.quickPinInputLabel')}</label>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyPin(resetPinValue)}
-                    className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedPin ? <Check size={12} /> : null}
-                    {copiedPin ? 'Copied!' : 'Copy PIN'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setResetPinValue(Math.floor(1000 + Math.random() * 9000).toString())}
+                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw size={11} /> Generate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPin(resetPinValue)}
+                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedPin ? <Check size={12} /> : <Copy size={11} />}
+                      {copiedPin ? 'Copied!' : 'Copy PIN'}
+                    </button>
+                  </div>
                 </div>
                 <input
                   type="text"
