@@ -1216,15 +1216,13 @@ export class AuthService {
          SET password_hash = $1, force_password_change = false, token_version = token_version + 1, updated_at = clock_timestamp()
          WHERE id = $2`,
         [newHash, userId],
-        user.tenant_id,
       );
       // Invalidate existing refresh tokens
       await client.query(
         `UPDATE refresh_tokens SET revoked_at = clock_timestamp() WHERE user_id = $1 AND revoked_at IS NULL`,
         [userId],
-        user.tenant_id,
       );
-    });
+    }, user.tenant_id);
 
     await this.auditSecurity.logAuthEvent({
       tenantId: user.tenant_id,
@@ -1236,7 +1234,7 @@ export class AuthService {
     });
 
     // Re-issue a fresh token for this user so current session continues uninterrupted
-    const roleRes = await this.db.query(`SELECT name FROM roles WHERE id = $1`, [user.role_id]);
+    const roleRes = await this.db.query(`SELECT name FROM roles WHERE id = $1`, [user.role_id], user.tenant_id);
     const authUser: AuthenticatedUser = {
       id: user.id,
       tenantId: user.tenant_id,

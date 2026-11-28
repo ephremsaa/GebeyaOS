@@ -506,6 +506,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ currentPassword: currentPass, newPassword: newPass }),
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data?.accessToken) {
+          localStorage.setItem('gebeyaos_access_token', data.accessToken);
+        }
         if (currentUser) {
           const updated = { ...currentUser, forcePasswordChange: false };
           setCurrentUser(updated);
