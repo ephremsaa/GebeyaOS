@@ -1232,8 +1232,8 @@ export const ProductCatalogView: React.FC = () => {
       )}
 
       {/* 5. Product Table */}
-      <div className="flex-1 bg-surface border border-border-subtle rounded-2xl overflow-hidden shadow-card flex flex-col">
-        <div className="flex-1 overflow-y-auto">
+      <div className="min-h-[480px] md:min-h-0 shrink-0 md:shrink flex-1 bg-surface border border-border-subtle rounded-2xl overflow-hidden shadow-card flex flex-col">
+        <div className="flex-1 overflow-x-auto overflow-y-auto">
           <table className="w-full text-left border-collapse text-xs">
             {/* Table Header */}
             <thead className="bg-surface-2 text-text-muted uppercase tracking-wider font-bold text-[14px] sticky top-0 z-10 border-b border-border-subtle">
