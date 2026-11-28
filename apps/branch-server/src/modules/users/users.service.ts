@@ -626,6 +626,11 @@ export class UsersService {
 
       if (dto.permissions && dto.permissions.length > 0) {
         for (const permId of dto.permissions) {
+          const mod = permId.split(':')[0]?.toUpperCase() || 'CUSTOM';
+          await client.query(
+            `INSERT INTO permissions (id, module, description) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+            [permId, mod, permId],
+          );
           await client.query(
             `INSERT INTO role_permissions (role_id, permission_id, tenant_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
             [roleId, permId, tenantId],
@@ -705,6 +710,11 @@ export class UsersService {
 
       // Insert new permissions
       for (const permId of dto.permissionIds) {
+        const mod = permId.split(':')[0]?.toUpperCase() || 'CUSTOM';
+        await client.query(
+          `INSERT INTO permissions (id, module, description) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+          [permId, mod, permId],
+        );
         await client.query(
           `INSERT INTO role_permissions (role_id, permission_id, tenant_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
           [roleId, permId, tenantId],

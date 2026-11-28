@@ -66,6 +66,35 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_encrypted TEXT;
          ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_encrypted TEXT;`,
       );
+      await this.pool.query(
+        `INSERT INTO permissions (id, module, description) VALUES
+          ('pos:shift:open', 'POS', 'Open a register shift with opening cash float'),
+          ('pos:shift:close', 'POS', 'Close register shift and perform cash reconciliation'),
+          ('pos:sale:create', 'POS', 'Process checkout sales and tender payments'),
+          ('pos:sale:hold', 'POS', 'Hold and resume active customer carts'),
+          ('pos:sale:discount', 'POS', 'Apply item or transaction level discounts'),
+          ('pos:sale:refund', 'POS', 'Authorize and process customer returns and refunds'),
+          ('pos:receipt:reprint', 'POS', 'Reprint customer receipts with audit logging'),
+          ('pos:cash:movement', 'POS', 'Perform cash-in, safe drops, and petty cash out'),
+          ('catalog:product:view', 'CATALOG', 'View product catalog and prices'),
+          ('catalog:product:create', 'CATALOG', 'Create new products in catalog'),
+          ('catalog:product:edit', 'CATALOG', 'Edit product metadata and master prices'),
+          ('catalog:cost:view', 'CATALOG', 'View supplier cost prices and wholesale margins'),
+          ('catalog:price:override', 'CATALOG', 'Set branch-specific price and tax overrides'),
+          ('inventory:stock:view', 'INVENTORY', 'View stock balances and batch expiry'),
+          ('inventory:adjust:create', 'INVENTORY', 'Create stock adjustments and write-offs'),
+          ('inventory:adjust:approve', 'INVENTORY', 'Approve stock adjustments'),
+          ('inventory:stocktake:execute', 'INVENTORY', 'Conduct physical stock count'),
+          ('inventory:stocktake:reconcile', 'INVENTORY', 'Reconcile stock take and post variances'),
+          ('inventory:import:execute', 'INVENTORY', 'Import products and inventory via Excel/CSV'),
+          ('purchasing:po:create', 'PURCHASING', 'Create and issue purchase orders'),
+          ('purchasing:grn:receive', 'PURCHASING', 'Receive goods (GRN) and log landed costs'),
+          ('reports:branch:view', 'REPORTS', 'View branch revenue, gross margins, and tax reports'),
+          ('admin:users:manage', 'ADMIN', 'Manage staff users, PINs, and passwords'),
+          ('admin:roles:manage', 'ADMIN', 'Create and edit custom roles and permissions'),
+          ('admin:settings:manage', 'ADMIN', 'Configure branch and system settings')
+        ON CONFLICT (id) DO NOTHING`,
+      );
     } catch (err: any) {
       this.logger.warn(`Reference UOM seed skipped: ${err.message}`);
     }
