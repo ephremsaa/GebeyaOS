@@ -60,6 +60,75 @@ export class InventoryService {
     return this.tenantContext?.getTenantId() || '01900000-0000-7000-8000-000000000001';
   }
 
+  private async resolveBranchAndUser(
+    branchId: string,
+    userId: string,
+  ): Promise<{ effectiveBranchId: string; effectiveUserId: string }> {
+    let effectiveBranchId = branchId;
+    let effectiveUserId = userId;
+    const tenantId = this.getTenantId();
+
+    if (process.env.NODE_ENV !== 'test') {
+      const isPlaceholderBranch =
+        !effectiveBranchId ||
+        effectiveBranchId === 'default' ||
+        effectiveBranchId.toUpperCase() === 'ALL' ||
+        effectiveBranchId === '00000000-0000-0000-0000-000000000001';
+
+      try {
+        let validBranch = false;
+        if (!isPlaceholderBranch) {
+          const branchCheck = await this.db.query(
+            'SELECT id FROM branches WHERE id = $1 AND tenant_id = $2',
+            [effectiveBranchId, tenantId],
+            tenantId,
+          );
+          validBranch = (branchCheck?.rows?.length || 0) > 0;
+        }
+        if (!validBranch) {
+          const fbBranch = await this.db.query(
+            'SELECT id FROM branches WHERE tenant_id = $1 ORDER BY is_hq DESC, created_at ASC LIMIT 1',
+            [tenantId],
+            tenantId,
+          );
+          if (fbBranch?.rows?.length) {
+            effectiveBranchId = fbBranch.rows[0].id;
+          }
+        }
+      } catch {}
+
+      const isPlaceholderUser =
+        !effectiveUserId ||
+        effectiveUserId === 'default' ||
+        effectiveUserId === '00000000-0000-0000-0000-000000000000' ||
+        effectiveUserId === '00000000-0000-0000-0000-000000000002';
+
+      try {
+        let validUser = false;
+        if (!isPlaceholderUser) {
+          const userCheck = await this.db.query(
+            'SELECT id FROM users WHERE id = $1 AND tenant_id = $2',
+            [effectiveUserId, tenantId],
+            tenantId,
+          );
+          validUser = (userCheck?.rows?.length || 0) > 0;
+        }
+        if (!validUser) {
+          const fbUser = await this.db.query(
+            'SELECT id FROM users WHERE tenant_id = $1 ORDER BY created_at ASC LIMIT 1',
+            [tenantId],
+            tenantId,
+          );
+          if (fbUser?.rows?.length) {
+            effectiveUserId = fbUser.rows[0].id;
+          }
+        }
+      } catch {}
+    }
+
+    return { effectiveBranchId, effectiveUserId };
+  }
+
   /**
    * Records an append-only stock movement in the ledger.
    * Acquires a transactional advisory lock for the (branch, product) pair
@@ -707,27 +776,8 @@ export class InventoryService {
     userId: string,
     dto: CreateStockAdjustmentDto,
   ): Promise<StockAdjustment> {
-    // Resolve fallback valid branch and user if provided IDs do not exist (only outside unit tests when IDs are missing or default)
-    let effectiveBranchId = branchId;
-    let effectiveUserId = userId;
-    if (process.env.NODE_ENV !== 'test' && (!branchId || branchId === 'default')) {
-      try {
-        const branchCheck = await this.db.query('SELECT id FROM branches WHERE id = $1', [effectiveBranchId]);
-        if (branchCheck?.rows?.length === 0) {
-          const fbBranch = await this.db.query('SELECT id FROM branches LIMIT 1');
-          if (fbBranch?.rows?.length) effectiveBranchId = fbBranch.rows[0].id;
-        }
-      } catch {}
-    }
-    if (process.env.NODE_ENV !== 'test' && (!userId || userId === 'default')) {
-      try {
-        const userCheck = await this.db.query('SELECT id FROM users WHERE id = $1', [effectiveUserId]);
-        if (userCheck?.rows?.length === 0) {
-          const fbUser = await this.db.query('SELECT id FROM users LIMIT 1');
-          if (fbUser?.rows?.length) effectiveUserId = fbUser.rows[0].id;
-        }
-      } catch {}
-    }
+    const { effectiveBranchId, effectiveUserId } = await this.resolveBranchAndUser(branchId, userId);
+    const tenantId = this.getTenantId();
 
     return this.db.withTransaction(async (client) => {
       // Large write-offs validation: loss quantity > 20 or estimated value > 5,000 ETB requires approval
@@ -845,27 +895,7 @@ export class InventoryService {
     userId: string,
     dto: CreateStockTakeDto,
   ): Promise<StockTake> {
-    // Resolve fallback valid branch and user if provided IDs do not exist (only outside unit tests when IDs are missing or default)
-    let effectiveBranchId = branchId;
-    let effectiveUserId = userId;
-    if (process.env.NODE_ENV !== 'test' && (!branchId || branchId === 'default')) {
-      try {
-        const branchCheck = await this.db.query('SELECT id FROM branches WHERE id = $1', [effectiveBranchId]);
-        if (branchCheck?.rows?.length === 0) {
-          const fbBranch = await this.db.query('SELECT id FROM branches LIMIT 1');
-          if (fbBranch?.rows?.length) effectiveBranchId = fbBranch.rows[0].id;
-        }
-      } catch {}
-    }
-    if (process.env.NODE_ENV !== 'test' && (!userId || userId === 'default')) {
-      try {
-        const userCheck = await this.db.query('SELECT id FROM users WHERE id = $1', [effectiveUserId]);
-        if (userCheck?.rows?.length === 0) {
-          const fbUser = await this.db.query('SELECT id FROM users LIMIT 1');
-          if (fbUser?.rows?.length) effectiveUserId = fbUser.rows[0].id;
-        }
-      } catch {}
-    }
+    const { effectiveBranchId, effectiveUserId } = await this.resolveBranchAndUser(branchId, userId);
 
     return this.db.withTransaction(async (client) => {
       // 1. Generate count number ST-YYYYMMDD-XXXX
