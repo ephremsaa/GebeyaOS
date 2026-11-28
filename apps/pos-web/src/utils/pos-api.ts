@@ -102,6 +102,8 @@ export const posApi = {
   async getCurrentShift(terminalId: string, branchId?: string): Promise<{ open: boolean; shift: Shift | null }> {
     try {
       const headers: Record<string, string> = {};
+      const token = localStorage.getItem('gebeyaos_access_token');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       if (branchId) headers['x-branch-id'] = branchId;
 
       const res = await fetch(`${API_BASE}/pos/shifts/current?terminalId=${encodeURIComponent(terminalId)}`, {
@@ -111,6 +113,14 @@ export const posApi = {
         const data = await res.json();
         if (data.open && data.shift) {
           localStorage.setItem(`gebeyaos_shift_${terminalId}`, JSON.stringify(data.shift));
+        } else {
+          // Clear stale offline shift if server is online and reports no open shift
+          try {
+            const local = localStorage.getItem(`gebeyaos_shift_${terminalId}`);
+            if (local && JSON.parse(local)?.id?.startsWith('shift-offline-')) {
+              localStorage.removeItem(`gebeyaos_shift_${terminalId}`);
+            }
+          } catch {}
         }
         return data;
       }
@@ -144,13 +154,17 @@ export const posApi = {
     notes?: string,
   ): Promise<Shift> {
     try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-branch-id': branchId,
+        'x-user-id': cashierId,
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`${API_BASE}/pos/shifts/open`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-branch-id': branchId,
-          'x-user-id': cashierId,
-        },
+        headers,
         body: JSON.stringify({
           terminal_id: terminalId,
           terminalId,
@@ -498,10 +512,26 @@ export const posApi = {
       localStorage.getItem('gebeyaos_terminal_id') ||
       '01a19309-1d46-799e-8dbe-200bdd7ce436';
 
+    let effectiveShiftId = payload.shiftId;
+    if (effectiveShiftId && String(effectiveShiftId).startsWith('shift-offline-')) {
+      try {
+        const syncedShift = await this.openShift(
+          branchId,
+          resolvedTerminalId,
+          cashierId,
+          0,
+          'Auto-synced shift on checkout',
+        );
+        if (syncedShift?.id && !String(syncedShift.id).startsWith('shift-offline-')) {
+          effectiveShiftId = syncedShift.id;
+        }
+      } catch {}
+    }
+
     const normalizedBody = {
       branchId,
       terminalId: resolvedTerminalId,
-      shiftId: payload.shiftId,
+      shiftId: effectiveShiftId,
       idempotencyKey: payload.idempotencyKey,
       clientTimestamp: payload.clientTimestamp,
       items: formattedItems,
