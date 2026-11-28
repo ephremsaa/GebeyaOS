@@ -455,7 +455,7 @@ export const SuppliersView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-page p-4 sm:p-6 overflow-hidden select-none text-text-main">
+    <div className="flex-1 flex flex-col min-h-0 md:h-full bg-page p-3 sm:p-6 overflow-y-auto md:overflow-hidden select-none text-text-main">
       {/* ─── 1. Header & Actions ─── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
@@ -609,7 +609,7 @@ export const SuppliersView: React.FC = () => {
       </div>
 
       {/* ─── 4. Main Tables ─── */}
-      <div className="flex-1 bg-surface rounded-2xl border border-border-subtle overflow-hidden flex flex-col shadow-xs min-h-0">
+      <div className="min-h-[420px] md:min-h-0 shrink-0 md:shrink flex-1 bg-surface rounded-2xl border border-border-subtle overflow-hidden flex flex-col shadow-xs">
         <div className="flex-1 overflow-auto">
           {/* TAB 1: SUPPLIERS */}
           {activeTab === 'suppliers' && (

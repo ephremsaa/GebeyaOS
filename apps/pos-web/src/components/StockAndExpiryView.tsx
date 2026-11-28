@@ -770,7 +770,7 @@ export const StockAndExpiryView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-page p-4 sm:p-6 overflow-hidden select-none text-text-main">
+    <div className="flex-1 flex flex-col min-h-0 md:h-full bg-page p-3 sm:p-6 overflow-y-auto md:overflow-hidden select-none text-text-main">
       {/* ─── 1. Header & Actions ─── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -1349,7 +1349,7 @@ export const StockAndExpiryView: React.FC = () => {
       </div>
 
       {/* ─── 4. Main Table View ─── */}
-      <div className="flex-1 bg-surface border border-border-subtle rounded-2xl overflow-hidden flex flex-col shadow-xs">
+      <div className="min-h-[480px] md:min-h-0 shrink-0 md:shrink flex-1 bg-surface border border-border-subtle rounded-2xl overflow-hidden flex flex-col shadow-xs">
         <div className="flex-1 overflow-auto">
           {viewMode === 'item' ? (
             /* ── VIEW 1: BY ITEM ── */
