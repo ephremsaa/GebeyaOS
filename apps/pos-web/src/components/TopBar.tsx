@@ -268,76 +268,83 @@ export const TopBar: React.FC<TopBarProps> = ({
 
           {/* User Menu Dropdown */}
           {isMenuOpen && (
-            <div className="absolute right-0 top-11 w-76 bg-surface rounded-2xl shadow-modal border border-border-subtle p-3.5 flex flex-col gap-2.5 animate-in fade-in duration-fast z-50">
+            <div className="absolute right-0 top-12 w-[340px] sm:w-[360px] bg-surface rounded-2xl shadow-2xl border border-border-subtle p-4 flex flex-col gap-3 animate-in fade-in duration-fast z-50">
               {/* Profile Card */}
-              <div className="p-3 rounded-xl bg-surface-2 border border-border-subtle flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-primary-soft text-primary flex items-center justify-center font-bold text-xs select-none">
+              <div className="p-3.5 rounded-2xl bg-surface-2/80 border border-border-subtle flex flex-col gap-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-primary-soft border border-primary/25 text-primary flex items-center justify-center font-extrabold text-sm select-none shrink-0">
                       {cashierName.slice(0, 2).toUpperCase()}
                     </div>
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-xs text-text-main leading-tight">
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold text-sm text-text-main leading-tight truncate">
                         {cashierName}
                       </span>
-                      <span className="text-[11px] text-text-muted">@{currentUser?.username || 'user'}</span>
+                      <span className="text-xs font-mono text-text-muted truncate mt-0.5">
+                        @{currentUser?.username || 'user'}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary-soft text-primary">
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary-soft text-primary border border-primary/20 whitespace-nowrap shrink-0">
                     {getTranslatedRole(currentUser?.role)}
                   </span>
                 </div>
 
-                <div className="h-px bg-border-subtle my-0.5" />
+                <div className="h-px bg-border-subtle" />
 
                 <div className="flex items-center justify-between text-xs text-text-muted">
-                  <span className="flex items-center gap-1.5 text-primary font-medium">
-                    <Wifi size={13} strokeWidth={1.75} />
+                  <span className="flex items-center gap-1.5 text-primary font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <Wifi size={14} strokeWidth={1.75} />
                     {t('common.online')}
                   </span>
-                  <span className="font-mono text-[11px] text-text-dim">Branch LAN</span>
+                  <span className="font-mono text-[11px] text-text-dim px-2 py-0.5 rounded-md bg-surface border border-border-subtle">
+                    Branch LAN
+                  </span>
                 </div>
               </div>
 
               {/* Quick Actions: Switch Cashier / Lock */}
               <div className="grid grid-cols-2 gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
+                <button
+                  type="button"
                   onClick={() => {
                     setIsMenuOpen(false);
                     switchCashier();
                   }}
-                  leftIcon={<RotateCcw size={13} strokeWidth={1.75} className="text-primary" />}
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-surface-2 hover:bg-surface border border-border-subtle text-xs font-bold text-text-main whitespace-nowrap transition-all cursor-pointer shadow-xs"
                 >
-                  {t('auth.switchCashier')}
-                </Button>
+                  <RotateCcw size={15} strokeWidth={2} className="text-primary shrink-0" />
+                  <span>{t('auth.switchCashier')}</span>
+                </button>
 
-                <Button
-                  size="sm"
-                  variant="secondary"
+                <button
+                  type="button"
                   onClick={() => {
                     setIsMenuOpen(false);
                     lockSession();
                   }}
-                  leftIcon={<Lock size={13} strokeWidth={1.75} className="text-warning" />}
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-surface-2 hover:bg-surface border border-border-subtle text-xs font-bold text-text-main whitespace-nowrap transition-all cursor-pointer shadow-xs"
                 >
-                  {t('auth.lockTerminal')}
-                </Button>
+                  <Lock size={15} strokeWidth={2} className="text-warning shrink-0" />
+                  <span>{t('auth.lockTerminal')}</span>
+                </button>
               </div>
 
               {/* Profile & Security Options */}
-              <div className="flex flex-col gap-1 border-t border-b border-border-subtle py-1.5">
+              <div className="flex flex-col gap-1 border-t border-b border-border-subtle py-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsMenuOpen(false);
                     setIsProfileModalOpen(true);
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
+                  className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-semibold text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                 >
-                  <Shield size={14} strokeWidth={1.75} className="text-primary" />
-                  {t('auth.profileModalTitle')}
+                  <span className="w-7 h-7 rounded-lg bg-primary-soft text-primary flex items-center justify-center shrink-0">
+                    <Shield size={15} strokeWidth={2} />
+                  </span>
+                  <span className="truncate">{t('auth.profileModalTitle')}</span>
                 </button>
                 <button
                   type="button"
@@ -345,10 +352,12 @@ export const TopBar: React.FC<TopBarProps> = ({
                     setIsMenuOpen(false);
                     setIsPassModalOpen(true);
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
+                  className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                 >
-                  <Lock size={14} strokeWidth={1.75} className="text-text-dim" />
-                  {t('auth.changePassword')}
+                  <span className="w-7 h-7 rounded-lg bg-surface-2 text-text-dim flex items-center justify-center shrink-0">
+                    <Lock size={15} strokeWidth={1.75} />
+                  </span>
+                  <span className="truncate">{t('auth.changePassword')}</span>
                 </button>
                 <button
                   type="button"
@@ -356,10 +365,12 @@ export const TopBar: React.FC<TopBarProps> = ({
                     setIsMenuOpen(false);
                     setIsPinModalOpen(true);
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
+                  className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                 >
-                  <KeyRound size={14} strokeWidth={1.75} className="text-text-dim" />
-                  {t('auth.changePin')}
+                  <span className="w-7 h-7 rounded-lg bg-surface-2 text-text-dim flex items-center justify-center shrink-0">
+                    <KeyRound size={15} strokeWidth={1.75} />
+                  </span>
+                  <span className="truncate">{t('auth.changePin')}</span>
                 </button>
                 {(currentUser?.role === 'OWNER' || currentUser?.role === 'BRANCH_MANAGER') && (
                   <button
@@ -368,62 +379,65 @@ export const TopBar: React.FC<TopBarProps> = ({
                       setIsMenuOpen(false);
                       setIsTerminalPairModalOpen(true);
                     }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
+                    className="flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-text-muted hover:text-text-main hover:bg-surface-2 text-left transition-colors cursor-pointer"
                   >
-                    <Terminal size={14} strokeWidth={1.75} className="text-primary" />
-                    {t('auth.terminalPairTitle')}
+                    <span className="w-7 h-7 rounded-lg bg-primary-soft text-primary flex items-center justify-center shrink-0">
+                      <Terminal size={15} strokeWidth={1.75} />
+                    </span>
+                    <span className="truncate">{t('auth.terminalPairTitle')}</span>
                   </button>
                 )}
               </div>
 
-              {/* Language Switcher */}
-              <div className="flex items-center justify-between px-2 py-1 text-xs">
-                <span className="flex items-center gap-2 text-text-muted">
-                  <Globe size={14} strokeWidth={1.75} />
-                  {t('common.language')}
-                </span>
-                <div className="flex bg-surface-2 p-0.5 rounded-lg border border-border-subtle">
+              {/* Language & Theme Preferences */}
+              <div className="flex flex-col gap-2 px-1">
+                <div className="flex items-center justify-between px-2 py-1 text-xs">
+                  <span className="flex items-center gap-2.5 text-text-muted font-medium">
+                    <Globe size={15} strokeWidth={1.75} />
+                    {t('common.language')}
+                  </span>
+                  <div className="flex bg-surface-2 p-0.5 rounded-xl border border-border-subtle">
+                    <button
+                      type="button"
+                      onClick={() => setLanguage('en')}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        language === 'en'
+                          ? 'bg-surface text-primary shadow-soft'
+                          : 'text-text-dim hover:text-text-main'
+                      }`}
+                    >
+                      EN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLanguage('am')}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        language === 'am'
+                          ? 'bg-surface text-primary shadow-soft'
+                          : 'text-text-dim hover:text-text-main'
+                      }`}
+                    >
+                      አማ
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between px-2 py-1 text-xs">
+                  <span className="flex items-center gap-2.5 text-text-muted font-medium">
+                    {isDarkMode ? <Moon size={15} strokeWidth={1.75} /> : <Sun size={15} strokeWidth={1.75} />}
+                    {t('common.theme')}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setLanguage('en')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                      language === 'en'
-                        ? 'bg-surface text-primary shadow-soft'
-                        : 'text-text-dim hover:text-text-main'
-                    }`}
+                    onClick={handleToggleTheme}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-surface-2 hover:bg-surface text-text-main transition-colors border border-border-subtle cursor-pointer shadow-soft whitespace-nowrap"
                   >
-                    EN
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLanguage('am')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                      language === 'am'
-                        ? 'bg-surface text-primary shadow-soft'
-                        : 'text-text-dim hover:text-text-main'
-                    }`}
-                  >
-                    አማ
+                    {isDarkMode ? t('common.darkMode') : t('common.lightMode')}
                   </button>
                 </div>
               </div>
 
-              {/* Theme Toggle */}
-              <div className="flex items-center justify-between px-2 py-1 text-xs">
-                <span className="flex items-center gap-2 text-text-muted">
-                  {isDarkMode ? <Moon size={14} strokeWidth={1.75} /> : <Sun size={14} strokeWidth={1.75} />}
-                  {t('common.theme')}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleToggleTheme}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface-2 hover:bg-surface text-text-main transition-colors border border-border-subtle cursor-pointer shadow-soft"
-                >
-                  {isDarkMode ? t('common.darkMode') : t('common.lightMode')}
-                </button>
-              </div>
-
-              <div className="h-px bg-border-subtle my-0.5" />
+              <div className="h-px bg-border-subtle" />
 
               {/* Logout */}
               <button
@@ -432,10 +446,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                   setIsMenuOpen(false);
                   logout();
                 }}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold text-danger hover:bg-danger-soft transition-colors text-left cursor-pointer"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold text-danger hover:bg-danger-soft transition-colors text-left cursor-pointer"
               >
-                <LogOut size={14} strokeWidth={1.75} />
-                {t('common.logout')}
+                <LogOut size={16} strokeWidth={2} />
+                <span>{t('common.logout')}</span>
               </button>
             </div>
           )}
