@@ -526,7 +526,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
         )}
 
         {/* FORCE PASSWORD CHANGE DIALOG */}
-        {currentStep === 'credentials' && isForcedPasswordChange && (
+        {isForcedPasswordChange && (
           <form onSubmit={handleForcePasswordSubmit} className="flex flex-col gap-4">
             <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
               <Key size={16} className="shrink-0 mt-0.5 text-amber-500" />
@@ -541,6 +541,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToPin }) => {
             {forceChangeError && (
               <p className="text-xs text-danger font-semibold">{forceChangeError}</p>
             )}
+
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1">
+                {language === 'am' ? 'የአሁኑ / ጊዜያዊ የይለፍ ቃል' : 'Current / Temporary Password'}
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full px-4 py-2.5 rounded-xl bg-input border border-border-subtle text-text-main text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono"
+              />
+            </div>
 
             <div>
               <label className="block text-xs font-semibold text-text-muted mb-1">{t('newPassword')}</label>
