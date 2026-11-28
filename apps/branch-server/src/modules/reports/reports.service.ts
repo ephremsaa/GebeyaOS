@@ -240,6 +240,7 @@ export class ReportsService {
         c.id as category_id,
         c.name_en as category_name,
         COALESCE(SUM(si.line_total), 0) as gross_revenue,
+        COALESCE(SUM(CASE WHEN si.tax_amount > 0 THEN si.tax_amount WHEN si.is_vat_applicable THEN (si.line_total * 15.0 / 115.0) ELSE 0 END), 0) as vat_amount,
         COALESCE(SUM(si.quantity * si.unit_cost), 0) as cogs,
         COALESCE(SUM(CASE WHEN p.uom_code IN ('PCS', 'PACK', 'BOX') THEN si.quantity ELSE 0 END), 0) as units_pcs,
         COALESCE(SUM(CASE WHEN p.uom_code IN ('KG', 'G') THEN (CASE WHEN p.uom_code = 'G' THEN si.quantity / 1000.0 ELSE si.quantity END) ELSE 0 END), 0) as units_kg,
@@ -256,20 +257,23 @@ export class ReportsService {
       ORDER BY gross_revenue DESC
     `;
     const categoryBreakdown: SalesByCategoryItem[] = [];
+    const r2Cat = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
     try {
       const catRes = await this.db.query<any>(catBreakdownQuery, salesParams);
       for (const row of catRes.rows) {
         const rev = parseFloat(row.gross_revenue);
+        const vat = r2Cat(parseFloat(row.vat_amount));
+        const netRev = r2Cat(rev - vat);
         const cogs = parseFloat(row.cogs);
-        const profit = rev - cogs;
-        const margin = rev > 0 ? (profit / rev) * 100 : 0;
+        const profit = r2Cat((rev - cogs) - vat);
+        const margin = netRev > 0 ? (profit / netRev) * 100 : 0;
         categoryBreakdown.push({
           categoryId: row.category_id,
           categoryName: row.category_name,
-          grossRevenue: Math.round(rev * 100) / 100,
-          netRevenue: Math.round((rev - (rev * 0.15)) * 100) / 100,
-          cogs: Math.round(cogs * 100) / 100,
-          grossProfit: Math.round(profit * 100) / 100,
+          grossRevenue: r2Cat(rev),
+          netRevenue: netRev,
+          cogs: r2Cat(cogs),
+          grossProfit: profit,
           marginPercentage: Math.round(margin * 10) / 10,
           unitsPcs: Math.round(parseFloat(row.units_pcs) * 100) / 100,
           unitsKg: Math.round(parseFloat(row.units_kg) * 100) / 100,
@@ -339,6 +343,7 @@ export class ReportsService {
          COALESCE(SUM(si.unit_price * si.quantity), 0) as gross_revenue,
          COALESCE(SUM(si.discount_amount), 0) as discount_amount,
          COALESCE(SUM(si.line_total), 0) as net_revenue,
+         COALESCE(SUM(CASE WHEN si.tax_amount > 0 THEN si.tax_amount WHEN si.is_vat_applicable THEN (si.line_total * 15.0 / 115.0) ELSE 0 END), 0) as vat_amount,
          COALESCE(SUM(si.unit_cost * si.quantity), 0) as cogs
        FROM sale_items si
        JOIN sales s ON si.sale_id = s.id
@@ -359,9 +364,11 @@ export class ReportsService {
     const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
     const items: ProductProfitabilityItem[] = res.rows.map((r: any) => {
-      const netRev = parseFloat(r.net_revenue);
+      const sellingTotal = parseFloat(r.net_revenue);
+      const vat = r2(parseFloat(r.vat_amount));
+      const netRev = r2(sellingTotal - vat);
       const cogs = parseFloat(r.cogs);
-      const grossProfit = netRev - cogs;
+      const grossProfit = r2((sellingTotal - cogs) - vat);
       const marginPercentage = netRev > 0 ? (grossProfit / netRev) * 100 : 0;
 
       totalRevenue += netRev;
