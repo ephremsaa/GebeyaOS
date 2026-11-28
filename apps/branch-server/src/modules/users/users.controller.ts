@@ -37,6 +37,12 @@ export class UsersController {
     return this.usersService.listUsers(branchId);
   }
 
+  @Get('branches')
+  @RequirePermissions('admin:users:manage')
+  async listBranches() {
+    return this.usersService.listBranches();
+  }
+
   @Post()
   @RequirePermissions('admin:users:manage')
   @HttpCode(HttpStatus.CREATED)

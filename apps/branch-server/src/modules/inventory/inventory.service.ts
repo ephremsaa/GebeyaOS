@@ -3,9 +3,11 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../../common/database/database.service';
+import { TenantContextService } from '../../common/tenant/tenant-context.service';
 import {
   StockMovementType,
   StockReferenceType,
@@ -49,7 +51,14 @@ export interface RecordMovementParams {
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    @Optional() private readonly tenantContext?: TenantContextService,
+  ) {}
+
+  private getTenantId(): string {
+    return this.tenantContext?.getTenantId() || '01900000-0000-7000-8000-000000000001';
+  }
 
   /**
    * Records an append-only stock movement in the ledger.
@@ -137,8 +146,8 @@ export class InventoryService {
       `INSERT INTO stock_ledger (
          branch_id, product_id, batch_id, movement_type,
          quantity_change, unit_cost, balance_after,
-         reference_type, reference_id, notes, created_by
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         reference_type, reference_id, notes, created_by, tenant_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         branchId,
@@ -152,6 +161,7 @@ export class InventoryService {
         referenceId,
         notes,
         createdBy,
+        this.getTenantId(),
       ],
     );
 
@@ -305,8 +315,8 @@ export class InventoryService {
 
         const insertRes = await client.query(
           `INSERT INTO batches (
-             branch_id, product_id, batch_number, expiry_date, unit_cost, initial_quantity, current_quantity, supplier_id
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             branch_id, product_id, batch_number, expiry_date, unit_cost, initial_quantity, current_quantity, supplier_id, tenant_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING *`,
           [
             branchId,
@@ -317,6 +327,7 @@ export class InventoryService {
             qty,
             qty,
             dto.supplierId || null,
+            this.getTenantId(),
           ],
         );
         batchRow = insertRes.rows[0];
@@ -750,12 +761,13 @@ export class InventoryService {
       const adjustmentNumber = `ADJ-${datePart}-${seq}`;
 
       // 2. Insert stock_adjustments record
+      const tenantId = this.getTenantId();
       const adjRes = await client.query<any>(
         `INSERT INTO stock_adjustments (
-           branch_id, adjustment_number, reason_code, notes, status, created_by, approved_by
-         ) VALUES ($1, $2, $3, $4, 'COMPLETED', $5, $6)
+           branch_id, adjustment_number, reason_code, notes, status, created_by, approved_by, tenant_id
+         ) VALUES ($1, $2, $3, $4, 'COMPLETED', $5, $6, $7)
          RETURNING *`,
-        [effectiveBranchId, adjustmentNumber, dto.reasonCode, dto.notes, effectiveUserId, dto.approvedBy || effectiveUserId],
+        [effectiveBranchId, adjustmentNumber, dto.reasonCode, dto.notes, effectiveUserId, dto.approvedBy || effectiveUserId, tenantId],
       );
       const adjRow = adjRes.rows[0];
 
@@ -771,8 +783,8 @@ export class InventoryService {
 
         const itemRes = await client.query<any>(
           `INSERT INTO stock_adjustment_items (
-             adjustment_id, product_id, batch_id, quantity_change, unit_cost
-           ) VALUES ($1, $2, $3, $4, COALESCE($5, (SELECT cost_price FROM products WHERE id = $2)))
+             adjustment_id, product_id, batch_id, quantity_change, unit_cost, tenant_id
+           ) VALUES ($1, $2, $3, $4, COALESCE($5, (SELECT cost_price FROM products WHERE id = $2)), $6)
            RETURNING *`,
           [
             adjRow.id,
@@ -780,6 +792,7 @@ export class InventoryService {
             item.batchId || null,
             item.quantityChange,
             item.unitCost ?? null,
+            tenantId,
           ],
         );
         const itemRow = itemRes.rows[0];
@@ -865,10 +878,11 @@ export class InventoryService {
       const countNumber = `ST-${datePart}-${seq}`;
 
       // 2. Insert stock_takes header
+      const tenantId = this.getTenantId();
       const takeRes = await client.query<any>(
         `INSERT INTO stock_takes (
-           branch_id, count_number, scope, category_id, status, notes, conducted_by
-         ) VALUES ($1, $2, $3, $4, 'IN_PROGRESS', $5, $6)
+           branch_id, count_number, scope, category_id, status, notes, conducted_by, tenant_id
+         ) VALUES ($1, $2, $3, $4, 'IN_PROGRESS', $5, $6, $7)
          RETURNING *`,
         [
           effectiveBranchId,
@@ -877,6 +891,7 @@ export class InventoryService {
           dto.categoryId || null,
           dto.notes || null,
           effectiveUserId,
+          tenantId,
         ],
       );
       const takeRow = takeRes.rows[0];
@@ -907,14 +922,15 @@ export class InventoryService {
       for (const prod of productsSnapshot.rows) {
         const itemRes = await client.query<any>(
           `INSERT INTO stock_take_items (
-             stock_take_id, product_id, system_quantity, counted_quantity, unit_cost
-           ) VALUES ($1, $2, $3, 0, $4)
+             stock_take_id, product_id, system_quantity, counted_quantity, unit_cost, tenant_id
+           ) VALUES ($1, $2, $3, 0, $4, $5)
            RETURNING *`,
           [
             takeRow.id,
             prod.product_id,
             parseFloat(prod.system_quantity),
             parseFloat(prod.cost_price),
+            tenantId,
           ],
         );
         const item = itemRes.rows[0];

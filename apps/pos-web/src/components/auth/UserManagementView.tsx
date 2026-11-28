@@ -162,6 +162,7 @@ export const UserManagementView: React.FC = () => {
   // Staff users state
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [roles, setRoles] = useState<RoleMatrixItem[]>([]);
+  const [branches, setBranches] = useState<Array<{ id: string; code: string; name: string }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
@@ -189,7 +190,7 @@ export const UserManagementView: React.FC = () => {
     setNewUsername('');
     setNewEmail('');
     setNewRole('CASHIER');
-    setNewBranchCode(currentUser?.branchCode || 'BOLE-01');
+    setNewBranchCode(currentUser?.branchId || branches[0]?.id || '');
     setNewInitialPass('Gebeya@2026');
     setForcePassChange(true);
     setIsAddModalOpen(true);
@@ -294,6 +295,33 @@ export const UserManagementView: React.FC = () => {
     }
   };
 
+  const fetchBranches = async () => {
+    try {
+      const token = localStorage.getItem('gebeyaos_access_token');
+      const res = await fetch('/api/users/branches', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setBranches(data);
+          return;
+        }
+      }
+    } catch {
+      // fallback below
+    }
+    if (currentUser?.branchId) {
+      setBranches([
+        {
+          id: currentUser.branchId,
+          code: currentUser.branchCode || 'MAIN-01',
+          name: currentUser.branchName || 'Main Branch',
+        },
+      ]);
+    }
+  };
+
   const fetchAuditLogs = async () => {
     setAuditLoading(true);
     try {
@@ -335,6 +363,7 @@ export const UserManagementView: React.FC = () => {
   useEffect(() => {
     fetchUsers();
     fetchRoles();
+    fetchBranches();
   }, []);
 
   useEffect(() => {
@@ -377,6 +406,7 @@ export const UserManagementView: React.FC = () => {
           phone: newPhone.trim(),
           email: newEmail.trim() || undefined,
           role: newRole,
+          branchId: newBranchCode || currentUser?.branchId || undefined,
           initialPassword: newInitialPass,
           pin: newPin,
           forcePasswordChange: forcePassChange,
@@ -1045,8 +1075,11 @@ export const UserManagementView: React.FC = () => {
               onChange={(e) => setBranchFilter(e.target.value)}
             >
               <option value="ALL">{t('staff.allBranches')}</option>
-              <option value="BOLE-01">BOLE-01 (Bole Medhanialem)</option>
-              <option value="HQ-MAIN">HQ-MAIN (Corporate)</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.code}>
+                  {b.code} ({b.name})
+                </option>
+              ))}
             </select>
 
             <span className="text-xs text-text-muted font-mono ml-auto px-1">
@@ -1867,8 +1900,11 @@ export const UserManagementView: React.FC = () => {
                     onChange={(e) => setNewBranchCode(e.target.value)}
                     disabled={currentUser?.role === 'BRANCH_MANAGER'}
                   >
-                    <option value="BOLE-01">BOLE-01 — Bole Medhanialem</option>
-                    <option value="HQ-MAIN">HQ-MAIN — Corporate Headquarters</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.code} — {b.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

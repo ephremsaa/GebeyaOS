@@ -27,7 +27,7 @@ export class UsersService {
   constructor(
     private readonly db: DatabaseService,
     @Optional() private readonly tenantContextService?: TenantContextService,
-  ) {}
+  ) { }
 
   /**
    * Helper: Hash with Argon2id
@@ -120,6 +120,9 @@ export class UsersService {
       }
     }
 
+    const tenantId = activeTenantId || '01900000-0000-7000-8000-000000000001';
+    await this.ensureDefaultTenantRoles(tenantId);
+
     const existing = await this.db.query(
       `SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR phone = $2 LIMIT 1`,
       [dto.username.trim(), dto.phone.trim()],
@@ -141,8 +144,7 @@ export class UsersService {
     const pinHash = await this.hash(dto.pin);
     const userId = generateUuidV7();
 
-    const branchId = dto.branchId || (await this.getDefaultBranchId());
-    const tenantId = activeTenantId || '01900000-0000-7000-8000-000000000001';
+    const branchId = await this.resolveBranchId(dto.branchId);
 
     await this.db.withTransaction(async (client) => {
       await client.query(
@@ -518,6 +520,7 @@ export class UsersService {
    */
   async adminResetPin(adminId: string, userId: string, dto: AdminResetPinDto) {
     const pinHash = await this.hash(dto.newPin);
+    const tenantId = this.tenantContextService?.getTenantId() || '01900000-0000-7000-8000-000000000001';
 
     await this.db.withTransaction(async (client) => {
       await client.query(
@@ -532,9 +535,9 @@ export class UsersService {
       );
 
       await client.query(
-        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
-         VALUES ($1, $2, 'ADMIN_PIN_RESET', 'users', $3, $4)`,
-        [generateUuidV7(), adminId, userId, JSON.stringify({ pinLength: dto.newPin.length })],
+        `INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_name, entity_id, details)
+         VALUES ($1, $2, $3, 'ADMIN_PIN_RESET', 'users', $4, $5)`,
+        [generateUuidV7(), tenantId, adminId, userId, JSON.stringify({ pinLength: dto.newPin.length })],
       );
     });
 
@@ -545,6 +548,11 @@ export class UsersService {
    * 7. List Roles & Permission Matrix
    */
   async listRoles() {
+    const tenantId = this.tenantContextService?.getTenantId();
+    if (tenantId) {
+      await this.ensureDefaultTenantRoles(tenantId);
+    }
+
     const res = await this.db.query(`
       SELECT r.id, r.name, r.description, r.is_system, r.max_discount_percentage,
              COALESCE(array_agg(rp.permission_id) FILTER (WHERE rp.permission_id IS NOT NULL), '{}') as permissions
@@ -564,6 +572,21 @@ export class UsersService {
     }));
   }
 
+  async listBranches() {
+    const res = await this.db.query(
+      `SELECT id, code, name, is_hq
+       FROM branches
+       WHERE is_active = TRUE
+       ORDER BY is_hq DESC, created_at ASC`,
+    );
+    return res.rows.map((b) => ({
+      id: b.id,
+      code: b.code,
+      name: b.name,
+      isHq: b.is_hq,
+    }));
+  }
+
   /**
    * 8. Create Custom Role
    */
@@ -579,12 +602,13 @@ export class UsersService {
 
     const roleId = generateUuidV7();
     const maxDiscount = dto.maxDiscountPercentage !== undefined ? dto.maxDiscountPercentage : 0;
+    const tenantId = this.tenantContextService?.getTenantId() || '01900000-0000-7000-8000-000000000001';
 
     await this.db.withTransaction(async (client) => {
       await client.query(
-        `INSERT INTO roles (id, name, description, is_system, max_discount_percentage)
-         VALUES ($1, $2, $3, FALSE, $4)`,
-        [roleId, roleName, dto.description || '', maxDiscount],
+        `INSERT INTO roles (id, tenant_id, name, description, is_system, max_discount_percentage)
+         VALUES ($1, $2, $3, $4, FALSE, $5)`,
+        [roleId, tenantId, roleName, dto.description || '', maxDiscount],
       );
 
       if (dto.permissions && dto.permissions.length > 0) {
@@ -597,7 +621,7 @@ export class UsersService {
       }
 
       await client.query(
-        `INSERT INTO audit_logs (id, user_id, action, entity_name, entity_id, details)
+        `INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_name, entity_id, details)
          VALUES ($1, $2, 'ROLE_CREATED', 'roles', $3, $4)`,
         [
           generateUuidV7(),
@@ -705,6 +729,74 @@ export class UsersService {
       `SELECT id, module, description FROM permissions ORDER BY module, id`,
     );
     return res.rows;
+  }
+
+  private async ensureDefaultTenantRoles(tenantId: string): Promise<void> {
+    const defaults = [
+      {
+        name: 'BRANCH_MANAGER',
+        description: 'Branch Manager with full store operations and staff supervision',
+        maxDiscount: 25,
+        perms: ['pos:shift:open', 'pos:shift:close', 'pos:sale:create', 'pos:sale:hold', 'pos:sale:discount', 'pos:sale:refund', 'pos:receipt:reprint', 'pos:cash:movement', 'catalog:product:view', 'catalog:product:create', 'catalog:product:edit', 'inventory:stock:view', 'inventory:adjust:create', 'inventory:adjust:approve', 'inventory:stocktake:execute', 'inventory:stocktake:reconcile', 'inventory:import:execute', 'purchasing:po:create', 'purchasing:grn:receive', 'admin:users:manage'],
+      },
+      {
+        name: 'CASHIER',
+        description: 'POS Register Cashier for checkout and receipt printing',
+        maxDiscount: 5,
+        perms: ['pos:shift:open', 'pos:shift:close', 'pos:sale:create', 'pos:sale:hold', 'pos:receipt:reprint', 'catalog:product:view'],
+      },
+      {
+        name: 'INVENTORY_CLERK',
+        description: 'Stock & Inventory Clerk for receiving, stock counts, and catalog updates',
+        maxDiscount: 0,
+        perms: ['catalog:product:view', 'catalog:product:create', 'catalog:product:edit', 'inventory:stock:view', 'inventory:adjust:create', 'inventory:stocktake:execute', 'inventory:import:execute', 'purchasing:po:create', 'purchasing:grn:receive'],
+      },
+      {
+        name: 'ACCOUNTANT',
+        description: 'Finance & Reporting Accountant with read access to sales and audit logs',
+        maxDiscount: 0,
+        perms: ['catalog:product:view', 'inventory:stock:view'],
+      },
+    ];
+
+    try {
+      for (const r of defaults) {
+        const res = await this.db.query(
+          `INSERT INTO roles (id, tenant_id, name, description, is_system, max_discount_percentage)
+           VALUES ($1, $2, $3, $4, TRUE, $5)
+           ON CONFLICT (tenant_id, name) DO NOTHING
+           RETURNING id`,
+          [generateUuidV7(), tenantId, r.name, r.description, r.maxDiscount],
+        );
+        if (res.rows.length > 0) {
+          const roleId = res.rows[0].id;
+          for (const permId of r.perms) {
+            await this.db.query(
+              `INSERT INTO role_permissions (role_id, permission_id)
+               SELECT $1, id FROM permissions WHERE id = $2
+               ON CONFLICT DO NOTHING`,
+              [roleId, permId],
+            );
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Default role seed check skipped: ${err.message}`);
+    }
+  }
+
+  private async resolveBranchId(branchIdOrCode?: string): Promise<string> {
+    const val = branchIdOrCode?.trim();
+    if (val) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+      if (isUuid) return val;
+      const byCode = await this.db.query(
+        `SELECT id FROM branches WHERE UPPER(code) = UPPER($1) LIMIT 1`,
+        [val],
+      );
+      if (byCode.rows.length > 0) return byCode.rows[0].id;
+    }
+    return this.getDefaultBranchId();
   }
 
   private async getDefaultBranchId(): Promise<string> {
