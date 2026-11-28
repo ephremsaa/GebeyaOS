@@ -1399,21 +1399,21 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
     const role = adminUser?.role || 'SUPER_ADMIN';
     if (role === 'SUPER_ADMIN') {
       return (
-        <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
-          <ShieldCheck size={11} /> Super Admin
+        <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5">
+          <ShieldCheck size={14} /> Super Admin
         </span>
       );
     }
     if (role === 'SUPPORT') {
       return (
-        <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold flex items-center gap-1">
-          <ShieldAlert size={11} /> Support Operator
+        <span className="px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-bold flex items-center gap-1.5">
+          <ShieldAlert size={14} /> Support Operator
         </span>
       );
     }
     return (
-      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
-        <Key size={11} /> Billing Operator
+      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5">
+        <Key size={14} /> Billing Operator
       </span>
     );
   };
@@ -1421,100 +1421,121 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
   return (
     <div className="min-h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden">
       {/* 1. Control Plane Header */}
-      <header className="h-16 px-6 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between shrink-0 z-20 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xs">
-              <ShieldAlert size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm tracking-tight text-white">GebeyaOS Platform Console</span>
-                {roleBadge()}
-              </div>
-              <p className="text-[11px] text-slate-400">Fleet Control & Supermarket Tenant Isolation</p>
-            </div>
+      <header className="px-6 py-3.5 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 shrink-0 z-20 backdrop-blur-md">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xs shrink-0">
+            <ShieldAlert size={24} />
           </div>
-
-          <div className="h-6 w-px bg-slate-800 mx-2" />
-
-          {/* Navigation switch */}
-          <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 text-xs font-semibold">
-            <button
-              onClick={() => setCurrentTab('tenants')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                currentTab === 'tenants'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Building2 size={14} /> Supermarkets ({tenants.length})
-            </button>
-            <button
-              onClick={() => setCurrentTab('applications')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                currentTab === 'applications'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <FileText size={14} /> Applications ({pendingApplicationsCount})
-            </button>
-            <button
-              onClick={() => setCurrentTab('sessions')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                currentTab === 'sessions'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Laptop size={14} /> Operator Sessions ({sessionsList.length})
-            </button>
-            <button
-              onClick={() => setCurrentTab('audit')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                currentTab === 'audit'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Clock size={14} /> Platform Audit ({auditLogs.length})
-            </button>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="font-extrabold text-lg tracking-tight text-white">GebeyaOS Platform Console</span>
+              {roleBadge()}
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">Fleet Control &amp; Supermarket Tenant Isolation</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="text-xs font-bold text-slate-200">{adminUser?.fullName || 'Operator'}</div>
-            <div className="text-[10px] font-mono text-emerald-400">{adminUser?.email || 'admin@gebeyaos.et'}</div>
+          <div className="text-right hidden sm:block">
+            <div className="text-sm font-bold text-slate-100">{adminUser?.fullName || 'Operator'}</div>
+            <div className="text-xs font-mono text-emerald-400">{adminUser?.email || 'admin@gebeyaos.et'}</div>
           </div>
 
           <button
             onClick={() => setShowChangePasswordModal(true)}
             title="Change Master Password"
-            className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-2 transition-all cursor-pointer"
           >
-            <KeyRound size={13} /> Password
+            <KeyRound size={15} /> Password
           </button>
 
           {onExit && (
             <button
               onClick={onExit}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700 transition-all flex items-center gap-2 cursor-pointer"
             >
-              <ArrowRight size={14} /> Exit to POS
+              <ArrowRight size={15} /> Exit to POS
             </button>
           )}
 
           <button
             onClick={handleLogout}
             title="Log Out Operator"
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700 transition-all"
+            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 hover:text-rose-400 text-slate-300 border border-slate-700 transition-all cursor-pointer"
           >
-            <LogOut size={16} />
+            <LogOut size={18} />
           </button>
         </div>
       </header>
+
+      {/* Navigation Tab Bar */}
+      <div className="px-6 py-2.5 bg-slate-900/60 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto shrink-0">
+        <button
+          onClick={() => setCurrentTab('tenants')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            currentTab === 'tenants'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+          }`}
+        >
+          <Building2 size={17} />
+          <span>Supermarkets</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'tenants' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
+            {tenants.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('applications')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            currentTab === 'applications'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+          }`}
+        >
+          <FileText size={17} />
+          <span>Applications</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${
+            currentTab === 'applications'
+              ? 'bg-white/20 text-white'
+              : pendingApplicationsCount > 0
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                : 'bg-slate-800 text-slate-300'
+          }`}>
+            {pendingApplicationsCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('sessions')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            currentTab === 'sessions'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+          }`}
+        >
+          <Laptop size={17} />
+          <span>Operator Sessions</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'sessions' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
+            {sessionsList.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('audit')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            currentTab === 'audit'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+          }`}
+        >
+          <Clock size={17} />
+          <span>Platform Audit</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-mono ${currentTab === 'audit' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'}`}>
+            {auditLogs.length}
+          </span>
+        </button>
+      </div>
 
       {/* 2. Break-Glass Support Access Banner */}
       {activeSupportSession && (
@@ -1544,47 +1565,47 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
           <>
             {/* Metric KPI cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Building2 size={24} />
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Building2 size={28} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400">Total Supermarkets</div>
-                  <div className="text-2xl font-bold text-white tracking-tight">{tenants.length}</div>
-                  <div className="text-[11px] text-emerald-400 mt-0.5">{activeTenantsCount} Active Supermarkets</div>
+                  <div className="text-sm font-semibold text-slate-400">Total Supermarkets</div>
+                  <div className="text-3xl font-black text-white tracking-tight mt-0.5">{tenants.length}</div>
+                  <div className="text-xs text-emerald-400 mt-0.5 font-medium">{activeTenantsCount} Active Supermarkets</div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
-                  <HardDrive size={24} />
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+                  <HardDrive size={28} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400">Branch LAN Servers</div>
-                  <div className="text-2xl font-bold text-white tracking-tight">{totalBranches}</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Offline-capable edge nodes</div>
+                  <div className="text-sm font-semibold text-slate-400">Branch LAN Servers</div>
+                  <div className="text-3xl font-black text-white tracking-tight mt-0.5">{totalBranches}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">Offline-capable edge nodes</div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Laptop size={24} />
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Laptop size={28} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400">POS Terminals</div>
-                  <div className="text-2xl font-bold text-white tracking-tight">{totalTerminals}</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Lane checkouts active</div>
+                  <div className="text-sm font-semibold text-slate-400">POS Terminals</div>
+                  <div className="text-3xl font-black text-white tracking-tight mt-0.5">{totalTerminals}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">Lane checkouts active</div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
-                  <ShieldAlert size={24} />
+              <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                  <ShieldAlert size={28} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400">Suspended Accounts</div>
-                  <div className="text-2xl font-bold text-white tracking-tight">{suspendedCount}</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Isolated from synchronization</div>
+                  <div className="text-sm font-semibold text-slate-400">Suspended Accounts</div>
+                  <div className="text-3xl font-black text-white tracking-tight mt-0.5">{suspendedCount}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">Isolated from synchronization</div>
                 </div>
               </div>
             </div>
@@ -1593,26 +1614,26 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-sm flex-1 flex flex-col">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-800">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-base font-bold text-white">Supermarket Tenant Fleet</h2>
-                  <span className="text-xs text-slate-400">({filteredTenants.length} shown)</span>
+                  <h2 className="text-lg font-extrabold text-white">Supermarket Tenant Fleet</h2>
+                  <span className="text-sm text-slate-400">({filteredTenants.length} shown)</span>
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
-                  <div className="relative min-w-[200px]">
-                    <Search size={14} className="absolute left-3 top-3 text-slate-500" />
+                  <div className="relative min-w-[240px]">
+                    <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
                     <input
                       type="text"
                       placeholder="Search company or slug..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 font-mono"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500 font-mono"
                     />
                   </div>
 
                   <select
                     value={statusFilter}
                     onChange={(e: any) => setStatusFilter(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-300 focus:outline-hidden focus:border-emerald-500 cursor-pointer font-medium"
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-slate-200 focus:outline-hidden focus:border-emerald-500 cursor-pointer font-semibold"
                   >
                     <option value="all">All Statuses</option>
                     <option value="active">Active Only</option>
@@ -1622,33 +1643,33 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                   <button
                     onClick={loadTenants}
                     title="Refresh fleet telemetry"
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all cursor-pointer"
+                    className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all cursor-pointer"
                   >
-                    <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+                    <RefreshCw size={17} className={isLoading ? 'animate-spin' : ''} />
                   </button>
 
                   <button
                     onClick={() => setShowCreateModal(true)}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-950/40 flex items-center gap-2 transition-all cursor-pointer"
                   >
-                    <Plus size={14} /> Provision Supermarket
+                    <Plus size={17} /> Provision Supermarket
                   </button>
                 </div>
               </div>
 
               {/* Tenants Table */}
               <div className="overflow-x-auto flex-1 mt-4">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="text-[11px] uppercase font-bold text-slate-400 border-b border-slate-800 bg-slate-900/60">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="text-xs uppercase font-bold tracking-wider text-slate-400 border-b border-slate-800 bg-slate-900/60">
                     <tr>
-                      <th className="py-3 px-4">Supermarket & Slug</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Plan & Quota</th>
-                      <th className="py-3 px-4">Branches</th>
-                      <th className="py-3 px-4">Terminals</th>
-                      <th className="py-3 px-4">Staff</th>
-                      <th className="py-3 px-4">Last Sync</th>
-                      <th className="py-3 px-4 text-right">Operator Actions</th>
+                      <th className="py-3.5 px-4">Supermarket &amp; Slug</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4">Plan &amp; Quota</th>
+                      <th className="py-3.5 px-4">Branches</th>
+                      <th className="py-3.5 px-4">Terminals</th>
+                      <th className="py-3.5 px-4">Staff</th>
+                      <th className="py-3.5 px-4">Last Sync</th>
+                      <th className="py-3.5 px-4 text-right">Operator Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-sans">
@@ -1726,16 +1747,16 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                             {tenant.lastSyncAt ? new Date(tenant.lastSyncAt).toLocaleTimeString() : 'Never'}
                           </td>
 
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
+                          <td className="py-4 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
                               {/* Reset owner access link */}
                               <button
                                 type="button"
                                 onClick={() => handleResetOwnerAccess(tenant)}
                                 title="Reset Owner Access / Generate Invite"
-                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all cursor-pointer"
+                                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-all cursor-pointer"
                               >
-                                <Key size={13} />
+                                <Key size={16} />
                               </button>
 
                               {/* Break-glass support access */}
@@ -1747,9 +1768,9 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                                 }}
                                 title="Request Audited Support Session"
                                 disabled={adminUser?.role === 'BILLING'}
-                                className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                className="p-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                               >
-                                <Shield size={13} />
+                                <Shield size={16} />
                               </button>
 
                               {/* Export tenant data */}
@@ -1758,12 +1779,12 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                                 onClick={() => handleExportData(tenant)}
                                 title="Export Complete Tenant Database & Ledger (ZIP)"
                                 disabled={exportingTenantId === tenant.id || adminUser?.role === 'BILLING'}
-                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all cursor-pointer disabled:opacity-50"
+                                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-all cursor-pointer disabled:opacity-50"
                               >
                                 {exportingTenantId === tenant.id ? (
-                                  <RefreshCw size={13} className="animate-spin text-emerald-400" />
+                                  <RefreshCw size={16} className="animate-spin text-emerald-400" />
                                 ) : (
-                                  <Download size={13} />
+                                  <Download size={16} />
                                 )}
                               </button>
 
@@ -1772,7 +1793,7 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                                 type="button"
                                 onClick={() => handleToggleTenantStatus(tenant)}
                                 disabled={adminUser?.role === 'SUPPORT' || (adminUser?.role === 'BILLING' && tenant.status === 'active')}
-                                className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
                                   tenant.status === 'active'
                                     ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30'
                                     : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30'
@@ -1792,9 +1813,9 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                                     setShowDeleteModal(true);
                                   }}
                                   title="Permanently Delete Tenant"
-                                  className="p-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/30 text-red-400 border border-red-500/30 transition-all cursor-pointer"
+                                  className="p-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 text-red-400 border border-red-500/30 transition-all cursor-pointer"
                                 >
-                                  <Trash2 size={13} />
+                                  <Trash2 size={16} />
                                 </button>
                               )}
                             </div>
@@ -1814,22 +1835,22 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
               <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <FileText size={18} className="text-emerald-400" /> Supermarket Onboarding Applications
+                <h2 className="text-lg font-extrabold text-white flex items-center gap-2.5">
+                  <FileText size={20} className="text-emerald-400" /> Supermarket Onboarding Applications
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-sm text-slate-400 mt-1">
                   Review incoming supermarket registrations, verify business details, and approve with 72-hour owner setup tokens.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-bold">
                   {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
                     <button
                       key={f}
                       type="button"
                       onClick={() => setApplicationFilter(f)}
-                      className={`px-3 py-1 rounded-lg capitalize transition-all ${
+                      className={`px-3.5 py-1.5 rounded-lg capitalize transition-all cursor-pointer ${
                         applicationFilter === f
                           ? 'bg-emerald-600 text-white shadow-xs'
                           : 'text-slate-400 hover:text-white'
@@ -1843,23 +1864,23 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                 <button
                   type="button"
                   onClick={loadApplications}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-2 cursor-pointer transition-colors"
                 >
-                  <RefreshCw size={13} className={isLoadingApplications ? 'animate-spin' : ''} /> Refresh
+                  <RefreshCw size={15} className={isLoadingApplications ? 'animate-spin' : ''} /> Refresh
                 </button>
               </div>
             </div>
 
             <div className="overflow-x-auto mt-4">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="text-[11px] uppercase font-bold text-slate-400 border-b border-slate-800 bg-slate-900/60">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="text-xs uppercase tracking-wider font-bold text-slate-400 border-b border-slate-800 bg-slate-900/60">
                   <tr>
-                    <th className="py-3 px-4">Supermarket & Location</th>
-                    <th className="py-3 px-4">Owner & Contact</th>
-                    <th className="py-3 px-4">Submitted</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Notes</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                    <th className="py-3.5 px-4">Supermarket & Location</th>
+                    <th className="py-3.5 px-4">Owner & Contact</th>
+                    <th className="py-3.5 px-4">Submitted</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4">Notes</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -1872,30 +1893,30 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                   ) : (
                     filteredApplications.map((app) => (
                       <tr key={app.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-white text-sm">{app.supermarketName}</div>
-                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <td className="py-4 px-4">
+                          <div className="font-bold text-white text-base">{app.supermarketName}</div>
+                          <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
                             <span>{app.city}</span>
                             {app.address && <span>• {app.address}</span>}
                           </div>
                           {app.businessLicenseNo && (
-                            <div className="text-[10px] font-mono text-amber-300 mt-0.5">
+                            <div className="text-xs font-mono text-amber-300 mt-1">
                               License / TIN: {app.businessLicenseNo}
                             </div>
                           )}
                         </td>
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-200">{app.ownerFullName}</div>
-                          <div className="text-[11px] font-mono text-emerald-400 mt-0.5">{app.phone}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{app.email}</div>
+                        <td className="py-4 px-4">
+                          <div className="font-bold text-slate-200 text-sm">{app.ownerFullName}</div>
+                          <div className="text-xs font-mono text-emerald-400 mt-1">{app.phone}</div>
+                          <div className="text-xs text-slate-400 font-mono mt-0.5">{app.email}</div>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-400 font-mono text-[11px]">
+                        <td className="py-4 px-4 text-slate-300 font-mono text-xs">
                           {new Date(app.createdAt).toLocaleDateString()}
-                          <div className="text-[10px] text-slate-500">{new Date(app.createdAt).toLocaleTimeString()}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{new Date(app.createdAt).toLocaleTimeString()}</div>
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-4 px-4">
                           <span
-                            className={`px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1 ${
+                            className={`px-3 py-1 rounded-full font-bold text-xs inline-flex items-center gap-1.5 ${
                               app.status === 'APPROVED'
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                 : app.status === 'REJECTED'
@@ -1903,38 +1924,48 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                                 : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                             }`}
                           >
-                            {app.status === 'APPROVED' && <CheckCircle2 size={11} />}
-                            {app.status === 'REJECTED' && <X size={11} />}
-                            {app.status === 'PENDING' && <Clock size={11} />}
+                            {app.status === 'APPROVED' && <CheckCircle2 size={14} />}
+                            {app.status === 'REJECTED' && <X size={14} />}
+                            {app.status === 'PENDING' && <Clock size={14} />}
                             {app.status}
                           </span>
                           {app.licenseKey && (
-                            <div className="mt-1.5 font-mono text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md inline-block select-all">
-                              {app.licenseKey}
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(app.licenseKey || '');
+                                setCopiedToken(app.licenseKey || null);
+                                setTimeout(() => setCopiedToken(null), 2500);
+                              }}
+                              title="Click to copy license key"
+                              className="mt-2 font-mono text-xs font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                            >
+                              <span>{app.licenseKey}</span>
+                              {copiedToken === app.licenseKey ? <Check size={13} /> : <Copy size={13} />}
+                            </button>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 text-slate-400 text-[11px] max-w-xs truncate">
+                        <td className="py-4 px-4 text-slate-400 text-xs max-w-xs truncate">
                           {app.notes || '—'}
                           {app.rejectionReason && (
-                            <div className="text-rose-400 text-[10px] mt-0.5 font-medium">
+                            <div className="text-rose-400 text-xs mt-1 font-medium">
                               Reason: {app.rejectionReason}
                             </div>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 text-right">
+                        <td className="py-4 px-4 text-right">
                           {app.status === 'PENDING' ? (
                             <div className="inline-flex items-center gap-2">
                               <button
                                 type="button"
                                 disabled={approvingAppId === app.id}
                                 onClick={() => handleApproveApplication(app)}
-                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                               >
                                 {approvingAppId === app.id ? (
-                                  <RefreshCw size={12} className="animate-spin" />
+                                  <RefreshCw size={15} className="animate-spin" />
                                 ) : (
-                                  <Check size={12} />
+                                  <Check size={15} />
                                 )}
                                 Approve & Issue Token
                               </button>
@@ -1944,7 +1975,7 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                                   setSelectedApplicationForReject(app);
                                   setRejectReason('');
                                 }}
-                                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 text-slate-400 font-medium text-xs border border-slate-700 transition-all cursor-pointer"
+                                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 text-slate-300 font-bold text-xs border border-slate-700 transition-all cursor-pointer"
                               >
                                 Reject
                               </button>
@@ -1958,13 +1989,13 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                                 setCopiedToken(app.inviteToken || null);
                                 setTimeout(() => setCopiedToken(null), 2500);
                               }}
-                              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs border border-slate-700 inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 inline-flex items-center gap-1.5 transition-all cursor-pointer"
                             >
-                              {copiedToken === app.inviteToken ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                              {copiedToken === app.inviteToken ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
                               {copiedToken === app.inviteToken ? 'Link Copied!' : 'Copy Invite Link'}
                             </button>
                           ) : (
-                            <span className="text-slate-600 text-xs">—</span>
+                            <span className="text-slate-600 text-sm">—</span>
                           )}
                         </td>
                       </tr>
@@ -1979,28 +2010,28 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
         {/* Sessions Tab */}
         {currentTab === 'sessions' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col">
-            <div className="flex items-center justify-between pb-5 border-b border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
               <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Laptop size={18} className="text-emerald-400" /> Active Platform Operator Sessions
+                <h2 className="text-lg font-extrabold text-white flex items-center gap-2.5">
+                  <Laptop size={20} className="text-emerald-400" /> Active Platform Operator Sessions
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-sm text-slate-400 mt-1">
                   Manage active browser sessions, IP addresses, and revoke compromised device logins.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
                   onClick={loadSessions}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-2 cursor-pointer transition-colors"
                 >
-                  <RefreshCw size={13} className={isLoadingSessions ? 'animate-spin' : ''} /> Refresh
+                  <RefreshCw size={15} className={isLoadingSessions ? 'animate-spin' : ''} /> Refresh
                 </button>
                 <button
                   type="button"
                   onClick={handleRevokeAllSessions}
-                  className="px-3.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition-all"
+                  className="px-4 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition-all cursor-pointer"
                 >
                   Revoke All Other Sessions
                 </button>
@@ -2009,29 +2040,29 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
 
             <div className="mt-5 space-y-3">
               {sessionsList.length === 0 ? (
-                <div className="py-8 text-center text-slate-500 text-xs">
+                <div className="py-10 text-center text-slate-500 text-sm">
                   No active platform sessions found.
                 </div>
               ) : (
                 sessionsList.map((session) => (
                   <div
                     key={session.id}
-                    className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between"
+                    className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300">
-                        <Laptop size={20} />
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300 shrink-0">
+                        <Laptop size={22} />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-white">{session.deviceInfo || 'Operator Console'}</span>
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-base font-bold text-white">{session.deviceInfo || 'Operator Console'}</span>
                           {session.isCurrent && (
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                            <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
                               Current Device
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-3 font-mono">
+                        <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono">
                           <span>IP: {session.ipAddress || '127.0.0.1'}</span>
                           <span>Created: {new Date(session.createdAt).toLocaleString()}</span>
                           <span>Expires: {new Date(session.expiresAt).toLocaleTimeString()}</span>
@@ -2043,7 +2074,7 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                       <button
                         type="button"
                         onClick={() => handleRevokeSession(session.id)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 text-slate-300 text-xs font-medium border border-slate-700 transition-all"
+                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 text-slate-300 text-xs font-bold border border-slate-700 transition-all cursor-pointer"
                       >
                         Revoke
                       </button>
@@ -2058,12 +2089,12 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
         {/* Audit Tab */}
         {currentTab === 'audit' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col">
-            <div className="flex items-center justify-between pb-5 border-b border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
               <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Clock size={18} className="text-emerald-400" /> Platform Security & Access Audit Trail
+                <h2 className="text-lg font-extrabold text-white flex items-center gap-2.5">
+                  <Clock size={20} className="text-emerald-400" /> Platform Security & Access Audit Trail
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-sm text-slate-400 mt-1">
                   Immutable record of all platform admin operations, tenant provisioning, support access, and security changes.
                 </p>
               </div>
@@ -2071,39 +2102,39 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
               <button
                 type="button"
                 onClick={loadAuditLogs}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-2 cursor-pointer transition-colors"
               >
-                <RefreshCw size={13} /> Refresh Log
+                <RefreshCw size={15} /> Refresh Log
               </button>
             </div>
 
             <div className="overflow-x-auto mt-4">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="text-[11px] uppercase font-bold text-slate-400 border-b border-slate-800 bg-slate-900/60">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="text-xs uppercase tracking-wider font-bold text-slate-400 border-b border-slate-800 bg-slate-900/60">
                   <tr>
-                    <th className="py-3 px-4">Timestamp</th>
-                    <th className="py-3 px-4">Operator</th>
-                    <th className="py-3 px-4">Action</th>
-                    <th className="py-3 px-4">Tenant</th>
-                    <th className="py-3 px-4">Client IP</th>
-                    <th className="py-3 px-4">Audit Details</th>
+                    <th className="py-3.5 px-4">Timestamp</th>
+                    <th className="py-3.5 px-4">Operator</th>
+                    <th className="py-3.5 px-4">Action</th>
+                    <th className="py-3.5 px-4">Tenant</th>
+                    <th className="py-3.5 px-4">Client IP</th>
+                    <th className="py-3.5 px-4">Audit Details</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
                   {auditLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-500 font-sans text-xs">
+                      <td colSpan={6} className="py-10 text-center text-slate-500 font-sans text-sm">
                         No audit trail entries recorded yet.
                       </td>
                     </tr>
                   ) : (
                     auditLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-800/40">
-                        <td className="py-3 px-4 text-slate-400">{new Date(log.createdAt).toLocaleString()}</td>
-                        <td className="py-3 px-4 text-slate-200 font-sans font-medium">{log.adminUsername || 'Operator'}</td>
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4 text-slate-400">{new Date(log.createdAt).toLocaleString()}</td>
+                        <td className="py-3.5 px-4 text-slate-200 font-sans font-bold text-sm">{log.adminUsername || 'Operator'}</td>
+                        <td className="py-3.5 px-4">
                           <span
-                            className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                            className={`px-2.5 py-1 rounded-md font-bold text-xs ${
                               log.action.includes('SUSPEND') || log.action.includes('DELETE')
                                 ? 'bg-rose-500/20 text-rose-300'
                                 : log.action.includes('SUPPORT')
@@ -2114,9 +2145,9 @@ export const PlatformAdminConsole: React.FC<{ onExit?: () => void }> = ({ onExit
                             {log.action}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-slate-300 font-sans">{log.tenantName || 'Platform HQ'}</td>
-                        <td className="py-3 px-4 text-slate-400">{log.ipAddress || '127.0.0.1'}</td>
-                        <td className="py-3 px-4 text-slate-400 max-w-xs truncate">{JSON.stringify(log.details || {})}</td>
+                        <td className="py-3.5 px-4 text-slate-200 font-sans font-medium text-sm">{log.tenantName || 'Platform HQ'}</td>
+                        <td className="py-3.5 px-4 text-slate-400">{log.ipAddress || '127.0.0.1'}</td>
+                        <td className="py-3.5 px-4 text-slate-400 max-w-xs truncate">{JSON.stringify(log.details || {})}</td>
                       </tr>
                     ))
                   )}
