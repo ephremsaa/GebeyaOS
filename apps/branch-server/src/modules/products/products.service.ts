@@ -540,24 +540,77 @@ export class ProductsService {
       }
     }
 
+    let product: Product;
+
     if (fields.length === 0) {
       const res = await this.db.query<Product>(`SELECT * FROM products WHERE id = $1`, [id]);
       if (res.rows.length === 0) throw new NotFoundException(`Product ${id} not found`);
-      return res.rows[0];
+      product = res.rows[0];
+    } else {
+      const query = `
+        UPDATE products
+        SET ${fields.join(', ')}, updated_at = clock_timestamp()
+        WHERE id = $1
+        RETURNING *
+      `;
+
+      const res = await this.db.query<Product>(query, params);
+      if (res.rows.length === 0) {
+        throw new NotFoundException(`Product ${id} not found`);
+      }
+      product = res.rows[0];
     }
 
-    const query = `
-      UPDATE products
-      SET ${fields.join(', ')}, updated_at = clock_timestamp()
-      WHERE id = $1
-      RETURNING *
-    `;
-
-    const res = await this.db.query<Product>(query, params);
-    if (res.rows.length === 0) {
-      throw new NotFoundException(`Product ${id} not found`);
+    if (dto.barcode !== undefined) {
+      const trimmedBarcode = dto.barcode.trim();
+      if (trimmedBarcode) {
+        const barcodeType = trimmedBarcode.length === 13 ? 'EAN13' : 'CODE128';
+        const tenantId = this.getTenantId();
+        try {
+          const existingSame = await this.db.query<{ id: string }>(
+            `SELECT id FROM product_barcodes WHERE product_id = $1 AND barcode = $2 LIMIT 1`,
+            [id, trimmedBarcode],
+          );
+          if (existingSame.rows.length > 0) {
+            await this.db.query(
+              `UPDATE product_barcodes SET is_primary = false WHERE product_id = $1 AND id <> $2`,
+              [id, existingSame.rows[0].id],
+            );
+            await this.db.query(
+              `UPDATE product_barcodes SET is_primary = true, pack_multiplier = COALESCE($2, pack_multiplier) WHERE id = $1`,
+              [existingSame.rows[0].id, dto.pack_multiplier ?? null],
+            );
+          } else {
+            const primaryRes = await this.db.query<{ id: string }>(
+              `SELECT id FROM product_barcodes WHERE product_id = $1 ORDER BY is_primary DESC, id ASC LIMIT 1`,
+              [id],
+            );
+            if (primaryRes.rows.length > 0) {
+              await this.db.query(
+                `UPDATE product_barcodes
+                 SET barcode = $1, barcode_type = $2, pack_multiplier = COALESCE($3, pack_multiplier), is_primary = true
+                 WHERE id = $4`,
+                [trimmedBarcode, barcodeType, dto.pack_multiplier ?? null, primaryRes.rows[0].id],
+              );
+            } else {
+              await this.db.query(
+                `INSERT INTO product_barcodes (
+                  id, product_id, barcode, barcode_type, pack_multiplier, is_primary, tenant_id
+                ) VALUES ($1, $2, $3, $4, $5, true, $6)`,
+                [generateUuidV7(), id, trimmedBarcode, barcodeType, dto.pack_multiplier || 1.0, tenantId],
+              );
+            }
+          }
+        } catch (err: any) {
+          if (err.code === '23505') {
+            throw new ConflictException(`Barcode '${trimmedBarcode}' is already assigned to a product.`);
+          }
+          throw err;
+        }
+      }
     }
-    return res.rows[0];
+
+    return product;
   }
 
   /**
