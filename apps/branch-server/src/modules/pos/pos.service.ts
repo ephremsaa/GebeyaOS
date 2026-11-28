@@ -391,21 +391,34 @@ export class PosService {
     shiftId: string,
     dto: CloseShiftDto | Partial<CloseShiftDto>,
   ): Promise<ZReportSummary> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(shiftId);
+    if (!isUuid) {
+      throw new NotFoundException(`Shift ${shiftId} not found`);
+    }
+
+    const tenantId = this.getTenantId();
     return this.db.withTransaction(async (client) => {
-      const shiftRes = await client.query<any>(
+      let shiftRes = await client.query<any>(
         `SELECT * FROM shifts WHERE id = $1 AND branch_id = $2 FOR UPDATE`,
         [shiftId, branchId],
       );
+      if (shiftRes.rows.length === 0) {
+        shiftRes = await client.query<any>(
+          `SELECT * FROM shifts WHERE id = $1 FOR UPDATE`,
+          [shiftId],
+        );
+      }
 
       if (shiftRes.rows.length === 0) {
         throw new NotFoundException(`Shift ${shiftId} not found`);
       }
       const shift = shiftRes.rows[0];
+      const effectiveBranchId = shift.branch_id || branchId;
       if (shift.status !== 'OPEN') {
         throw new BadRequestException(`Shift is already ${shift.status}`);
       }
 
-      const xReport = await this.getXReport(branchId, shiftId);
+      const xReport = await this.getXReport(effectiveBranchId, shiftId);
       const expectedCash = xReport.expectedCashInDrawer;
       const counted = dto.getResolvedClosingCash
         ? dto.getResolvedClosingCash()
@@ -429,7 +442,7 @@ export class PosService {
         cashVariance: variance,
         closedAt: new Date().toISOString(),
       };
-    });
+    }, tenantId);
   }
 
   /**

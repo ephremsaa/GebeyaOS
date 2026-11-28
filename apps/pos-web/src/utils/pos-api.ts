@@ -206,14 +206,17 @@ export const posApi = {
    * If cashier, expected cash is hidden (null).
    */
   async getXReport(shiftId: string, userRole?: string, branchId?: string): Promise<XReportData> {
-    try {
-      const headers: Record<string, string> = {};
-      if (branchId) headers['x-branch-id'] = branchId;
-      if (userRole) headers['x-user-role'] = userRole;
+    if (!shiftId.startsWith('shift-offline-')) {
+      try {
+        const headers: Record<string, string> = {};
+        const token = localStorage.getItem('gebeyaos_access_token');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (branchId) headers['x-branch-id'] = branchId;
+        if (userRole) headers['x-user-role'] = userRole;
 
-      const res = await fetch(`${API_BASE}/pos/shifts/${encodeURIComponent(shiftId)}/x-report`, {
-        headers,
-      });
+        const res = await fetch(`${API_BASE}/pos/shifts/${encodeURIComponent(shiftId)}/x-report`, {
+          headers,
+        });
       if (res.ok) {
         const raw = await res.json();
         const salesCount = Number(raw.totalSalesCount ?? raw.total_sales_count ?? 0);
@@ -258,8 +261,9 @@ export const posApi = {
           is_blind_close: Boolean(raw.isBlindClose ?? raw.is_blind_close ?? (userRole?.toUpperCase() === 'CASHIER')),
         };
       }
-    } catch {
-      // Offline fallback
+      } catch {
+        // Offline fallback
+      }
     }
 
     // Offline computation from localStorage
@@ -402,42 +406,66 @@ export const posApi = {
     branchId: string,
     payload: CloseShiftPayload,
   ): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE}/pos/shifts/${encodeURIComponent(shiftId)}/close`, {
-        method: 'POST',
-        headers: {
+    const clearShiftFromStorage = (terminalIdHint?: string) => {
+      try {
+        if (terminalIdHint) {
+          localStorage.removeItem(`gebeyaos_shift_${terminalIdHint}`);
+        }
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('gebeyaos_shift_')) {
+            const val = localStorage.getItem(key);
+            if (val && val.includes(shiftId)) {
+              localStorage.removeItem(key);
+            }
+          }
+        }
+      } catch {}
+    };
+
+    if (!shiftId.startsWith('shift-offline-')) {
+      try {
+        const token = localStorage.getItem('gebeyaos_access_token');
+        const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           'x-branch-id': branchId,
           'x-user-id': cashierId,
-        },
-        body: JSON.stringify({
-          closingCashCounted: payload.closing_cash_counted ?? (payload as any).closingCashCounted ?? 0,
-          closing_cash_counted: payload.closing_cash_counted ?? (payload as any).closingCashCounted ?? 0,
-          notes: payload.notes,
-        }),
-      });
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      if (res.ok) {
-        const closed = await res.json();
-        localStorage.removeItem(`gebeyaos_shift_${closed.terminal_id}`);
-        return closed;
-      } else {
-        const err = await res.json().catch(() => ({ message: 'Close shift failed' }));
-        throw new Error(err.message || 'Failed to close shift');
-      }
-    } catch (err: any) {
-      if (err.message && !err.message.includes('fetch')) {
-        throw err;
+        const res = await fetch(`${API_BASE}/pos/shifts/${encodeURIComponent(shiftId)}/close`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            closingCashCounted: payload.closing_cash_counted ?? (payload as any).closingCashCounted ?? 0,
+            closing_cash_counted: payload.closing_cash_counted ?? (payload as any).closingCashCounted ?? 0,
+            notes: payload.notes,
+          }),
+        });
+
+        if (res.ok) {
+          const closed = await res.json();
+          clearShiftFromStorage(closed.terminalId || closed.terminal_id);
+          return closed;
+        } else {
+          const err = await res.json().catch(() => ({ message: 'Close shift failed' }));
+          throw new Error(err.message || 'Failed to close shift');
+        }
+      } catch (err: any) {
+        if (err.message && !err.message.includes('fetch')) {
+          throw err;
+        }
       }
     }
 
-    // Offline close simulation
+    // Offline close simulation (also cleans up legacy shift-offline-* entries)
     const xReport = await this.getXReport(shiftId, 'BRANCH_MANAGER', branchId);
     const expected = xReport.expected_cash || 0;
     const counted = payload.closing_cash_counted;
     const variance = counted - expected;
 
     const zReport = {
+      ...xReport,
       id: shiftId,
       shift_id: shiftId,
       status: 'CLOSED',
@@ -445,13 +473,9 @@ export const posApi = {
       expected_cash: expected,
       cash_variance: variance,
       closed_at: new Date().toISOString(),
-      notes: payload.notes || null,
-      opening_cash_float: xReport.opening_float,
-      total_cash_sales: xReport.cash_sales_amount,
-      total_cash_drops: xReport.total_cash_drops,
-      total_refunds: xReport.total_refunds,
     };
 
+    clearShiftFromStorage();
     localStorage.setItem(`gebeyaos_z_report_${shiftId}`, JSON.stringify(zReport));
     return zReport;
   },
