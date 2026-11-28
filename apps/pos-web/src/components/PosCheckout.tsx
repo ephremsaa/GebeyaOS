@@ -262,8 +262,8 @@ export const PosCheckout: React.FC = () => {
     }
   };
 
-  const handleBarcodeSubmit = () => {
-    const code = searchQuery.trim();
+  const handleBarcodeSubmit = (overrideCode?: string) => {
+    const code = (overrideCode ?? searchQuery).trim();
     if (!code) return;
 
     if (!isShiftOpen) {
@@ -698,11 +698,10 @@ export const PosCheckout: React.FC = () => {
 
           {scanNotice && (
             <div
-              className={`mb-2.5 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shrink-0 animate-in fade-in ${
-                scanNotice.type === 'success'
-                  ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
-                  : 'bg-amber-500/15 border border-amber-500/30 text-amber-300'
-              }`}
+              className={`mb-2.5 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shrink-0 animate-in fade-in ${scanNotice.type === 'success'
+                ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+                : 'bg-amber-500/15 border border-amber-500/30 text-amber-300'
+                }`}
             >
               <span>{scanNotice.text}</span>
               {scanNotice.type === 'success' && (
@@ -730,17 +729,6 @@ export const PosCheckout: React.FC = () => {
                 size="lg"
               />
             </div>
-            <button
-              type="button"
-              onClick={refreshCatalog}
-              disabled={isLoadingCatalog}
-              className="h-[52px] px-3.5 rounded-xl border border-border-subtle bg-surface hover:bg-surface-2 text-text-muted hover:text-text-main transition-colors flex items-center justify-center cursor-pointer shadow-soft"
-              title="Refresh Catalog"
-              aria-label="Refresh"
-            >
-              <RefreshCw size={18} className={isLoadingCatalog ? 'animate-spin text-primary' : ''} />
-            </button>
-          </div>
           <button
             type="button"
             onClick={() => setIsCameraScannerOpen(true)}
@@ -994,38 +982,40 @@ export const PosCheckout: React.FC = () => {
     onAuthorizeOverride={handleAuthorizeExpiredOverride}
   />
 
-      {/* 10. Expired Item Scanner Block Modal with Manager Override */}
-      <ExpiredItemBlockModal
-        isOpen={!!blockedExpiredProduct}
-        product={blockedExpiredProduct}
-        branchId={branchId}
-        onClose={() => setBlockedExpiredProduct(null)}
-        onAuthorizeOverride={handleAuthorizeExpiredOverride}
-      />
+  {/* 10. Expired Item Scanner Block Modal with Manager Override */ }
+  <ExpiredItemBlockModal
+    isOpen={!!blockedExpiredProduct}
+    product={blockedExpiredProduct}
+    branchId={branchId}
+    onClose={() => setBlockedExpiredProduct(null)}
+    onAuthorizeOverride={handleAuthorizeExpiredOverride}
+  />
 
-      {/* 11. Phone Camera Barcode Scanner */}
-      <CameraBarcodeScanner
-        isOpen={isCameraScannerOpen}
-        onClose={() => setIsCameraScannerOpen(false)}
-        onDetected={(code) => handleBarcodeSubmit(code)}
-        title="Scan Item to Basket"
-      />
+  {/* 11. Phone Camera Barcode Scanner */ }
+  <CameraBarcodeScanner
+    isOpen={isCameraScannerOpen}
+    onClose={() => setIsCameraScannerOpen(false)}
+    onDetected={(code) => handleBarcodeSubmit(code)}
+    title="Scan Item to Basket"
+  />
 
-      {/* Mobile Floating View Basket Pill when items are in cart */}
-      {mobilePane === 'catalog' && cart.length > 0 && (
-        <div className="lg:hidden fixed bottom-20 inset-x-4 z-20 pointer-events-none flex justify-center">
-          <button
-            type="button"
-            onClick={() => setMobilePane('basket')}
-            className="pointer-events-auto w-full max-w-sm py-3 px-4 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold text-sm shadow-2xl flex items-center justify-between cursor-pointer active:scale-98 transition-all"
-          >
-            <span>
-              View Basket ({cart.reduce((s, i) => s + (Number.isInteger(i.quantity) ? i.quantity : 1), 0)})
-            </span>
-            <span className="font-mono">{formatCurrency(finalCartTotal)} →</span>
-          </button>
-        </div>
-      )}
-    </div>
+  {/* Mobile Floating View Basket Pill when items are in cart */ }
+  {
+    mobilePane === 'catalog' && cart.length > 0 && (
+      <div className="lg:hidden fixed bottom-20 inset-x-4 z-20 pointer-events-none flex justify-center">
+        <button
+          type="button"
+          onClick={() => setMobilePane('basket')}
+          className="pointer-events-auto w-full max-w-sm py-3 px-4 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold text-sm shadow-2xl flex items-center justify-between cursor-pointer active:scale-98 transition-all"
+        >
+          <span>
+            View Basket ({cart.reduce((s, i) => s + (Number.isInteger(i.quantity) ? i.quantity : 1), 0)})
+          </span>
+          <span className="font-mono">{formatCurrency(finalCartTotal)} →</span>
+        </button>
+      </div>
+    )
+  }
+    </div >
   );
 };
